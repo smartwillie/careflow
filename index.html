@@ -1,0 +1,956 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CareFlow — MED/TELE Charge Nurse</title>
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #f1f5f9; }
+  .nurse-panel { width: 340px; min-width: 280px; flex-shrink: 0; }
+  .room-panel { flex: 1; position: relative; overflow: visible; }
+  .corridor-container { position: relative; width: 100%; height: 100%; }
+
+  /* ── Room card ── */
+  .room-card {
+    position: absolute;
+    width: 66px; height: 52px;
+    border-radius: 8px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 600;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+    user-select: none;
+    z-index: 1;
+    overflow: visible;
+  }
+  .room-card:hover { transform: scale(1.13); z-index: 20; }
+  .room-card.selected { border-color: #f59e0b !important; box-shadow: 0 0 0 3px rgba(245,158,11,0.45); z-index: 10; }
+  .vacant  { background: #2d3f55; border-color: #3d5068; color: #7a91aa; }
+  .female  { background: #f9a8d4; border-color: #ec4899; color: #831843; }
+  .male    { background: #bfdbfe; border-color: #60a5fa; color: #1e3a8a; }
+
+  /* Assign button – hidden until card is hovered */
+  .assign-btn {
+    display: none;
+    position: absolute; top: 2px; right: 2px;
+    width: 15px; height: 15px; border-radius: 4px;
+    background: rgba(15,23,42,0.85); border: 1px solid #475569;
+    color: #94a3b8; font-size: 11px; line-height: 1;
+    cursor: pointer; align-items: center; justify-content: center;
+    z-index: 5;
+  }
+  .room-card:hover .assign-btn { display: flex; }
+
+  /* ── Nurse card ── */
+  .nurse-card {
+    background: #1e293b; border: 2px solid #334155; border-radius: 12px;
+    padding: 10px; margin-bottom: 8px; position: relative;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .nurse-card.drag-over {
+    border-color: #22c55e;
+    box-shadow: 0 0 0 3px rgba(34,197,94,0.25);
+  }
+
+  /* ── Badges ── */
+  .badge {
+    display: inline-flex; align-items: center; gap: 2px;
+    padding: 3px 7px; border-radius: 5px; font-size: 11px; font-weight: 700;
+    cursor: grab; margin: 2px; white-space: nowrap;
+    transition: opacity 0.1s;
+  }
+  .badge:active { cursor: grabbing; opacity: 0.7; }
+  .badge-male   { background: #dbeafe; color: #1d4ed8; border: 1px solid #93c5fd; }
+  .badge-female { background: #fce7f3; color: #9d174d; border: 1px solid #f9a8d4; }
+  .badge-preview {
+    display: inline-flex; align-items: center; gap: 2px;
+    padding: 3px 7px; border-radius: 5px; font-size: 11px; font-weight: 700;
+    margin: 2px; white-space: nowrap;
+    background: rgba(34,197,94,0.12); color: #86efac;
+    border: 1.5px dashed #22c55e; opacity: 0.85;
+    animation: pulse-in 0.2s ease;
+  }
+  @keyframes pulse-in { from { transform: scale(0.85); opacity: 0; } to { transform: scale(1); opacity: 0.85; } }
+
+  /* ── Trash zone ── */
+  .trash-zone {
+    width: 28px; height: 28px; border-radius: 6px;
+    background: #1e293b; border: 1px dashed #475569;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; transition: all 0.15s; cursor: pointer; flex-shrink: 0;
+  }
+  .trash-zone.drag-over { background: #7f1d1d; border-color: #ef4444; }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.72);
+    display: flex; align-items: center; justify-content: center; z-index: 1000;
+    backdrop-filter: blur(2px);
+  }
+  .modal { background: #1e293b; border-radius: 16px; padding: 24px; width: 360px; border: 1px solid #334155; box-shadow: 0 24px 80px rgba(0,0,0,0.5); }
+  .toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 0; border-bottom: 1px solid #334155;
+  }
+  .toggle { width: 40px; height: 22px; border-radius: 11px; background: #334155; position: relative; cursor: pointer; transition: background 0.2s; border: none; flex-shrink: 0; }
+  .toggle.on { background: #22c55e; }
+  .toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: white; transition: transform 0.2s; }
+  .toggle.on::after { transform: translateX(18px); }
+
+  /* ── Toast ── */
+  .warn-toast {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+    background: #7f1d1d; color: #fca5a5; padding: 10px 20px; border-radius: 8px;
+    font-size: 13px; z-index: 2000; border: 1px solid #ef4444; white-space: nowrap;
+    animation: fadeout 3s forwards; box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  }
+  @keyframes fadeout { 0%{opacity:1} 70%{opacity:1} 100%{opacity:0;pointer-events:none} }
+
+  /* ── Misc ── */
+  .corridor-path { fill: none; stroke: #1e3a5f; stroke-width: 1.5; stroke-dasharray: 8 5; opacity: 0.35; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+  .nurse-color-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  input[type=text] {
+    background: #0f172a; border: 1px solid #334155; color: #f1f5f9;
+    border-radius: 6px; padding: 6px 10px; font-size: 13px; width: 100%; outline: none;
+  }
+  input[type=text]:focus { border-color: #3b82f6; }
+  .btn { border-radius: 7px; padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; transition: opacity 0.15s; }
+  .btn:hover { opacity: 0.82; }
+  .btn-primary { background: #3b82f6; color: white; }
+  .btn-ghost   { background: #334155; color: #94a3b8; }
+  .cap-bar  { height: 4px; border-radius: 2px; background: #0f172a; overflow: hidden; margin-top: 4px; }
+  .cap-fill { height: 100%; border-radius: 2px; transition: width 0.35s; }
+  .flag { font-size: 9px; background: rgba(0,0,0,0.35); border-radius: 3px; padding: 1px 3px; margin: 1px; display: inline-block; line-height: 1.3; }
+
+  /* ── Room dropdown (portal, fixed) ── */
+  .room-dropdown {
+    position: fixed; z-index: 9999;
+    background: #1e293b; border: 1px solid #3b4f6a; border-radius: 10px;
+    padding: 4px; min-width: 210px;
+    box-shadow: 0 12px 48px rgba(0,0,0,0.65);
+    animation: dd-in 0.12s ease;
+  }
+  @keyframes dd-in { from { opacity:0; transform: translateY(-4px); } to { opacity:1; transform: translateY(0); } }
+  .dd-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 10px; border-radius: 6px; cursor: pointer;
+    font-size: 12px; color: #cbd5e1; transition: background 0.1s;
+  }
+  .dd-item:hover { background: #334155; }
+  .dd-item.active { background: #1e3a5f; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useRef, useEffect, useMemo } = React;
+
+// ── ROOM GENERATION ───────────────────────────────────────────────────────────
+const DOUBLE_ROOMS = new Set([1110,1111,1129,1130,1131,1132,1133,1134,1135]);
+function generateRooms() {
+  const list = [];
+  for (let n = 1101; n <= 1135; n++) {
+    DOUBLE_ROOMS.has(n) ? list.push(n+'A', n+'B') : list.push(String(n));
+  }
+  return list; // exactly 44
+}
+const ROOM_IDS = generateRooms(); // [1101..1135B]
+
+function initRooms() {
+  return ROOM_IDS.reduce((acc, id) => {
+    acc[id] = { id, occupied: false, gender: 'male', type: 'MEDSURG',
+                foley: false, drip: false, prisoner: false, totalCare: false,
+                glucose: false, highAcuity: false, sitter: false, nurseId: null };
+    return acc;
+  }, {});
+}
+
+const NURSE_COLORS = ['#3b82f6','#22c55e','#f59e0b','#a855f7','#ec4899','#14b8a6','#f97316','#6366f1','#84cc16','#06b6d4'];
+
+const STORAGE_KEY = 'careflow_assignment';
+const DEFAULT_NURSES = [
+  { id:'n1', name:'RN — Smith', color:NURSE_COLORS[0] },
+  { id:'n2', name:'RN — Jones', color:NURSE_COLORS[1] },
+  { id:'n3', name:'RN — Patel', color:NURSE_COLORS[2] },
+];
+
+function loadFromStorage() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || null; }
+  catch(e) { return null; }
+}
+
+function mergeRooms(saved) {
+  const defaults = initRooms();
+  if (!saved) return defaults;
+  const out = {};
+  ROOM_IDS.forEach(id => { out[id] = { ...defaults[id], ...(saved[id] || {}) }; });
+  return out;
+}
+
+// ── ASSIGNMENT RULES ──────────────────────────────────────────────────────────
+function checkAssignment(nurseId, roomIds, allRooms) {
+  const rms = roomIds.map(id => allRooms[id]).filter(Boolean);
+  const hasTele = rms.some(r => r.occupied && r.type === 'TELE');
+  const cap = hasTele ? 4 : 5;
+  const occ = rms.filter(r => r.occupied);
+  if (occ.length > cap) return `Exceeds ${cap}-patient limit (${hasTele?'TELE':'Med/Surg'} group)`;
+  const cnt = k => occ.filter(r => r[k]).length;
+  if (cnt('glucose')    > 2) return 'Exceeds 2 glucose-check patients';
+  if (cnt('totalCare')  > 2) return 'Exceeds 2 total-care patients';
+  if (cnt('prisoner')   > 2) return 'Exceeds 2 prisoner patients';
+  if (cnt('highAcuity') > 2) return 'Exceeds 2 high-acuity patients';
+  if (cnt('drip')       > 2) return 'Exceeds 2 infusion-drip patients';
+  return null;
+}
+
+// ── CORRIDOR POSITIONS (hospital floor plan style) ────────────────────────────
+// 44 rooms: 12 top, 10 right, 12 bottom, 10 left — no overlaps
+const CW = 66, CH = 52;
+function getCorridorPositions(W, H) {
+  const PAD = 14, GAP = 10;
+  const xL = PAD, xR = W - PAD - CW;
+  const yT = PAD, yB = H - PAD - CH;
+  const yMidT = yT + CH + GAP, yMidB = yB - GAP;
+  const pos = [];
+
+  // Top (12): left → right
+  for (let i = 0; i < 12; i++)
+    pos.push({ x: xL + (xR-xL)*i/11, y: yT });
+
+  // Right (10): top → bottom (between corners)
+  for (let i = 0; i < 10; i++)
+    pos.push({ x: xR, y: yMidT + (yMidB-yMidT)*i/9 });
+
+  // Bottom (12): right → left
+  for (let i = 0; i < 12; i++)
+    pos.push({ x: xR - (xR-xL)*i/11, y: yB });
+
+  // Left (10): bottom → top (between corners)
+  for (let i = 0; i < 10; i++)
+    pos.push({ x: xL, y: yMidB - (yMidB-yMidT)*i/9 });
+
+  return pos; // 44 positions
+}
+
+// ── ROOM DROPDOWN (portal) ────────────────────────────────────────────────────
+function RoomDropdown({ room, nurses, nurseRooms, anchor, onAssign, onUnassign, onClose }) {
+  const ref = useRef();
+
+  useEffect(() => {
+    const h = e => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
+    document.addEventListener('mousedown', h, true);
+    return () => document.removeEventListener('mousedown', h, true);
+  }, []);
+
+  // Flip up if near bottom
+  const menuH = nurses.length * 38 + 60;
+  const spaceBelow = window.innerHeight - anchor.bottom;
+  const style = {
+    left: Math.min(anchor.left, window.innerWidth - 220),
+    ...(spaceBelow > menuH
+      ? { top: anchor.bottom + 4 }
+      : { bottom: window.innerHeight - anchor.top + 4 })
+  };
+
+  return ReactDOM.createPortal(
+    <div ref={ref} className="room-dropdown" style={style}>
+      <div style={{ padding:'5px 10px 6px', fontSize:10, color:'#64748b', borderBottom:'1px solid #334155', fontWeight:700, letterSpacing:'0.05em' }}>
+        ASSIGN ROOM {room.id}
+      </div>
+      {nurses.map(n => {
+        const pts = (nurseRooms[n.id]||[]).length;
+        const isMe = room.nurseId === n.id;
+        return (
+          <div key={n.id} className={`dd-item${isMe?' active':''}`}
+            onClick={() => { onAssign(n.id); onClose(); }}>
+            <div style={{ width:8,height:8,borderRadius:'50%',background:n.color,flexShrink:0 }}/>
+            <span style={{ flex:1 }}>{n.name}</span>
+            <span style={{ fontSize:10,color:'#64748b' }}>{pts}pt</span>
+            {isMe && <span style={{ color:'#22c55e',fontSize:11 }}>✓</span>}
+          </div>
+        );
+      })}
+      {room.nurseId && (
+        <div className="dd-item" style={{ color:'#f87171',borderTop:'1px solid #334155',marginTop:2 }}
+          onClick={() => { onUnassign(); onClose(); }}>
+          <span>✕</span><span>Unassign</span>
+        </div>
+      )}
+    </div>,
+    document.body
+  );
+}
+
+// ── ROOM CARD ────────────────────────────────────────────────────────────────
+function RoomCard({ room, pos, selected, nurses, nurseRooms, onSelect, onDragStart, onDblClick, onAssignNurse, onUnassign }) {
+  const [anchor, setAnchor] = useState(null);
+  const cardRef = useRef();
+
+  let cls = 'room-card ';
+  if (!room.occupied) cls += 'vacant';
+  else if (room.gender === 'female') cls += 'female';
+  else cls += 'male';
+  if (selected) cls += ' selected';
+
+  const flags = [];
+  if (room.foley)      flags.push('F');
+  if (room.drip)       flags.push('IV');
+  if (room.prisoner)   flags.push('🔒');
+  if (room.totalCare)  flags.push('TC');
+  if (room.glucose)    flags.push('BG');
+  if (room.highAcuity) flags.push('HA');
+  if (room.sitter)    flags.push('ST');
+
+  function openMenu(e) {
+    e.stopPropagation();
+    if (anchor) { setAnchor(null); return; }
+    setAnchor(cardRef.current.getBoundingClientRect());
+  }
+
+  return (
+    <>
+      <div ref={cardRef} className={cls}
+        style={{ left: pos.x, top: pos.y }}
+        onClick={onSelect}
+        onDoubleClick={onDblClick}
+        draggable={room.occupied}
+        onDragStart={onDragStart}
+        title={`Room ${room.id}${room.occupied ? (room.type==='TELE' ? ' · TELE' : ' · M/S') : ' · Vacant'}`}
+      >
+        {/* Room number + TELE heart */}
+        <div style={{ fontSize:11, fontWeight:700, letterSpacing:'-0.2px', lineHeight:1.1 }}>
+          {room.id}
+          {room.occupied && room.type==='TELE' &&
+            <span style={{ color:'#f87171', marginLeft:2, fontSize:10 }}>♥</span>}
+        </div>
+
+        {/* Flags */}
+        {room.occupied && flags.length > 0 && (
+          <div style={{ display:'flex', flexWrap:'wrap', justifyContent:'center', gap:1, marginTop:2 }}>
+            {flags.slice(0,3).map(f => <span key={f} className="flag">{f}</span>)}
+          </div>
+        )}
+
+        {/* Nurse color dot */}
+        {room.nurseId && room._nurseColor && (
+          <div style={{ width:6,height:6,borderRadius:'50%',background:room._nurseColor,marginTop:2 }}/>
+        )}
+
+        {/* Assign button (visible on hover via CSS) */}
+        {room.occupied && (
+          <button className="assign-btn" onClick={openMenu} title="Assign to nurse">+</button>
+        )}
+      </div>
+
+      {anchor && (
+        <RoomDropdown
+          room={room} nurses={nurses} nurseRooms={nurseRooms}
+          anchor={anchor}
+          onAssign={onAssignNurse}
+          onUnassign={onUnassign}
+          onClose={() => setAnchor(null)}
+        />
+      )}
+    </>
+  );
+}
+
+// ── TOGGLE ────────────────────────────────────────────────────────────────────
+function Toggle({ on, onChange, label, color='#22c55e' }) {
+  return (
+    <div className="toggle-row">
+      <span style={{ fontSize:13, color:'#cbd5e1' }}>{label}</span>
+      <button className={`toggle${on?' on':''}`} style={on?{background:color}:{}} onClick={()=>onChange(!on)}/>
+    </div>
+  );
+}
+
+// ── PATIENT MODAL ─────────────────────────────────────────────────────────────
+function PatientModal({ room, onClose, onSave }) {
+  const [s, setS] = useState({...room});
+  const set = (k,v) => setS(p=>({...p,[k]:v}));
+  return (
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal">
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+          <h2 style={{ margin:0, fontSize:18, fontWeight:700 }}>Room {room.id}</h2>
+          <button className="btn btn-ghost" onClick={onClose}>✕</button>
+        </div>
+
+        <div className="toggle-row">
+          <span style={{ fontSize:13,color:'#cbd5e1' }}>Occupied</span>
+          <button className={`toggle${s.occupied?' on':''}`} onClick={()=>set('occupied',!s.occupied)}/>
+        </div>
+
+        {s.occupied && (<>
+          <div className="toggle-row">
+            <span style={{ fontSize:13,color:'#cbd5e1' }}>Gender</span>
+            <div style={{ display:'flex', gap:6 }}>
+              {['male','female'].map(g=>(
+                <button key={g} className="btn" onClick={()=>set('gender',g)}
+                  style={{ background:s.gender===g?(g==='male'?'#1d4ed8':'#be185d'):'#334155', color:'white', padding:'4px 10px' }}>
+                  {g==='male'?'♂ Male':'♀ Female'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="toggle-row">
+            <span style={{ fontSize:13,color:'#cbd5e1' }}>Type</span>
+            <div style={{ display:'flex', gap:6 }}>
+              {['MEDSURG','TELE'].map(t=>(
+                <button key={t} className="btn" onClick={()=>set('type',t)}
+                  style={{ background:s.type===t?(t==='TELE'?'#dc2626':'#0369a1'):'#334155', color:'white', padding:'4px 10px' }}>
+                  {t==='TELE'?'♥ TELE':'MED/SURG'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <Toggle on={s.foley}      onChange={v=>set('foley',v)}      label="Foley Catheter"  color="#8b5cf6"/>
+          <Toggle on={s.drip}       onChange={v=>set('drip',v)}       label="Infusion Drip"   color="#0891b2"/>
+          <Toggle on={s.prisoner}   onChange={v=>set('prisoner',v)}   label="Prisoner"        color="#b45309"/>
+          <Toggle on={s.totalCare}  onChange={v=>set('totalCare',v)}  label="Total Care"      color="#be123c"/>
+          <Toggle on={s.glucose}    onChange={v=>set('glucose',v)}    label="Glucose Check"   color="#16a34a"/>
+          <Toggle on={s.highAcuity} onChange={v=>set('highAcuity',v)} label="High Acuity"     color="#ea580c"/>
+          <Toggle on={s.sitter}    onChange={v=>set('sitter',v)}    label="Sitter"          color="#7c3aed"/>
+        </>)}
+
+        <div style={{ display:'flex', gap:8, marginTop:16, justifyContent:'flex-end' }}>
+          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" onClick={()=>onSave(s)}>Save</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── WARNING MODAL ─────────────────────────────────────────────────────────────
+function WarningModal({ warning, onOverride, onCancel }) {
+  return (
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onCancel()}>
+      <div className="modal" style={{ maxWidth:400 }}>
+        <div style={{ display:'flex', gap:14, alignItems:'flex-start', marginBottom:14 }}>
+          <span style={{ fontSize:32, lineHeight:1 }}>⚠️</span>
+          <div>
+            <h3 style={{ margin:0, fontSize:16, fontWeight:700, color:'#fbbf24' }}>Assignment Warning</h3>
+            <p style={{ margin:'8px 0 0', fontSize:13, color:'#cbd5e1', lineHeight:1.55 }}>{warning}</p>
+          </div>
+        </div>
+        <p style={{ margin:'0 0 18px', fontSize:12, color:'#64748b' }}>
+          Override this rule and assign anyway?
+        </p>
+        <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
+          <button className="btn btn-ghost" onClick={onCancel}>Cancel</button>
+          <button className="btn" onClick={onOverride}
+            style={{ background:'#d97706', color:'white' }}>
+            Override & Assign
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── NURSE BADGE ───────────────────────────────────────────────────────────────
+function NurseBadge({ room, onDragStart }) {
+  const cls = room.gender==='female' ? 'badge badge-female' : 'badge badge-male';
+  return (
+    <span className={cls} draggable onDragStart={onDragStart}>
+      {room.id}
+      {room.type==='TELE' && <span style={{ color:'#f87171', marginLeft:2 }}>♥</span>}
+    </span>
+  );
+}
+
+// ── NURSE CARD ────────────────────────────────────────────────────────────────
+function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, onRename, onDelete }) {
+  const [dragOver, setDragOver] = useState(false);
+  const [trashOver, setTrashOver] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [nameVal, setNameVal] = useState(nurse.name);
+  const inputRef = useRef();
+
+  useEffect(() => { if (editing && inputRef.current) inputRef.current.focus(); }, [editing]);
+
+  const nurseRms = rooms.map(id=>allRooms[id]).filter(Boolean);
+  const occ = nurseRms.filter(r=>r.occupied);
+  const hasTele = occ.some(r=>r.type==='TELE');
+  const cap = hasTele ? 4 : 5;
+  const pct = Math.min((occ.length/cap)*100, 100);
+  const capColor = pct>=100 ? '#ef4444' : pct>=75 ? '#f59e0b' : '#22c55e';
+
+  const flagDefs = [
+    { key:'glucose',    label:'BG', color:'#16a34a' },
+    { key:'totalCare',  label:'TC', color:'#be123c' },
+    { key:'drip',       label:'IV', color:'#0891b2' },
+    { key:'prisoner',   label:'🔒', color:'#b45309' },
+    { key:'highAcuity', label:'HA', color:'#ea580c' },
+  ];
+
+  // Rooms being dragged that aren't already in this nurse's list
+  const incomingPreview = dragOver
+    ? (previewIds||[]).filter(id => !rooms.includes(id) && allRooms[id]?.occupied)
+    : [];
+
+  return (
+    <div
+      className={`nurse-card${dragOver&&!trashOver?' drag-over':''}`}
+      onDragOver={e=>{ e.preventDefault(); if(!trashOver) setDragOver(true); }}
+      onDragLeave={e=>{ if(!e.currentTarget.contains(e.relatedTarget)) setDragOver(false); }}
+      onDrop={e=>{ e.preventDefault(); setDragOver(false); onDrop(e,false); }}
+    >
+      {/* Header row */}
+      <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
+        <div className="nurse-color-dot" style={{ background:nurse.color }}/>
+        {editing ? (
+          <input ref={inputRef} type="text" value={nameVal}
+            onChange={e=>setNameVal(e.target.value)}
+            onBlur={()=>{ onRename(nameVal); setEditing(false); }}
+            onKeyDown={e=>{ if(e.key==='Enter'){onRename(nameVal);setEditing(false);} }}
+            style={{ flex:1, padding:'2px 6px', fontSize:13 }}
+          />
+        ) : (
+          <span style={{ flex:1, fontWeight:700, fontSize:13, cursor:'text' }}
+            onDoubleClick={()=>{ setNameVal(nurse.name); setEditing(true); }}>
+            {nurse.name}
+          </span>
+        )}
+        <span style={{ fontSize:11, color:'#64748b', fontWeight:600 }}>{occ.length}/{cap}</span>
+        {hasTele && <span style={{ fontSize:10, background:'#7f1d1d', color:'#fca5a5', borderRadius:4, padding:'1px 5px' }}>TELE</span>}
+        {/* Trash */}
+        <div className={`trash-zone${trashOver?' drag-over':''}`}
+          onDragOver={e=>{ e.preventDefault(); e.stopPropagation(); setTrashOver(true); setDragOver(false); }}
+          onDragLeave={()=>setTrashOver(false)}
+          onDrop={e=>{ e.preventDefault(); e.stopPropagation(); setTrashOver(false); setDragOver(false); onDrop(e,true); }}
+          onClick={onDelete}
+          title="Drop room here to remove · Click to delete nurse"
+        >🗑</div>
+      </div>
+
+      {/* Capacity bar */}
+      <div className="cap-bar">
+        <div className="cap-fill" style={{ width:pct+'%', background:capColor }}/>
+      </div>
+
+      {/* Flag pills */}
+      <div style={{ display:'flex', gap:3, marginTop:5, flexWrap:'wrap' }}>
+        {flagDefs.map(f=>{
+          const c = occ.filter(r=>r[f.key]).length;
+          if(!c) return null;
+          return <span key={f.key} style={{ fontSize:9, padding:'1px 5px', borderRadius:4, fontWeight:700,
+            background: c>=2?f.color:'#1e293b', color: c>=2?'white':'#94a3b8', border:`1px solid ${f.color}` }}>
+            {c} {f.label}
+          </span>;
+        })}
+      </div>
+
+      {/* Room badges */}
+      <div style={{ display:'flex', flexWrap:'wrap', marginTop:6, gap:3, minHeight:10 }}>
+        {rooms.map(id=>{
+          const r = allRooms[id];
+          if(!r?.occupied) return null;
+          return (
+            <NurseBadge key={id} room={r}
+              onDragStart={e=>{ e.dataTransfer.setData('badgeRoomId',id); e.dataTransfer.setData('fromNurseId',nurse.id); }}
+            />
+          );
+        })}
+        {/* Drag-over preview badges */}
+        {incomingPreview.map(id=>{
+          const r = allRooms[id];
+          return (
+            <span key={'p'+id} className="badge-preview">
+              {id}{r.type==='TELE'&&<span style={{ color:'#f87171',marginLeft:2 }}>♥</span>}
+            </span>
+          );
+        })}
+      </div>
+
+      {/* Remove all */}
+      {rooms.length>0 && (
+        <button className="btn btn-ghost" onClick={onRemoveAll}
+          style={{ fontSize:10, padding:'2px 8px', marginTop:6, width:'100%' }}>
+          Remove All Rooms
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── LEGEND ────────────────────────────────────────────────────────────────────
+function Legend() {
+  const sw = (bg) => ({ width:10,height:10,borderRadius:3,background:bg,display:'inline-block' });
+  return (
+    <div style={{ padding:'7px 10px', background:'#1e293b', borderRadius:8, fontSize:10, display:'flex', flexWrap:'wrap', gap:'6px 12px', color:'#7a91aa' }}>
+      <span style={{ display:'flex',alignItems:'center',gap:4 }}><span style={sw('#2d3f55')}/>Vacant</span>
+      <span style={{ display:'flex',alignItems:'center',gap:4 }}><span style={sw('#bfdbfe')}/>Male</span>
+      <span style={{ display:'flex',alignItems:'center',gap:4 }}><span style={sw('#f9a8d4')}/>Female</span>
+      <span>♥ TELE</span><span>F=Foley</span><span>IV=Drip</span><span>TC=Total Care</span><span>BG=Glucose</span><span>HA=High Acuity</span>
+    </div>
+  );
+}
+
+// ── CORRIDOR GRID ─────────────────────────────────────────────────────────────
+function CorridorGrid({ allRooms, selected, nurses, nurseRooms, dragPreviewIds, onSelect, onDragStart, onDblClick, onAssignNurse, onUnassign, onClearSelection }) {
+  const ref = useRef();
+  const [dims, setDims] = useState({ w:900, h:580 });
+
+  useEffect(()=>{
+    const obs = new ResizeObserver(entries=>{
+      const {width,height} = entries[0].contentRect;
+      setDims({ w:width, h:height });
+    });
+    if(ref.current) obs.observe(ref.current);
+    return ()=>obs.disconnect();
+  },[]);
+
+  const { w, h } = dims;
+  const positions = getCorridorPositions(w, h);
+
+  // nurse color lookup
+  const nurseColorMap = {};
+  nurses.forEach(n=>(nurseRooms[n.id]||[]).forEach(id=>{ nurseColorMap[id]=n.color; }));
+
+  // SVG corridor outline
+  const PAD=14;
+  const rx=PAD, ry=PAD, rw=w-2*PAD-CW, rh=h-2*PAD-CH;
+
+  return (
+    <div ref={ref} className="corridor-container">
+      {/* Click empty space to clear selection */}
+      <div style={{ position:'absolute', inset:0, zIndex:0 }} onClick={onClearSelection}/>
+      {/* Dashed corridor rectangle */}
+      <svg style={{ position:'absolute',inset:0,width:'100%',height:'100%',pointerEvents:'none' }}>
+        <rect x={rx+CW/2} y={ry+CH/2} width={rw} height={rh} rx={18} ry={18} className="corridor-path"/>
+      </svg>
+
+      {/* Nursing Station center */}
+      <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'none' }}>
+        <div style={{ textAlign:'center', background:'rgba(15,23,42,0.9)', border:'1px solid #1e3a5f', borderRadius:14, padding:'14px 28px' }}>
+          <div style={{ fontSize:22, fontWeight:800, letterSpacing:'-0.5px', color:'#1d4ed8', opacity:0.9 }}>MED/TELE</div>
+          <div style={{ fontSize:11, color:'#475569', marginTop:2 }}>44 Beds</div>
+          <div style={{ fontSize:10, color:'#334155', marginTop:1 }}>Nursing Station</div>
+        </div>
+      </div>
+
+      {/* Room cards */}
+      {ROOM_IDS.map((id,i)=>{
+        const room = {...allRooms[id], _nurseColor: nurseColorMap[id]};
+        return (
+          <RoomCard key={id} room={room} pos={positions[i]}
+            selected={selected.has(id)}
+            nurses={nurses}
+            nurseRooms={nurseRooms}
+            onSelect={e=>onSelect(id,e)}
+            onDragStart={e=>onDragStart(id,e)}
+            onDblClick={()=>onDblClick(id)}
+            onAssignNurse={nid=>onAssignNurse(id,nid)}
+            onUnassign={()=>onUnassign(id)}
+          />
+        );
+      })}
+
+      {/* Hint */}
+      <div style={{ position:'absolute', bottom:8, right:12, fontSize:9, color:'#334155' }}>
+        Double-click to edit · Ctrl+click multi-select · Drag to nurse · hover + to assign
+      </div>
+    </div>
+  );
+}
+
+// ── APP ───────────────────────────────────────────────────────────────────────
+function App() {
+  const _saved = useMemo(loadFromStorage, []);
+  const [rooms, setRooms] = useState(()=>mergeRooms(_saved?.rooms));
+  const [nurses, setNurses] = useState(()=>_saved?.nurses || DEFAULT_NURSES);
+  const [lastSaved, setLastSaved] = useState(()=>_saved?.savedAt || null);
+  const [selected, setSelected] = useState(new Set());
+  const [editingRoom, setEditingRoom] = useState(null);
+  const [toast, setToast] = useState(null);
+  const [newNurseName, setNewNurseName] = useState('');
+  const [dragRoomIds, setDragRoomIds] = useState([]);
+  const [pendingAssignment, setPendingAssignment] = useState(null);
+  const toastRef = useRef();
+  const autoSaveRef = useRef();
+  const colorIdx = useRef(_saved?.nurses?.length ?? DEFAULT_NURSES.length);
+
+  // Auto-save on any rooms/nurses change (debounced)
+  useEffect(()=>{
+    clearTimeout(autoSaveRef.current);
+    autoSaveRef.current = setTimeout(()=>{
+      const savedAt = new Date().toISOString();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ rooms, nurses, savedAt }));
+      setLastSaved(savedAt);
+    }, 800);
+    return ()=>clearTimeout(autoSaveRef.current);
+  }, [rooms, nurses]);
+
+  function showToast(msg) {
+    setToast(msg);
+    clearTimeout(toastRef.current);
+    toastRef.current = setTimeout(()=>setToast(null), 3200);
+  }
+
+  const nurseRooms = useMemo(()=>{
+    const map = {};
+    nurses.forEach(n=>{ map[n.id]=[]; });
+    Object.values(rooms).forEach(r=>{
+      if(r.nurseId && map[r.nurseId]) map[r.nurseId].push(r.id);
+    });
+    return map;
+  }, [rooms, nurses]);
+
+  function selectRoom(id, e) {
+    if(!rooms[id].occupied) return;
+    e.stopPropagation(); // don't bubble to corridor background
+    setSelected(prev=>{
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  // Escape or click on empty corridor space clears selection
+  useEffect(()=>{
+    const h = e => { if(e.key==='Escape') setSelected(new Set()); };
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  }, []);
+
+  function handleRoomDragStart(id, e) {
+    const ids = selected.has(id) ? [...selected] : [id];
+    e.dataTransfer.setData('roomIds', JSON.stringify(ids));
+    e.dataTransfer.effectAllowed = 'move';
+    setDragRoomIds(ids);
+  }
+
+  // Core commit — called immediately or after override confirmation
+  function commitAssign(nurseId, roomIds) {
+    setRooms(prev=>{ const n={...prev}; roomIds.forEach(id=>{n[id]={...n[id],nurseId};}); return n; });
+    setSelected(new Set());
+    setDragRoomIds([]);
+    setPendingAssignment(null);
+  }
+
+  function tryAssign(nurseId, roomIds, onConflictToast) {
+    const cand = [...new Set([...(nurseRooms[nurseId]||[]),...roomIds])];
+    const err = checkAssignment(nurseId, cand, rooms);
+    if(err) {
+      setPendingAssignment({ warning: err, onConfirm: ()=>commitAssign(nurseId, roomIds) });
+    } else {
+      commitAssign(nurseId, roomIds);
+    }
+  }
+
+  function handleDropOnNurse(nurseId, e, toTrash) {
+    const badgeRoomId = e.dataTransfer.getData('badgeRoomId');
+    const fromNurseId = e.dataTransfer.getData('fromNurseId');
+
+    // Badge dragged to trash
+    if(toTrash && badgeRoomId) {
+      setRooms(prev=>({...prev,[badgeRoomId]:{...prev[badgeRoomId],nurseId:null}}));
+      return;
+    }
+    if(toTrash) return;
+
+    // Badge moved between nurse cards
+    if(badgeRoomId && fromNurseId) {
+      if(fromNurseId===nurseId) return;
+      tryAssign(nurseId, [badgeRoomId]);
+      return;
+    }
+
+    // Room cards dragged from grid
+    const rawIds = e.dataTransfer.getData('roomIds');
+    if(!rawIds) return;
+    const ids = JSON.parse(rawIds);
+    const conflicts = [], toAssign = [];
+    for(const id of ids) {
+      const room = rooms[id];
+      if(!room.occupied) continue;
+      if(room.nurseId && room.nurseId!==nurseId) {
+        conflicts.push(`Room ${id} already assigned to ${nurses.find(n=>n.id===room.nurseId)?.name||'another nurse'}`);
+        continue;
+      }
+      toAssign.push(id);
+    }
+    if(conflicts.length) showToast('⚠ '+conflicts.join(' · '));
+    if(!toAssign.length) return;
+    tryAssign(nurseId, toAssign);
+  }
+
+  function assignRoomToNurse(roomId, nurseId) {
+    const room = rooms[roomId];
+    if(!room.occupied) return;
+    if(room.nurseId && room.nurseId!==nurseId) {
+      showToast(`⚠ Room ${roomId} already assigned to ${nurses.find(n=>n.id===room.nurseId)?.name}`);
+      return;
+    }
+    tryAssign(nurseId, [roomId]);
+  }
+
+  function unassignRoom(roomId) {
+    setRooms(prev=>({...prev,[roomId]:{...prev[roomId],nurseId:null}}));
+  }
+
+  function addNurse() {
+    const name = newNurseName.trim() || `RN — Nurse ${nurses.length+1}`;
+    const color = NURSE_COLORS[colorIdx.current % NURSE_COLORS.length];
+    colorIdx.current++;
+    setNurses(prev=>[...prev,{id:'n'+Date.now(),name,color}]);
+    setNewNurseName('');
+  }
+
+  function deleteNurse(nurseId) {
+    if(!confirm(`Delete nurse? Rooms will be unassigned.`)) return;
+    setNurses(prev=>prev.filter(n=>n.id!==nurseId));
+    setRooms(prev=>{ const n={...prev}; Object.keys(n).forEach(id=>{ if(n[id].nurseId===nurseId) n[id]={...n[id],nurseId:null}; }); return n; });
+  }
+
+  function removeAllRooms(nurseId) {
+    setRooms(prev=>{ const n={...prev}; Object.keys(n).forEach(id=>{ if(n[id].nurseId===nurseId) n[id]={...n[id],nurseId:null}; }); return n; });
+  }
+
+  function saveRoom(updated) {
+    setRooms(prev=>({...prev,[updated.id]:updated}));
+    setEditingRoom(null);
+  }
+
+  const totalOcc    = Object.values(rooms).filter(r=>r.occupied).length;
+  const totalAsg    = Object.values(rooms).filter(r=>r.occupied&&r.nurseId).length;
+  const totalTele   = Object.values(rooms).filter(r=>r.occupied&&r.type==='TELE').length;
+  const totalSitter = Object.values(rooms).filter(r=>r.occupied&&r.sitter).length;
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', height:'100vh', overflow:'hidden' }}>
+      {/* ── Header ── */}
+      <div style={{ background:'#0a1628', borderBottom:'1px solid #1e293b', padding:'9px 20px', display:'flex', alignItems:'center', gap:16, flexShrink:0 }}>
+        <div>
+          <span style={{ fontSize:21, fontWeight:800, background:'linear-gradient(90deg,#3b82f6,#22c55e)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>CareFlow</span>
+          <span style={{ fontSize:12, color:'#475569', marginLeft:8 }}>MED/TELE</span>
+        </div>
+        <div style={{ marginLeft:'auto', display:'flex', gap:16, fontSize:11, color:'#64748b', alignItems:'center' }}>
+          <span><b style={{ color:'#64748b' }}>{ROOM_IDS.length - totalOcc}</b> empty</span>
+          <span><b style={{ color:'#f1f5f9' }}>{totalOcc}</b> occupied</span>
+          <span><b style={{ color:'#22c55e' }}>{totalAsg}</b> assigned</span>
+          <span><b style={{ color:'#f59e0b' }}>{totalOcc-totalAsg}</b> unassigned</span>
+          <span style={{ color:'#334155' }}>|</span>
+          <span><b style={{ color:'#f87171' }}>♥ {totalTele}</b> TELE</span>
+          <span><b style={{ color:'#a78bfa' }}>👤 {totalSitter}</b> sitter</span>
+          <span style={{ color:'#334155' }}>|</span>
+          <span>{new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}</span>
+          {lastSaved && (
+            <span style={{ fontSize:10, color:'#22c55e', display:'flex', alignItems:'center', gap:4 }}>
+              ✓ saved {new Date(lastSaved).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}
+            </span>
+          )}
+          <button className="btn btn-ghost" onClick={()=>{
+            setRooms(prev=>{
+              const next={};
+              Object.keys(prev).forEach(id=>{
+                next[id]={...prev[id], occupied:true, gender:'female', type:'TELE',
+                  foley:false, drip:false, prisoner:false, totalCare:false, glucose:false, highAcuity:false, nurseId:null};
+              });
+              return next;
+            });
+            setSelected(new Set());
+          }} style={{ fontSize:11, padding:'4px 12px', border:'1px solid #334155' }}>
+            ↺ Reset
+          </button>
+        </div>
+      </div>
+
+      {/* ── Main ── */}
+      <div style={{ display:'flex', flex:1, overflow:'hidden' }}>
+        {/* Nurse panel */}
+        <div className="nurse-panel" style={{ background:'#0a1628', borderRight:'1px solid #1e293b', display:'flex', flexDirection:'column', overflow:'hidden' }}>
+          <div style={{ padding:'12px 12px 8px', borderBottom:'1px solid #1e293b' }}>
+            <div style={{ fontSize:11, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:8, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <span>Nursing Staff</span>
+              <span style={{ background:'#334155', color:'#94a3b8', borderRadius:10, padding:'1px 8px', fontSize:11, fontWeight:700, letterSpacing:0 }}>{nurses.length}</span>
+            </div>
+            <div style={{ display:'flex', gap:6 }}>
+              <input type="text" placeholder="Add nurse name…" value={newNurseName}
+                onChange={e=>setNewNurseName(e.target.value)}
+                onKeyDown={e=>e.key==='Enter'&&addNurse()}
+                style={{ flex:1, fontSize:12 }}
+              />
+              <button className="btn btn-primary" onClick={addNurse} style={{ whiteSpace:'nowrap' }}>+ Add</button>
+            </div>
+          </div>
+
+          {selected.size>0 && (
+            <div style={{ padding:'6px 12px', background:'#1c2a3a', borderBottom:'1px solid #1e3a5f', fontSize:11, color:'#93c5fd', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+              <span>🔵 {selected.size} room{selected.size>1?'s':''} selected — drag to a nurse</span>
+              <button className="btn btn-ghost" onClick={()=>setSelected(new Set())} style={{ fontSize:10, padding:'2px 8px' }}>Clear</button>
+            </div>
+          )}
+
+          <div style={{ flex:1, overflowY:'auto', padding:12 }}>
+            {nurses.length===0 && (
+              <div style={{ textAlign:'center', color:'#475569', fontSize:13, marginTop:40 }}>No nurses added yet</div>
+            )}
+            {nurses.map(nurse=>(
+              <NurseCard key={nurse.id} nurse={nurse}
+                rooms={nurseRooms[nurse.id]||[]}
+                allRooms={rooms}
+                previewIds={dragRoomIds}
+                onRemoveAll={()=>removeAllRooms(nurse.id)}
+                onDrop={(e,trash)=>handleDropOnNurse(nurse.id,e,trash)}
+                onRename={name=>setNurses(prev=>prev.map(n=>n.id===nurse.id?{...n,name}:n))}
+                onDelete={()=>deleteNurse(nurse.id)}
+              />
+            ))}
+          </div>
+
+          <div style={{ padding:8, borderTop:'1px solid #1e293b' }}>
+            <Legend/>
+          </div>
+        </div>
+
+        {/* Room grid */}
+        <div className="room-panel" style={{ background:'#080f1d' }}>
+          <CorridorGrid
+            allRooms={rooms}
+            selected={selected}
+            nurses={nurses}
+            nurseRooms={nurseRooms}
+            dragPreviewIds={dragRoomIds}
+            onSelect={selectRoom}
+            onDragStart={handleRoomDragStart}
+            onDblClick={id=>setEditingRoom(rooms[id])}
+            onAssignNurse={assignRoomToNurse}
+            onUnassign={unassignRoom}
+            onClearSelection={()=>setSelected(new Set())}
+          />
+        </div>
+      </div>
+
+      {editingRoom && <PatientModal room={editingRoom} onClose={()=>setEditingRoom(null)} onSave={saveRoom}/>}
+      {pendingAssignment && (
+        <WarningModal
+          warning={pendingAssignment.warning}
+          onOverride={pendingAssignment.onConfirm}
+          onCancel={()=>setPendingAssignment(null)}
+        />
+      )}
+      {toast && <div className="warn-toast">{toast}</div>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
