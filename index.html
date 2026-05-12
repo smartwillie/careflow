@@ -435,6 +435,57 @@ function PatientModal({ room, onClose, onSave }) {
   );
 }
 
+// ── UNASSIGNED ROOMS POPUP ────────────────────────────────────────────────────
+function UnassignedPopup({ rooms, onClose }) {
+  return (
+    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal" style={{ width:440, maxHeight:'72vh', display:'flex', flexDirection:'column' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+          <div>
+            <h2 style={{ margin:0, fontSize:16, fontWeight:700 }}>Unassigned Rooms</h2>
+            <p style={{ margin:'2px 0 0', fontSize:11, color:'#64748b' }}>
+              {rooms.length} occupied {rooms.length===1?'room':'rooms'} without a nurse
+            </p>
+          </div>
+          <button className="btn btn-ghost" onClick={onClose}>✕</button>
+        </div>
+
+        <div style={{ overflowY:'auto', flex:1 }}>
+          {rooms.length===0 ? (
+            <div style={{ textAlign:'center', padding:'28px 0', color:'#22c55e', fontSize:14, fontWeight:600 }}>
+              ✓ All occupied rooms are assigned!
+            </div>
+          ) : (
+            <div style={{ display:'flex', flexWrap:'wrap', gap:8, padding:'4px 2px' }}>
+              {rooms.map(r=>(
+                <div key={r.id} style={{
+                  padding:'8px 14px', borderRadius:8, fontSize:13, fontWeight:700,
+                  display:'flex', alignItems:'center', gap:5,
+                  background: r.gender==='female' ? '#fce7f3' : '#dbeafe',
+                  color:       r.gender==='female' ? '#9d174d'  : '#1d4ed8',
+                  border:`1.5px solid ${r.gender==='female'?'#f9a8d4':'#93c5fd'}`,
+                }}>
+                  {r.id}
+                  {r.type==='TELE' && <span style={{ color:'#f87171' }}>♥</span>}
+                  {r.sitter && <span style={{ fontSize:10, color:'#7c3aed' }}>ST</span>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {rooms.length>0 && (
+          <div style={{ marginTop:14, paddingTop:12, borderTop:'1px solid #334155', display:'flex', gap:10, fontSize:11, color:'#64748b' }}>
+            <span>♥ = TELE</span>
+            <span style={{ background:'#fce7f3', color:'#9d174d', padding:'1px 7px', borderRadius:4 }}>Pink = Female</span>
+            <span style={{ background:'#dbeafe', color:'#1d4ed8', padding:'1px 7px', borderRadius:4 }}>Blue = Male</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── WARNING MODAL ─────────────────────────────────────────────────────────────
 function WarningModal({ warning, onOverride, onCancel }) {
   return (
@@ -827,8 +878,10 @@ function App() {
     setEditingRoom(null);
   }
 
+  const [showUnassigned, setShowUnassigned] = useState(false);
   const totalOcc    = Object.values(rooms).filter(r=>r.occupied).length;
   const totalAsg    = Object.values(rooms).filter(r=>r.occupied&&r.nurseId).length;
+  const unassignedRooms = Object.values(rooms).filter(r=>r.occupied&&!r.nurseId);
   const totalTele   = Object.values(rooms).filter(r=>r.occupied&&r.type==='TELE').length;
   const totalSitter = Object.values(rooms).filter(r=>r.occupied&&r.sitter).length;
 
@@ -844,7 +897,11 @@ function App() {
           <span><b style={{ color:'#64748b' }}>{ROOM_IDS.length - totalOcc}</b> empty</span>
           <span><b style={{ color:'#f1f5f9' }}>{totalOcc}</b> occupied</span>
           <span><b style={{ color:'#22c55e' }}>{totalAsg}</b> assigned</span>
-          <span><b style={{ color:'#f59e0b' }}>{totalOcc-totalAsg}</b> unassigned</span>
+          <span onClick={()=>setShowUnassigned(true)}
+            style={{ cursor:'pointer', borderBottom:'1px dashed #f59e0b', paddingBottom:1 }}
+            title="Click to see unassigned rooms">
+            <b style={{ color:'#f59e0b' }}>{totalOcc-totalAsg}</b> unassigned
+          </span>
           <span style={{ color:'#334155' }}>|</span>
           <span><b style={{ color:'#f87171' }}>♥ {totalTele}</b> TELE</span>
           <span><b style={{ color:'#a78bfa' }}>👤 {totalSitter}</b> sitter</span>
@@ -937,6 +994,7 @@ function App() {
         </div>
       </div>
 
+      {showUnassigned && <UnassignedPopup rooms={unassignedRooms} onClose={()=>setShowUnassigned(false)}/>}
       {editingRoom && <PatientModal room={editingRoom} onClose={()=>setEditingRoom(null)} onSave={saveRoom}/>}
       {pendingAssignment && (
         <WarningModal
