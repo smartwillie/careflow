@@ -323,38 +323,44 @@
     0%,100% { opacity: 0.75; }
     50%     { opacity: 0.95; }
   }
-  /* Stat cell hover */
-  .stat-cell { transition: background 0.15s, transform 0.12s; }
-  .stat-cell:hover { transform: scale(1.04); }
-
-  /* ── Liquid grass dashboard background ── */
-  .dash-liquid {
-    background: linear-gradient(125deg,
-      #03260e 0%,
-      #04471a 10%,
-      #065f35 20%,
-      #0a7c45 30%,
-      #0d9955 38%,
-      #12b566 46%,
-      #1dcc76 54%,
-      #3de88e 60%,
-      #83f5b8 66%,
-      #c2fde0 70%,
-      #5ee8a4 76%,
-      #18c46a 82%,
-      #0a8a48 88%,
-      #055229 94%,
-      #03260e 100%
-    ) !important;
-    background-size: 400% 400% !important;
-    animation: liquid-grass 9s ease-in-out infinite !important;
+  /* ── Car cockpit dashboard background ── */
+  .dash-cockpit {
+    background: radial-gradient(ellipse 140% 90% at 50% -5%,
+      #1c1c2e 0%, #10101c 45%, #070710 100%) !important;
   }
-  @keyframes liquid-grass {
-    0%   { background-position:   0%   0%; }
-    25%  { background-position: 100%  30%; }
-    50%  { background-position:  60% 100%; }
-    75%  { background-position:   0%  70%; }
-    100% { background-position:   0%   0%; }
+
+  /* ── Dashboard stat tiles — recessed car-button look ── */
+  .dash-tile {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 5px; padding: 9px 6px; border-radius: 8px;
+    flex: 1 1 0; min-width: 0;
+    background: linear-gradient(168deg, #21213a 0%, #13131f 100%);
+    border-top:    1px solid rgba(255,255,255,0.09);
+    border-left:   1px solid rgba(255,255,255,0.05);
+    border-right:  1px solid rgba(0,0,0,0.4);
+    border-bottom: 1px solid rgba(0,0,0,0.55);
+    box-shadow:
+      inset 0 3px 10px rgba(0,0,0,0.70),
+      inset 0 1px 0   rgba(255,255,255,0.04),
+      0 1px 0         rgba(255,255,255,0.03);
+    transition: background 0.12s, box-shadow 0.12s, transform 0.08s;
+  }
+  .dash-tile-btn { cursor: pointer; }
+  .dash-tile-btn:hover {
+    background: linear-gradient(168deg, #28283e 0%, #18182a 100%);
+    box-shadow:
+      inset 0 3px 10px rgba(0,0,0,0.55),
+      inset 0 1px 0   rgba(255,255,255,0.07),
+      0 1px 0         rgba(255,255,255,0.03);
+  }
+  .dash-tile-btn:active { transform: scale(0.95); }
+  .dash-tile-active {
+    border-top-color:  rgba(251,191,36,0.35);
+    border-left-color: rgba(251,191,36,0.18);
+    box-shadow:
+      inset 0 3px 10px rgba(0,0,0,0.55),
+      0 0 10px rgba(251,191,36,0.15);
   }
 
   /* ── Zap Assign button ── */
@@ -1082,50 +1088,44 @@ function Legend() {
 }
 
 // ── CENTER DASHBOARD ─────────────────────────────────────────────────────────
-function StatCell({ icon, value, label, color, iconColor, btnRef }) {
+// Unified car-dashboard tile: same shape for all stats.
+// Pass onClick to make it interactive (unassigned dropdown trigger).
+function DashTile({ icon, value, label, color, onClick, active, btnRef }) {
+  const isBtn = !!onClick;
   return (
-    <div ref={btnRef}
-      className="stat-cell"
-      style={{
-        display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
-        gap:4, padding:'8px 6px', borderRadius:10, flex:'1 1 0', minWidth:0,
-        background:'rgba(0,0,0,0.28)',
-        border:'1.5px solid rgba(255,255,255,0.12)',
-        backdropFilter:'blur(4px)',
-      }}>
-      <div style={{ fontSize:15, lineHeight:1, color: iconColor || 'rgba(255,255,255,0.7)' }}>{icon}</div>
-      <div style={{ textAlign:'center' }}>
-        <div style={{ fontSize:20, fontWeight:800, color, lineHeight:1 }}>{value}</div>
-        <div style={{ fontSize:10, color:'rgba(255,255,255,0.55)', fontWeight:600,
-          letterSpacing:'0.05em', textTransform:'uppercase', marginTop:3 }}>{label}</div>
-      </div>
-    </div>
-  );
-}
-
-// The unassigned cell is a distinct interactive button — larger, amber-accented
-function UnassignedCell({ value, onClick, active, btnRef }) {
-  return (
-    <div ref={btnRef} onClick={onClick}
-      className="stat-cell"
-      style={{
-        display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
-        gap:3, padding:'8px 10px', borderRadius:10, flex:'1 1 0', minWidth:0,
-        cursor:'pointer',
-        background: active ? 'rgba(251,191,36,0.22)' : 'rgba(251,191,36,0.10)',
-        border:`1.5px solid ${active ? '#fbbf24' : 'rgba(251,191,36,0.45)'}`,
-        backdropFilter:'blur(4px)',
-        boxShadow: value > 0 ? '0 0 10px rgba(251,191,36,0.20)' : 'none',
-      }}>
-      <div style={{ fontSize:15, lineHeight:1 }}>⚠</div>
-      <div style={{ textAlign:'center' }}>
-        <div style={{ fontSize:20, fontWeight:900, color:'#fbbf24', lineHeight:1 }}>{value}</div>
-        <div style={{ fontSize:10, color:'rgba(251,191,36,0.80)', fontWeight:700,
-          letterSpacing:'0.05em', textTransform:'uppercase', marginTop:3 }}>Unassigned</div>
-      </div>
-      <span style={{ fontSize:10, color:'#fbbf24', opacity: active ? 1 : 0.5,
-        transform: active ? 'rotate(180deg)' : 'none',
-        transition:'transform 0.2s', lineHeight:1, marginTop:1 }}>▾</span>
+    <div
+      ref={btnRef}
+      onClick={onClick}
+      className={`dash-tile${isBtn ? ' dash-tile-btn' : ''}${active ? ' dash-tile-active' : ''}`}
+    >
+      {/* Indicator dot — like a dashboard warning light */}
+      <div style={{
+        width:5, height:5, borderRadius:'50%',
+        background: color,
+        boxShadow: `0 0 6px ${color}`,
+        opacity: 0.75,
+      }} />
+      {/* Value — LED-style glow */}
+      <div style={{
+        fontSize:22, fontWeight:900, color, lineHeight:1,
+        textShadow: `0 0 10px ${color}55, 0 0 20px ${color}22`,
+        letterSpacing:'-0.5px',
+      }}>{value}</div>
+      {/* Label */}
+      <div style={{
+        fontSize:9, fontWeight:700, letterSpacing:'0.07em',
+        textTransform:'uppercase', color:'rgba(255,255,255,0.35)',
+        lineHeight:1,
+      }}>{label}</div>
+      {/* Chevron for dropdown tiles */}
+      {isBtn && (
+        <div style={{
+          fontSize:8, color, lineHeight:1, marginTop:1,
+          opacity: active ? 0.9 : 0.35,
+          transform: active ? 'rotate(180deg)' : 'none',
+          transition:'transform 0.2s, opacity 0.2s',
+        }}>▾</div>
+      )}
     </div>
   );
 }
@@ -1167,40 +1167,56 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
   }
 
   return (
-    <div className="dash-card dash-liquid" style={{
-      padding:'16px 18px',
-      boxShadow: `
-        inset 0 1px 0 rgba(255,255,255,0.12),
-        inset 0 -1px 0 rgba(0,0,0,0.30),
-        0 4px 8px rgba(0,0,0,0.40),
-        0 12px 28px rgba(0,0,0,0.45),
-        0 28px 56px rgba(0,0,0,0.32)`,
+    <div className="dash-card dash-cockpit" style={{
+      padding:'14px 16px',
+      boxShadow:`
+        inset 0 1px 0 rgba(255,255,255,0.07),
+        inset 0 -1px 0 rgba(0,0,0,0.5),
+        0 4px 12px rgba(0,0,0,0.5),
+        0 16px 36px rgba(0,0,0,0.55),
+        0 32px 64px rgba(0,0,0,0.35)`,
     }}>
-      {/* Animated title */}
-      <div style={{ textAlign:'center', marginBottom:14, paddingBottom:12, borderBottom:'1px solid rgba(255,255,255,0.12)' }}>
-        <div style={{ fontSize:18, fontWeight:800, letterSpacing:'-0.5px', lineHeight:1.1 }}>
-          <span className="dash-title">CareFlow MED/TELE</span>
+
+      {/* ── Header ── */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+        marginBottom:12, paddingBottom:10, borderBottom:'1px solid rgba(255,255,255,0.07)' }}>
+        <div>
+          <div style={{ fontSize:16, fontWeight:800, letterSpacing:'-0.5px', lineHeight:1.1 }}>
+            <span className="dash-title">CareFlow MED/TELE</span>
+          </div>
+          <div className="dash-sub" style={{ fontSize:8.5, color:'rgba(255,255,255,0.40)',
+            marginTop:3, fontWeight:600, letterSpacing:'0.06em', fontStyle:'italic' }}>
+            Fueled by caffeine. Driven by a crazy brain.
+          </div>
         </div>
-        <div className="dash-sub" style={{ fontSize:10, color:'rgba(255,255,255,0.75)', marginTop:5, fontWeight:700, letterSpacing:'0.18em', textTransform:'uppercase' }}>
-          Fueled by caffeine. Driven by a crazy brain.
+        {/* Cluster badge */}
+        <div style={{ textAlign:'right', lineHeight:1.3 }}>
+          <div style={{ fontSize:8, fontWeight:700, color:'rgba(255,255,255,0.25)',
+            letterSpacing:'0.12em', textTransform:'uppercase' }}>Unit</div>
+          <div style={{ fontSize:11, fontWeight:800, color:'rgba(255,255,255,0.55)',
+            letterSpacing:'0.04em' }}>MED/TELE</div>
+          <div style={{ fontSize:8, color:'rgba(255,255,255,0.22)', letterSpacing:'0.06em' }}>44 beds</div>
         </div>
       </div>
 
-      {/* Row 1: bed status — alignItems:stretch keeps all 4 cells same height */}
-      <div style={{ display:'flex', gap:4, alignItems:'stretch' }}>
-        <StatCell icon="🛏" value={vacant}    label="Empty"    color="rgba(255,255,255,0.85)" />
-        <StatCell icon="👥" value={occupied}  label="Occupied" color="#fff" />
-        <StatCell icon="✓"  value={assigned}  label="Assigned" color="#86efac" />
-        <UnassignedCell value={unassigned}
+      {/* ── Row 1: bed census ── */}
+      <div style={{ display:'flex', gap:3, alignItems:'stretch' }}>
+        <DashTile value={vacant}    label="Empty"      color="#94a3b8" />
+        <DashTile value={occupied}  label="Occupied"   color="#e2e8f0" />
+        <DashTile value={assigned}  label="Assigned"   color="#4ade80" />
+        <DashTile value={unassigned} label="Unassigned" color="#fbbf24"
           onClick={onUnassignedClick} active={unassignedOpen} btnRef={unassignedBtnRef} />
       </div>
 
-      {/* Row 2: room flags */}
-      <div style={{ display:'flex', gap:4, marginTop:4, alignItems:'stretch' }}>
-        <StatCell icon="♥"  value={tele}      label="TELE"      color="#fca5a5" iconColor="#fca5a5" />
-        <StatCell icon="👤" value={sitter}     label="Sitter"    color="#c4b5fd" />
-        <StatCell icon="📤" value={discharge} label="Discharge" color="#7dd3fc" />
-        <StatCell icon="🧤" value={isolation} label="Isolation" color="#fdba74" />
+      {/* ── Divider ── */}
+      <div style={{ height:1, background:'rgba(255,255,255,0.05)', margin:'6px 0' }} />
+
+      {/* ── Row 2: room flags ── */}
+      <div style={{ display:'flex', gap:3, alignItems:'stretch' }}>
+        <DashTile value={tele}      label="TELE"       color="#f87171" />
+        <DashTile value={sitter}    label="Sitter"     color="#a78bfa" />
+        <DashTile value={discharge} label="Discharge"  color="#38bdf8" />
+        <DashTile value={isolation} label="Isolation"  color="#fb923c" />
       </div>
 
       {/* Zap Assign button */}
