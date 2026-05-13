@@ -276,14 +276,19 @@
     border-radius: 20px;
     transition: background 0.25s;
   }
-  /* Animated gradient border via ::before */
+  /* Animated gradient border via ::before — soft, muted tones */
   .dash-card::before {
     content: '';
-    position: absolute; inset: -2.5px;
-    border-radius: 22.5px;
-    background: linear-gradient(135deg, #3b82f6, #22c55e, #a855f7, #f59e0b, #3b82f6);
+    position: absolute; inset: -2px;
+    border-radius: 22px;
+    background: linear-gradient(135deg,
+      rgba(96,165,250,0.55),
+      rgba(52,211,153,0.50),
+      rgba(167,139,250,0.45),
+      rgba(96,165,250,0.55)
+    );
     background-size: 300% 300%;
-    animation: grad-border 5s ease infinite;
+    animation: grad-border 7s ease infinite;
     z-index: -1;
   }
   @keyframes grad-border {
@@ -291,26 +296,26 @@
     50%  { background-position: 100% 50%; }
     100% { background-position: 0%   50%; }
   }
-  /* Animated shimmer title */
+  /* Animated shimmer title — clean blue-to-cyan-to-teal */
   .dash-title {
-    background: linear-gradient(90deg, #3b82f6, #22c55e, #a855f7, #f59e0b, #3b82f6);
+    background: linear-gradient(90deg, #60a5fa, #34d399, #818cf8, #60a5fa);
     background-size: 300% 100%;
     -webkit-background-clip: text; background-clip: text;
     -webkit-text-fill-color: transparent; color: transparent;
-    animation: title-shimmer 4s linear infinite;
+    animation: title-shimmer 5s linear infinite;
     display: inline-block;
   }
   @keyframes title-shimmer {
     0%   { background-position:   0% 50%; }
     100% { background-position: 300% 50%; }
   }
-  /* Subtle pulse on subtitle */
+  /* Subtle pulse on subtitle — stays more visible */
   .dash-sub {
-    animation: sub-pulse 4s ease-in-out infinite;
+    animation: sub-pulse 5s ease-in-out infinite;
   }
   @keyframes sub-pulse {
-    0%,100% { opacity: 0.55; }
-    50%     { opacity: 0.90; }
+    0%,100% { opacity: 0.75; }
+    50%     { opacity: 0.95; }
   }
   /* Stat cell hover */
   .stat-cell { transition: background 0.15s, transform 0.12s; }
@@ -550,12 +555,12 @@ function RoomCard({ room, pos, cw, ch, selected, nurses, nurseRooms, onSelect, o
         onDragStart={onDragStart}
         title={`Room ${room.id}${room.occupied ? (room.type==='TELE' ? ' · TELE' : ' · M/S') : ' · Vacant'}`}
       >
-        {/* Assigned checkmark badge */}
-        {room.nurseId && room._nurseColor && (
+        {/* Assigned checkmark badge — always green */}
+        {room.nurseId && (
           <div style={{
             position:'absolute', top:-7, right:-7,
             width:17, height:17, borderRadius:'50%',
-            background: room._nurseColor,
+            background: '#22c55e',
             border:'2px solid var(--bg-base)',
             display:'flex', alignItems:'center', justifyContent:'center',
             fontSize:10, fontWeight:900, color:'white', lineHeight:1,
@@ -993,7 +998,7 @@ function StatCell({ icon, value, label, color, onClick, active, btnRef }) {
       <div style={{ fontSize:18, lineHeight:1, flexShrink:0 }}>{icon}</div>
       <div>
         <div style={{ fontSize:22, fontWeight:800, color, lineHeight:1 }}>{value}</div>
-        <div style={{ fontSize:9, color:'var(--text-4)', fontWeight:700,
+        <div style={{ fontSize:9, color:'var(--text-3)', fontWeight:700,
           letterSpacing:'0.07em', textTransform:'uppercase', marginTop:2 }}>{label}</div>
       </div>
     </div>
@@ -1019,14 +1024,14 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
         <div style={{ fontSize:18, fontWeight:800, letterSpacing:'-0.5px', lineHeight:1.1 }}>
           <span className="dash-title">CareFlow MED/TELE</span>
         </div>
-        <div className="dash-sub" style={{ fontSize:10, color:'var(--text-4)', marginTop:5, fontWeight:600, letterSpacing:'0.04em' }}>
+        <div className="dash-sub" style={{ fontSize:10, color:'var(--text-2)', marginTop:5, fontWeight:600, letterSpacing:'0.04em' }}>
           44 Beds · Nursing Station
         </div>
       </div>
 
       {/* 2×4 stats grid */}
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:5 }}>
-        <StatCell icon="🛏" value={vacant}     label="empty"      color="var(--text-3)" />
+        <StatCell icon="🛏" value={vacant}     label="empty"      color="var(--text-2)" />
         <StatCell icon="👥" value={occupied}   label="occupied"   color="var(--text-1)" />
         <StatCell icon="✓"  value={assigned}   label="assigned"   color="#22c55e" />
         <StatCell icon="⚠"  value={unassigned} label="unassigned" color="#f59e0b"
