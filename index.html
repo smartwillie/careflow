@@ -1172,22 +1172,22 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
       {/* ── Header ── */}
       <div style={{ marginBottom:14, paddingBottom:12, borderBottom:'1px solid rgba(0,0,0,0.15)' }}>
         <div style={{ fontSize:26, fontWeight:900, letterSpacing:'-0.5px', lineHeight:1.15,
-          color:'#000', fontStyle:'italic' }}>
+          color:'#ea580c', fontStyle:'italic' }}>
           Fueled by caffeine.<br/>Driven by a crazy brain.
         </div>
       </div>
 
       {/* ── Single row: all 8 stats ── */}
       <div style={{ display:'flex', gap:3, alignItems:'stretch' }}>
-        <DashTile value={vacant}     label="Empty"      color="#fff" />
-        <DashTile value={occupied}   label="Occupied"   color="#fff" />
-        <DashTile value={assigned}   label="Assigned"   color="#bbf7d0" />
-        <DashTile value={unassigned} label="Unassigned" color="#fef08a"
+        <DashTile value={vacant}     label="Empty"      color="#f97316" />
+        <DashTile value={occupied}   label="Occupied"   color="#f97316" />
+        <DashTile value={assigned}   label="Assigned"   color="#f97316" />
+        <DashTile value={unassigned} label="Unassigned" color="#f97316"
           onClick={onUnassignedClick} active={unassignedOpen} btnRef={unassignedBtnRef} />
-        <DashTile value={tele}       label="TELE"       color="#fecaca" />
-        <DashTile value={sitter}     label="Sitter"     color="#e9d5ff" />
-        <DashTile value={discharge}  label="Discharge"  color="#bae6fd" />
-        <DashTile value={isolation}  label="Isolation"  color="#fed7aa" />
+        <DashTile value={tele}       label="TELE"       color="#f97316" />
+        <DashTile value={sitter}     label="Sitter"     color="#f97316" />
+        <DashTile value={discharge}  label="Discharge"  color="#f97316" />
+        <DashTile value={isolation}  label="Isolation"  color="#f97316" />
       </div>
 
       {/* Zap Assign button */}
