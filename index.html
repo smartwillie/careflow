@@ -332,7 +332,7 @@
     position: absolute;
     top: 4px;
     left: -50px;
-    animation: rabbit-run 60s linear infinite;
+    animation: rabbit-run 5s linear infinite;
   }
   .rabbit-emoji {
     display: inline-block;
@@ -343,10 +343,10 @@
     transform-origin: center bottom;
   }
   @keyframes rabbit-run {
-    0%     { left: -50px; }                  /* start of run */
-    7.5%   { left: calc(100% + 30px); }      /* finished crossing (~4.5s) */
-    7.51%  { left: -50px; }                  /* snap back off-screen */
-    100%   { left: -50px; }                  /* wait hidden until next minute */
+    0%    { left: -50px; }              /* start of run */
+    20%   { left: calc(100% + 30px); } /* finished crossing (~1s) */
+    20.1% { left: -50px; }             /* snap back off-screen */
+    100%  { left: -50px; }             /* wait hidden for remaining ~4s */
   }
   @keyframes rabbit-bob {
     0%, 100% { transform: scaleX(-1) translateY(0px)   scaleY(1);    }
