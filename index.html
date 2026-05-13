@@ -1471,6 +1471,13 @@ function App() {
       try {
         const N = nurses.length;
 
+        // ── Acuity point value per room ──────────────────────────────────
+        // highAcuity=2, isolation=2, totalCare=2
+        // Soft cap: 4 pts/nurse  |  Hard cap: 6 pts/nurse
+        function roomAcuityPts(r) {
+          return (r.highAcuity ? 2 : 0) + (r.isolation ? 2 : 0) + (r.totalCare ? 2 : 0);
+        }
+
         // Nurse state: track current + newly assigned rooms this run
         // Randomise nurse order so each run picks a different starting distribution
         const shuffledNurses = [...nurses].sort(() => Math.random() - 0.5);
@@ -1479,53 +1486,70 @@ function App() {
           const existing = (nurseRooms[n.id] || []).filter(id => rooms[id]?.occupied);
           ns[n.id] = {
             nurse: n,
-            rooms: [...existing],
-            teleCount: existing.filter(id => rooms[id]?.type === 'TELE').length,
-            haCount:   existing.filter(id => rooms[id]?.highAcuity).length,
+            rooms:          [...existing],
+            teleCount:      existing.filter(id => rooms[id]?.type === 'TELE').length,
+            haCount:        existing.filter(id => rooms[id]?.highAcuity).length,
+            acuityPts:      existing.reduce((s, id) => s + roomAcuityPts(rooms[id] || {}), 0),
+            isolationCount: existing.filter(id => rooms[id]?.isolation).length,
+            totalCareCount: existing.filter(id => rooms[id]?.totalCare).length,
           };
         });
 
-        // Sort rooms to assign: HA first (hardest constraint), TELE next, rest random
+        // Sort rooms: heaviest acuity first (hardest to place → assign early)
         const toAssign = [...unassigned].sort((a, b) => {
-          if (a.highAcuity !== b.highAcuity) return b.highAcuity ? 1 : -1;
-          if ((a.type==='TELE') !== (b.type==='TELE')) return a.type==='TELE' ? -1 : 1;
-          return Math.random() - 0.5;
+          const wa = (a.isolation?4:0)+(a.highAcuity?3:0)+(a.totalCare?2:0)+(a.type==='TELE'?1:0);
+          const wb = (b.isolation?4:0)+(b.highAcuity?3:0)+(b.totalCare?2:0)+(b.type==='TELE'?1:0);
+          return wb - wa || Math.random() - 0.5;
         });
 
-        // Score a nurse for a candidate room (lower = better fit)
+        // Score a nurse for a candidate room (lower = better fit, Infinity = blocked)
         function score(state, room) {
-          const { rooms: nRooms, teleCount, haCount } = state;
+          const { rooms: nRooms, teleCount, haCount,
+                  acuityPts, isolationCount, totalCareCount } = state;
 
-          // ── Hard limits (mirror checkAssignment rules) ──
-          // If any TELE involved → cap 4, else cap 5
-          const projTele = teleCount + (room.type === 'TELE' ? 1 : 0);
-          const capTele  = (teleCount > 0 || room.type === 'TELE');
-          const cap      = capTele ? 4 : 5;
-          if (nRooms.length + 1 > cap)            return Infinity;
+          // ── Hard limits ──────────────────────────────────────────────────
+          const capTele = teleCount > 0 || room.type === 'TELE';
+          const cap     = capTele ? 4 : 5;
+          if (nRooms.length + 1 > cap)               return Infinity;
           if (room.type === 'TELE' && teleCount >= 4) return Infinity;
-          if (room.highAcuity  && haCount >= 2)   return Infinity;
+          if (room.highAcuity     && haCount >= 2)    return Infinity;
+          // Hard acuity cap: never exceed 6 pts
+          if (acuityPts + roomAcuityPts(room) > 6)   return Infinity;
 
-          // ── Proximity: circular distance to nearest existing room ──
-          // Prefer rooms within 11 positions on the perimeter; penalise further.
+          // ── Soft penalties ───────────────────────────────────────────────
+          let penalty = 0;
+          const projAcuity = acuityPts + roomAcuityPts(room);
+
+          // Soft acuity cap: each point over 4 costs heavily
+          if (projAcuity > 4) penalty += 60 * (projAcuity - 4);
+
+          // Isolation: strongly discourage a 2nd isolation room on same nurse
+          if (room.isolation && isolationCount >= 1) penalty += 90;
+
+          // If nurse already has isolation, discourage adding totalCare patients
+          if (isolationCount >= 1 && room.totalCare && totalCareCount >= 1) penalty += 70;
+          if (room.isolation && totalCareCount >= 2) penalty += 70;
+
+          // ── Proximity ────────────────────────────────────────────────────
           let prox = 0;
           if (nRooms.length > 0) {
             const minDist = Math.min(...nRooms.map(id => circDist(room.id, id)));
             prox = minDist <= 11 ? minDist * 2.5 : 22 + (minDist - 11) * 5;
           }
 
-          // ── Load balance: favour less-loaded nurses ──
+          // ── Load balance: favour less-loaded nurses ──────────────────────
           const load = nRooms.length * 5;
 
-          // ── Acuity spread: discourage stacking HA on one nurse ──
-          const acuity = room.highAcuity ? haCount * 18 : 0;
+          // ── HA spread: discourage stacking high-acuity ───────────────────
+          const haSpread = room.highAcuity ? haCount * 18 : 0;
 
-          // ── Tele mix balance ──
+          // ── Tele mix ─────────────────────────────────────────────────────
           const telePenalty = (room.type === 'TELE' && teleCount >= 3) ? 15 : 0;
 
-          // ── Random noise: guarantees different results each press ──
+          // ── Random noise (different result each press) ────────────────────
           const noise = (Math.random() - 0.5) * 12;
 
-          return prox + load + acuity + telePenalty + noise;
+          return prox + load + haSpread + telePenalty + penalty + noise;
         }
 
         const newAssignments = {};
@@ -1540,6 +1564,9 @@ function App() {
             best.rooms.push(room.id);
             if (room.type === 'TELE') best.teleCount++;
             if (room.highAcuity)     best.haCount++;
+            best.acuityPts      += roomAcuityPts(room);
+            if (room.isolation)  best.isolationCount++;
+            if (room.totalCare)  best.totalCareCount++;
           }
         }
 
