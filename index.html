@@ -621,15 +621,23 @@ function PatientModal({ room, onClose, onSave }) {
 }
 
 // ── UNASSIGNED ROOMS POPUP ────────────────────────────────────────────────────
-function UnassignedPopup({ rooms, onClose }) {
+function UnassignedPopup({ rooms, nurses, nurseRooms, onAssign, onClose }) {
+  const [dropdown, setDropdown] = useState(null); // { room, anchor }
+
+  function openDropdown(e, room) {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    setDropdown(prev => prev?.room.id === room.id ? null : { room, anchor: rect });
+  }
+
   return (
-    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal" style={{ width:440, maxHeight:'72vh', display:'flex', flexDirection:'column' }}>
+    <div className="modal-overlay" onClick={e=>{ if(e.target===e.currentTarget){ setDropdown(null); onClose(); } }}>
+      <div className="modal" style={{ width:460, maxHeight:'76vh', display:'flex', flexDirection:'column' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
           <div>
             <h2 style={{ margin:0, fontSize:16, fontWeight:700, color:'var(--text-1)' }}>Unassigned Rooms</h2>
             <p style={{ margin:'2px 0 0', fontSize:11, color:'var(--text-4)' }}>
-              {rooms.length} occupied {rooms.length===1?'room':'rooms'} without a nurse
+              {rooms.length} occupied {rooms.length===1?'room':'rooms'} without a nurse · click <b>+</b> to assign
             </p>
           </div>
           <button className="btn btn-ghost" onClick={onClose}>✕</button>
@@ -642,19 +650,39 @@ function UnassignedPopup({ rooms, onClose }) {
             </div>
           ) : (
             <div style={{ display:'flex', flexWrap:'wrap', gap:8, padding:'4px 2px' }}>
-              {rooms.map(r=>(
-                <div key={r.id} style={{
-                  padding:'8px 14px', borderRadius:8, fontSize:13, fontWeight:700,
-                  display:'flex', alignItems:'center', gap:5,
-                  background: r.gender==='female' ? '#fce7f3' : '#dbeafe',
-                  color:       r.gender==='female' ? '#9d174d'  : '#1d4ed8',
-                  border:`1.5px solid ${r.gender==='female'?'#f9a8d4':'#93c5fd'}`,
-                }}>
-                  {r.id}
-                  {r.type==='TELE' && <span style={{ color:'#f87171' }}>♥</span>}
-                  {r.sitter && <span style={{ fontSize:10, color:'#7c3aed' }}>ST</span>}
-                </div>
-              ))}
+              {rooms.map(r => {
+                const isFemale = r.gender === 'female';
+                const isActive = dropdown?.room.id === r.id;
+                return (
+                  <div key={r.id} style={{
+                    padding:'7px 10px 7px 12px', borderRadius:9, fontSize:13, fontWeight:700,
+                    display:'flex', alignItems:'center', gap:6, position:'relative',
+                    background: isFemale ? '#fce7f3' : '#dbeafe',
+                    color:       isFemale ? '#9d174d'  : '#1d4ed8',
+                    border:`1.5px solid ${isFemale?'#f9a8d4':'#93c5fd'}`,
+                  }}>
+                    <span>{r.id}</span>
+                    {r.type==='TELE' && <span style={{ color:'#f87171' }}>♥</span>}
+                    {r.sitter && <span style={{ fontSize:10, color:'#7c3aed' }}>ST</span>}
+                    {/* Assign + button */}
+                    <button
+                      onClick={e => openDropdown(e, r)}
+                      title="Assign to nurse"
+                      style={{
+                        width:20, height:20, borderRadius:5, border:'none', cursor:'pointer',
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                        fontSize:15, lineHeight:1, fontWeight:700,
+                        background: isActive
+                          ? (isFemale ? '#be185d' : '#1d4ed8')
+                          : (isFemale ? 'rgba(190,24,93,0.15)' : 'rgba(29,78,216,0.15)'),
+                        color: isFemale ? '#be185d' : '#1d4ed8',
+                        transition:'background 0.15s',
+                        marginLeft:2,
+                      }}
+                    >+</button>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -667,6 +695,19 @@ function UnassignedPopup({ rooms, onClose }) {
           </div>
         )}
       </div>
+
+      {/* Nurse assignment dropdown — rendered via portal so it floats above everything */}
+      {dropdown && (
+        <RoomDropdown
+          room={dropdown.room}
+          nurses={nurses}
+          nurseRooms={nurseRooms}
+          anchor={dropdown.anchor}
+          onAssign={nid => { onAssign(dropdown.room.id, nid); setDropdown(null); }}
+          onUnassign={() => setDropdown(null)}
+          onClose={() => setDropdown(null)}
+        />
+      )}
     </div>
   );
 }
@@ -1211,7 +1252,15 @@ function App() {
         </div>
       </div>
 
-      {showUnassigned && <UnassignedPopup rooms={unassignedRooms} onClose={()=>setShowUnassigned(false)}/>}
+      {showUnassigned && (
+        <UnassignedPopup
+          rooms={unassignedRooms}
+          nurses={nurses}
+          nurseRooms={nurseRooms}
+          onAssign={assignRoomToNurse}
+          onClose={()=>setShowUnassigned(false)}
+        />
+      )}
       {editingRoom && <PatientModal room={editingRoom} onClose={()=>setEditingRoom(null)} onSave={saveRoom}/>}
       {pendingAssignment && (
         <WarningModal
