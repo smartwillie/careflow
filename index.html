@@ -360,6 +360,59 @@
     60%      { transform: translateY(0px)  scaleY(0.92); }
   }
 
+  /* ── ECO Toggle button ── */
+  .eco-toggle {
+    flex-shrink: 0;
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 12px; border-radius: 20px; border: none; cursor: pointer;
+    font-weight: 800; font-size: 11px; letter-spacing: 0.06em;
+    transition: background 0.25s, color 0.25s, box-shadow 0.25s;
+    position: relative; overflow: hidden;
+  }
+  .eco-toggle-off {
+    background: rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.75);
+    box-shadow: none;
+  }
+  .eco-toggle-on {
+    background: rgba(255,255,255,0.95);
+    color: #c2410c;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    animation: eco-glow 2.2s ease-in-out infinite;
+  }
+  .eco-toggle-pop {
+    animation: eco-pop 0.38s cubic-bezier(0.34,1.56,0.64,1) forwards !important;
+  }
+  .eco-icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  .eco-toggle-on .eco-icon {
+    transform: rotate(-15deg) scale(1.15);
+  }
+  @keyframes eco-glow {
+    0%, 100% { box-shadow: 0 2px 8px rgba(0,0,0,0.25), 0 0 0 0 rgba(255,255,255,0.55); }
+    50%       { box-shadow: 0 2px 8px rgba(0,0,0,0.25), 0 0 0 5px rgba(255,255,255,0); }
+  }
+  @keyframes eco-pop {
+    0%   { transform: scale(1); }
+    35%  { transform: scale(1.18); }
+    65%  { transform: scale(0.93); }
+    100% { transform: scale(1); }
+  }
+  /* Ripple */
+  .eco-ripple {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.45);
+    transform: scale(0);
+    animation: eco-ripple 0.5s ease-out forwards;
+    pointer-events: none;
+  }
+  @keyframes eco-ripple {
+    to { transform: scale(4); opacity: 0; }
+  }
+
   /* ── Zap Assign button ── */
   .zap-btn {
     position: relative; overflow: hidden;
@@ -1153,12 +1206,40 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
                            unassignedOpen, onUnassignedClick, unassignedBtnRef,
                            onZapAssign, zapLoading, fuelMode, onToggleFuel }) {
   const [pressed, setPressed] = React.useState(false);
+  const [ecoPop, setEcoPop] = React.useState(false);
+  const prevFuelRef = React.useRef(fuelMode);
+  const ecoBtnRef = React.useRef(null);
+
+  // Pop animation whenever fuelMode changes
+  React.useEffect(() => {
+    if (prevFuelRef.current !== fuelMode) {
+      setEcoPop(true);
+      const t = setTimeout(() => setEcoPop(false), 420);
+      prevFuelRef.current = fuelMode;
+      return () => clearTimeout(t);
+    }
+  }, [fuelMode]);
 
   function handleZap() {
     if (zapLoading) return;
     setPressed(true);
     setTimeout(() => setPressed(false), 400);
     onZapAssign();
+  }
+
+  function handleEcoClick(e) {
+    // Ripple
+    const btn = ecoBtnRef.current;
+    if (btn) {
+      const r = btn.getBoundingClientRect();
+      const ripple = document.createElement('span');
+      ripple.className = 'eco-ripple';
+      const size = Math.max(r.width, r.height);
+      ripple.style.cssText = `width:${size}px;height:${size}px;left:${e.clientX-r.left-size/2}px;top:${e.clientY-r.top-size/2}px`;
+      btn.appendChild(ripple);
+      setTimeout(() => ripple.remove(), 520);
+    }
+    onToggleFuel();
   }
 
   return (
@@ -1192,25 +1273,37 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
         </div>
         {/* ── Fuel Efficiency Toggle ── */}
         <button
-          onClick={onToggleFuel}
+          ref={ecoBtnRef}
+          onClick={handleEcoClick}
           title={fuelMode ? 'Fuel Efficiency ON — MedSurg priority' : 'Fuel Efficiency OFF'}
-          style={{
-            flexShrink:0, display:'flex', alignItems:'center', gap:5,
-            padding:'5px 10px', borderRadius:20, border:'none', cursor:'pointer',
-            background: fuelMode ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.18)',
-            color: fuelMode ? '#c2410c' : 'rgba(255,255,255,0.80)',
-            fontWeight:800, fontSize:11, letterSpacing:'0.04em',
-            boxShadow: fuelMode ? '0 2px 8px rgba(0,0,0,0.25)' : 'none',
-            transition:'background 0.18s, color 0.18s, box-shadow 0.18s',
-          }}>
-          {/* Fuel gauge icon */}
-          <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
-            <rect x="2" y="4" width="11" height="14" rx="2" stroke="currentColor" strokeWidth="1.8"/>
-            <path d="M13 8h2a2 2 0 012 2v2a2 2 0 01-2 2h-2" stroke="currentColor" strokeWidth="1.8"/>
-            <rect x="4" y="10" width={fuelMode ? 7 : 3} height="3" rx="1" fill="currentColor" style={{transition:'width 0.3s'}}/>
-            <line x1="4" y1="8" x2="11" y2="8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-          </svg>
-          <span>{fuelMode ? 'ECO ON' : 'ECO'}</span>
+          className={[
+            'eco-toggle',
+            fuelMode ? 'eco-toggle-on' : 'eco-toggle-off',
+            ecoPop ? 'eco-toggle-pop' : '',
+          ].join(' ')}
+        >
+          {/* Animated fuel gauge */}
+          <span className="eco-icon">
+            <svg width="15" height="15" viewBox="0 0 20 20" fill="none">
+              <rect x="2" y="4" width="11" height="14" rx="2" stroke="currentColor" strokeWidth="1.8"/>
+              <path d="M13 8h2a2 2 0 012 2v2a2 2 0 01-2 2h-2" stroke="currentColor" strokeWidth="1.8"/>
+              <rect x="4" y="10" width={fuelMode ? 7 : 2} height="3" rx="1" fill="currentColor"
+                style={{transition:'width 0.4s cubic-bezier(0.34,1.56,0.64,1)'}}/>
+              <line x1="4" y1="8" x2="11" y2="8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+            </svg>
+          </span>
+          {/* Label fades between ECO / ECO ON */}
+          <span style={{ transition:'opacity 0.2s', minWidth:34, textAlign:'left' }}>
+            {fuelMode ? 'ECO ON' : 'ECO'}
+          </span>
+          {/* ON indicator dot */}
+          <span style={{
+            width:6, height:6, borderRadius:'50%',
+            background: fuelMode ? '#c2410c' : 'transparent',
+            boxShadow: fuelMode ? '0 0 0 2px rgba(194,65,12,0.3)' : 'none',
+            transition:'background 0.25s, box-shadow 0.25s',
+            flexShrink:0,
+          }}/>
         </button>
       </div>
 
