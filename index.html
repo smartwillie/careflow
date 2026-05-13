@@ -101,7 +101,7 @@
     color: var(--text-1);
     transition: background 0.25s, color 0.25s;
   }
-  .nurse-panel { width: 340px; min-width: 280px; flex-shrink: 0; }
+  .nurse-panel { width: 400px; min-width: 320px; flex-shrink: 0; }
   .room-panel  { flex: 1; position: relative; overflow: visible; }
   .corridor-container { position: relative; width: 100%; height: 100%; }
 
@@ -1034,9 +1034,9 @@ function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, on
         })}
       </div>
 
-      {/* Room badges */}
+      {/* Room badges — sorted in natural corridor order (1101, 1102 … 1110A, 1110B …) */}
       <div style={{ display:'flex', flexWrap:'wrap', marginTop:6, gap:3, minHeight:10 }}>
-        {rooms.map(id=>{
+        {[...rooms].sort((a,b) => _RIDX[a] - _RIDX[b]).map(id=>{
           const r = allRooms[id];
           if(!r?.occupied) return null;
           return (
