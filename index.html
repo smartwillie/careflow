@@ -620,64 +620,99 @@ function PatientModal({ room, onClose, onSave }) {
   );
 }
 
-// ── UNASSIGNED ROOMS POPUP ────────────────────────────────────────────────────
-function UnassignedPopup({ rooms, nurses, nurseRooms, onAssign, onClose }) {
-  const [dropdown, setDropdown] = useState(null); // { room, anchor }
+// ── UNASSIGNED PANEL (dropdown, portal) ──────────────────────────────────────
+function UnassignedPanel({ rooms, nurses, nurseRooms, onAssign, onDragStart, onClose, anchor }) {
+  const ref = useRef();
+  const [dropdown, setDropdown] = useState(null); // { room, btnAnchor }
 
-  function openDropdown(e, room) {
+  // Close on outside-click
+  useEffect(() => {
+    const h = e => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
+    document.addEventListener('mousedown', h, true);
+    return () => document.removeEventListener('mousedown', h, true);
+  }, []);
+
+  // Position below the header stat that was clicked
+  const PW = 420;
+  const left = Math.min(Math.max(8, anchor.right - PW), window.innerWidth - PW - 8);
+  const top  = anchor.bottom + 6;
+
+  function openRoomDropdown(e, room) {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
     setDropdown(prev => prev?.room.id === room.id ? null : { room, anchor: rect });
   }
 
-  return (
-    <div className="modal-overlay" onClick={e=>{ if(e.target===e.currentTarget){ setDropdown(null); onClose(); } }}>
-      <div className="modal" style={{ width:460, maxHeight:'76vh', display:'flex', flexDirection:'column' }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+  return ReactDOM.createPortal(
+    <>
+      {/* Panel */}
+      <div ref={ref} style={{
+        position:'fixed', left, top, width:PW, maxHeight:'60vh', zIndex:600,
+        background:'var(--modal-bg)', border:'1px solid var(--border-sub)',
+        borderRadius:14, boxShadow:'0 16px 56px rgba(0,0,0,0.45)',
+        display:'flex', flexDirection:'column', overflow:'hidden',
+        animation:'dd-in 0.15s ease',
+      }}>
+
+        {/* Header */}
+        <div style={{ padding:'11px 14px 9px', borderBottom:'1px solid var(--border-sub)', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
           <div>
-            <h2 style={{ margin:0, fontSize:16, fontWeight:700, color:'var(--text-1)' }}>Unassigned Rooms</h2>
-            <p style={{ margin:'2px 0 0', fontSize:11, color:'var(--text-4)' }}>
-              {rooms.length} occupied {rooms.length===1?'room':'rooms'} without a nurse · click <b>+</b> to assign
-            </p>
+            <div style={{ fontWeight:700, fontSize:13, color:'var(--text-1)', display:'flex', alignItems:'center', gap:8 }}>
+              Unassigned Rooms
+              <span style={{ background:'#f59e0b', color:'white', borderRadius:10, padding:'1px 9px', fontSize:11, fontWeight:700 }}>
+                {rooms.length}
+              </span>
+            </div>
+            <div style={{ fontSize:10, color:'var(--text-4)', marginTop:3 }}>
+              Drag a chip to a nurse · or click <b style={{ color:'var(--text-2)' }}>+</b> to assign
+            </div>
           </div>
-          <button className="btn btn-ghost" onClick={onClose}>✕</button>
+          <button className="btn btn-ghost" onClick={onClose} style={{ padding:'3px 8px', fontSize:12 }}>✕</button>
         </div>
 
-        <div style={{ overflowY:'auto', flex:1 }}>
-          {rooms.length===0 ? (
-            <div style={{ textAlign:'center', padding:'28px 0', color:'#22c55e', fontSize:14, fontWeight:600 }}>
+        {/* Room chips */}
+        <div style={{ overflowY:'auto', flex:1, padding:'10px 12px' }}>
+          {rooms.length === 0 ? (
+            <div style={{ textAlign:'center', padding:'22px 0', color:'#22c55e', fontSize:13, fontWeight:600 }}>
               ✓ All occupied rooms are assigned!
             </div>
           ) : (
-            <div style={{ display:'flex', flexWrap:'wrap', gap:8, padding:'4px 2px' }}>
+            <div style={{ display:'flex', flexWrap:'wrap', gap:7 }}>
               {rooms.map(r => {
-                const isFemale = r.gender === 'female';
-                const isActive = dropdown?.room.id === r.id;
+                const fem = r.gender === 'female';
+                const active = dropdown?.room.id === r.id;
                 return (
-                  <div key={r.id} style={{
-                    padding:'7px 10px 7px 12px', borderRadius:9, fontSize:13, fontWeight:700,
-                    display:'flex', alignItems:'center', gap:6, position:'relative',
-                    background: isFemale ? '#fce7f3' : '#dbeafe',
-                    color:       isFemale ? '#9d174d'  : '#1d4ed8',
-                    border:`1.5px solid ${isFemale?'#f9a8d4':'#93c5fd'}`,
-                  }}>
+                  <div
+                    key={r.id}
+                    draggable
+                    onDragStart={e => onDragStart(r.id, e)}
+                    style={{
+                      padding:'6px 8px 6px 10px', borderRadius:8, fontSize:12, fontWeight:700,
+                      display:'flex', alignItems:'center', gap:5, userSelect:'none',
+                      background: fem ? '#fce7f3' : '#dbeafe',
+                      color:       fem ? '#9d174d'  : '#1d4ed8',
+                      border:`1.5px solid ${fem ? '#f9a8d4' : '#93c5fd'}`,
+                      cursor:'grab', transition:'transform 0.1s, box-shadow 0.1s',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.transform='scale(1.06)'; e.currentTarget.style.boxShadow='0 4px 14px rgba(0,0,0,0.18)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.transform=''; e.currentTarget.style.boxShadow=''; }}
+                  >
+                    {/* drag-handle dots */}
+                    <span style={{ opacity:0.35, fontSize:9, letterSpacing:'-1px', pointerEvents:'none' }}>⠿</span>
                     <span>{r.id}</span>
                     {r.type==='TELE' && <span style={{ color:'#f87171' }}>♥</span>}
-                    {r.sitter && <span style={{ fontSize:10, color:'#7c3aed' }}>ST</span>}
-                    {/* Assign + button */}
+                    {r.sitter && <span style={{ fontSize:9, color:'#7c3aed' }}>ST</span>}
+                    {/* + assign button */}
                     <button
-                      onClick={e => openDropdown(e, r)}
+                      onClick={e => openRoomDropdown(e, r)}
                       title="Assign to nurse"
                       style={{
-                        width:20, height:20, borderRadius:5, border:'none', cursor:'pointer',
+                        width:18, height:18, borderRadius:4, border:'none', cursor:'pointer', flexShrink:0,
                         display:'flex', alignItems:'center', justifyContent:'center',
-                        fontSize:15, lineHeight:1, fontWeight:700,
-                        background: isActive
-                          ? (isFemale ? '#be185d' : '#1d4ed8')
-                          : (isFemale ? 'rgba(190,24,93,0.15)' : 'rgba(29,78,216,0.15)'),
-                        color: isFemale ? '#be185d' : '#1d4ed8',
-                        transition:'background 0.15s',
-                        marginLeft:2,
+                        fontSize:14, lineHeight:1, fontWeight:900,
+                        background: active ? (fem?'#be185d':'#1d4ed8') : (fem?'rgba(190,24,93,0.15)':'rgba(29,78,216,0.15)'),
+                        color: active ? 'white' : (fem?'#be185d':'#1d4ed8'),
+                        transition:'background 0.15s, color 0.15s',
                       }}
                     >+</button>
                   </div>
@@ -687,16 +722,17 @@ function UnassignedPopup({ rooms, nurses, nurseRooms, onAssign, onClose }) {
           )}
         </div>
 
-        {rooms.length>0 && (
-          <div style={{ marginTop:14, paddingTop:12, borderTop:'1px solid var(--border-sub)', display:'flex', gap:10, fontSize:11, color:'var(--text-4)' }}>
+        {/* Legend */}
+        {rooms.length > 0 && (
+          <div style={{ padding:'7px 12px', borderTop:'1px solid var(--border-sub)', display:'flex', gap:10, fontSize:10, color:'var(--text-4)', flexShrink:0 }}>
             <span>♥ = TELE</span>
-            <span style={{ background:'#fce7f3', color:'#9d174d', padding:'1px 7px', borderRadius:4 }}>Pink = Female</span>
-            <span style={{ background:'#dbeafe', color:'#1d4ed8', padding:'1px 7px', borderRadius:4 }}>Blue = Male</span>
+            <span style={{ background:'#fce7f3', color:'#9d174d', padding:'1px 6px', borderRadius:4 }}>Pink = Female</span>
+            <span style={{ background:'#dbeafe', color:'#1d4ed8', padding:'1px 6px', borderRadius:4 }}>Blue = Male</span>
           </div>
         )}
       </div>
 
-      {/* Nurse assignment dropdown — rendered via portal so it floats above everything */}
+      {/* Nurse picker dropdown for + button */}
       {dropdown && (
         <RoomDropdown
           room={dropdown.room}
@@ -708,7 +744,8 @@ function UnassignedPopup({ rooms, nurses, nurseRooms, onAssign, onClose }) {
           onClose={() => setDropdown(null)}
         />
       )}
-    </div>
+    </>,
+    document.body
   );
 }
 
@@ -1111,6 +1148,13 @@ function App() {
     setRooms(prev=>({...prev,[roomId]:{...prev[roomId],nurseId:null}}));
   }
 
+  // Drag from the Unassigned panel — reuses the same nurse-card drop handler
+  function handleUnassignedDragStart(roomId, e) {
+    e.dataTransfer.setData('roomIds', JSON.stringify([roomId]));
+    e.dataTransfer.effectAllowed = 'move';
+    setDragRoomIds([roomId]);
+  }
+
   function addNurse() {
     const name = newNurseName.trim() || `RN — Nurse ${nurses.length+1}`;
     const color = NURSE_COLORS[colorIdx.current % NURSE_COLORS.length];
@@ -1134,7 +1178,7 @@ function App() {
     setEditingRoom(null);
   }
 
-  const [showUnassigned, setShowUnassigned] = useState(false);
+  const [unassignedAnchor, setUnassignedAnchor] = useState(null);
   const totalOcc    = Object.values(rooms).filter(r=>r.occupied).length;
   const totalAsg    = Object.values(rooms).filter(r=>r.occupied&&r.nurseId).length;
   const unassignedRooms = Object.values(rooms).filter(r=>r.occupied&&!r.nurseId);
@@ -1153,9 +1197,12 @@ function App() {
           <span><b style={{ color:'var(--text-4)' }}>{ROOM_IDS.length - totalOcc}</b> empty</span>
           <span><b style={{ color:'var(--text-1)' }}>{totalOcc}</b> occupied</span>
           <span><b style={{ color:'#22c55e' }}>{totalAsg}</b> assigned</span>
-          <span onClick={()=>setShowUnassigned(true)}
-            style={{ cursor:'pointer', borderBottom:'1px dashed #f59e0b', paddingBottom:1 }}
-            title="Click to see unassigned rooms">
+          <span
+            onClick={e => setUnassignedAnchor(prev => prev ? null : e.currentTarget.getBoundingClientRect())}
+            style={{ cursor:'pointer', borderBottom:`1px dashed ${unassignedAnchor?'#f59e0b':'#f59e0b'}`, paddingBottom:1,
+              background: unassignedAnchor ? 'rgba(245,158,11,0.12)' : 'transparent',
+              borderRadius:4, padding:'1px 5px 2px' }}
+            title="Click to toggle unassigned rooms panel">
             <b style={{ color:'#f59e0b' }}>{totalOcc-totalAsg}</b> unassigned
           </span>
           <span style={{ color:'var(--stat-border)' }}>|</span>
@@ -1252,13 +1299,15 @@ function App() {
         </div>
       </div>
 
-      {showUnassigned && (
-        <UnassignedPopup
+      {unassignedAnchor && (
+        <UnassignedPanel
           rooms={unassignedRooms}
           nurses={nurses}
           nurseRooms={nurseRooms}
           onAssign={assignRoomToNurse}
-          onClose={()=>setShowUnassigned(false)}
+          onDragStart={handleUnassignedDragStart}
+          onClose={()=>setUnassignedAnchor(null)}
+          anchor={unassignedAnchor}
         />
       )}
       {editingRoom && <PatientModal room={editingRoom} onClose={()=>setEditingRoom(null)} onSave={saveRoom}/>}
