@@ -9,16 +9,105 @@
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
+  /* ═══════════════════════════════════════════════════════════
+     CSS VARIABLES — Night mode (default)
+  ═══════════════════════════════════════════════════════════ */
+  :root {
+    --bg-base:        #080f1d;
+    --bg-panel:       #0a1628;
+    --bg-card:        #1e293b;
+    --border:         #1e293b;
+    --border-sub:     #334155;
+    --text-1:         #f1f5f9;
+    --text-2:         #cbd5e1;
+    --text-3:         #94a3b8;
+    --text-4:         #64748b;
+    --text-5:         #334155;
+    --input-bg:       #0f172a;
+    --cap-bg:         #0f172a;
+    --legend-bg:      #1e293b;
+    --corridor-path:  #1e3a5f;
+    --station-bg:     rgba(15,23,42,0.92);
+    --station-border: #1e3a5f;
+    --station-label:  #1d4ed8;
+    --room-vacant-bg: #2d3f55;
+    --room-vacant-br: #3d5068;
+    --room-vacant-tx: #7a91aa;
+    --dd-bg:          #1e293b;
+    --dd-border:      #3b4f6a;
+    --dd-hover:       #334155;
+    --dd-active:      #1e3a5f;
+    --dd-text:        #cbd5e1;
+    --dd-label:       #64748b;
+    --sel-bar-bg:     #1c2a3a;
+    --sel-bar-border: #1e3a5f;
+    --sel-bar-text:   #93c5fd;
+    --trash-bg:       #1e293b;
+    --trash-border:   #475569;
+    --modal-bg:       #1e293b;
+    --scrollbar:      #334155;
+    --btn-ghost-bg:   #334155;
+    --btn-ghost-tx:   #94a3b8;
+    --stat-border:    #334155;
+  }
+
+  /* ═══════════════════════════════════════════════════════════
+     CSS VARIABLES — Day mode overrides
+  ═══════════════════════════════════════════════════════════ */
+  body[data-theme="day"] {
+    --bg-base:        #e4ecf7;
+    --bg-panel:       #f0f4fb;
+    --bg-card:        #ffffff;
+    --border:         #dde4ef;
+    --border-sub:     #c8d4e6;
+    --text-1:         #0f172a;
+    --text-2:         #1e293b;
+    --text-3:         #475569;
+    --text-4:         #64748b;
+    --text-5:         #94a3b8;
+    --input-bg:       #ffffff;
+    --cap-bg:         #e2e8f0;
+    --legend-bg:      #f8fafc;
+    --corridor-path:  #94a3b8;
+    --station-bg:     rgba(240,244,251,0.96);
+    --station-border: #bfdbfe;
+    --station-label:  #1d4ed8;
+    --room-vacant-bg: #dde5f0;
+    --room-vacant-br: #b0bed4;
+    --room-vacant-tx: #64748b;
+    --dd-bg:          #ffffff;
+    --dd-border:      #dde4ef;
+    --dd-hover:       #f1f5f9;
+    --dd-active:      #dbeafe;
+    --dd-text:        #1e293b;
+    --dd-label:       #64748b;
+    --sel-bar-bg:     #eff6ff;
+    --sel-bar-border: #bfdbfe;
+    --sel-bar-text:   #1d4ed8;
+    --trash-bg:       #f1f5f9;
+    --trash-border:   #c8d4e6;
+    --modal-bg:       #ffffff;
+    --scrollbar:      #c8d4e6;
+    --btn-ghost-bg:   #e2e8f0;
+    --btn-ghost-tx:   #475569;
+    --stat-border:    #c8d4e6;
+  }
+
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f172a; color: #f1f5f9; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg-base);
+    color: var(--text-1);
+    transition: background 0.25s, color 0.25s;
+  }
   .nurse-panel { width: 340px; min-width: 280px; flex-shrink: 0; }
-  .room-panel { flex: 1; position: relative; overflow: visible; }
+  .room-panel  { flex: 1; position: relative; overflow: visible; }
   .corridor-container { position: relative; width: 100%; height: 100%; }
 
   /* ── Room card ── */
   .room-card {
     position: absolute;
-    /* width & height set dynamically via inline style */
     border-radius: 8px;
     border: 2px solid transparent;
     cursor: pointer;
@@ -32,7 +121,7 @@
   }
   .room-card:hover { transform: scale(1.1); z-index: 20; }
   .room-card.selected { border-color: #4ade80 !important; box-shadow: 0 0 0 3px rgba(74,222,128,0.3); z-index: 10; }
-  .vacant  { background: #2d3f55; border-color: #3d5068; color: #7a91aa; }
+  .vacant  { background: var(--room-vacant-bg); border-color: var(--room-vacant-br); color: var(--room-vacant-tx); }
   .female  { background: #f9a8d4; border-color: #ec4899; color: #831843; }
   .male    { background: #bfdbfe; border-color: #60a5fa; color: #1e3a8a; }
 
@@ -41,18 +130,23 @@
     display: none;
     position: absolute; top: 2px; right: 2px;
     width: 15px; height: 15px; border-radius: 4px;
-    background: rgba(15,23,42,0.85); border: 1px solid #475569;
+    background: rgba(15,23,42,0.75); border: 1px solid #475569;
     color: #94a3b8; font-size: 11px; line-height: 1;
     cursor: pointer; align-items: center; justify-content: center;
     z-index: 5;
+  }
+  body[data-theme="day"] .assign-btn {
+    background: rgba(255,255,255,0.85); border-color: #94a3b8; color: #475569;
   }
   .room-card:hover .assign-btn { display: flex; }
 
   /* ── Nurse card ── */
   .nurse-card {
-    background: #1e293b; border: 2px solid #334155; border-radius: 12px;
+    background: var(--bg-card);
+    border: 2px solid var(--border-sub);
+    border-radius: 12px;
     padding: 10px; margin-bottom: 8px; position: relative;
-    transition: border-color 0.15s, box-shadow 0.15s;
+    transition: border-color 0.15s, box-shadow 0.15s, background 0.25s;
   }
   .nurse-card.drag-over {
     border-color: #22c55e;
@@ -82,7 +176,7 @@
   /* ── Trash zone ── */
   .trash-zone {
     width: 28px; height: 28px; border-radius: 6px;
-    background: #1e293b; border: 1px dashed #475569;
+    background: var(--trash-bg); border: 1px dashed var(--trash-border);
     display: flex; align-items: center; justify-content: center;
     font-size: 14px; transition: all 0.15s; cursor: pointer; flex-shrink: 0;
   }
@@ -90,16 +184,21 @@
 
   /* ── Modal ── */
   .modal-overlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.72);
+    position: fixed; inset: 0; background: rgba(0,0,0,0.68);
     display: flex; align-items: center; justify-content: center; z-index: 1000;
     backdrop-filter: blur(2px);
   }
-  .modal { background: #1e293b; border-radius: 16px; padding: 24px; width: 360px; border: 1px solid #334155; box-shadow: 0 24px 80px rgba(0,0,0,0.5); }
+  .modal {
+    background: var(--modal-bg); border-radius: 16px; padding: 24px; width: 360px;
+    border: 1px solid var(--border-sub);
+    box-shadow: 0 24px 80px rgba(0,0,0,0.45);
+    transition: background 0.25s;
+  }
   .toggle-row {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 8px 0; border-bottom: 1px solid #334155;
+    padding: 8px 0; border-bottom: 1px solid var(--border-sub);
   }
-  .toggle { width: 40px; height: 22px; border-radius: 11px; background: #334155; position: relative; cursor: pointer; transition: background 0.2s; border: none; flex-shrink: 0; }
+  .toggle { width: 40px; height: 22px; border-radius: 11px; background: var(--border-sub); position: relative; cursor: pointer; transition: background 0.2s; border: none; flex-shrink: 0; }
   .toggle.on { background: #22c55e; }
   .toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: white; transition: transform 0.2s; }
   .toggle.on::after { transform: translateX(18px); }
@@ -114,40 +213,61 @@
   @keyframes fadeout { 0%{opacity:1} 70%{opacity:1} 100%{opacity:0;pointer-events:none} }
 
   /* ── Misc ── */
-  .corridor-path { fill: none; stroke: #1e3a5f; stroke-width: 1.5; stroke-dasharray: 8 5; opacity: 0.35; }
+  .corridor-path { fill: none; stroke: var(--corridor-path); stroke-width: 1.5; stroke-dasharray: 8 5; opacity: 0.45; }
   ::-webkit-scrollbar { width: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 3px; }
   .nurse-color-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
   input[type=text] {
-    background: #0f172a; border: 1px solid #334155; color: #f1f5f9;
+    background: var(--input-bg); border: 1px solid var(--border-sub); color: var(--text-1);
     border-radius: 6px; padding: 6px 10px; font-size: 13px; width: 100%; outline: none;
+    transition: background 0.25s, border-color 0.15s;
   }
   input[type=text]:focus { border-color: #3b82f6; }
   .btn { border-radius: 7px; padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; transition: opacity 0.15s; }
   .btn:hover { opacity: 0.82; }
   .btn-primary { background: #3b82f6; color: white; }
-  .btn-ghost   { background: #334155; color: #94a3b8; }
-  .cap-bar  { height: 4px; border-radius: 2px; background: #0f172a; overflow: hidden; margin-top: 4px; }
+  .btn-ghost   { background: var(--btn-ghost-bg); color: var(--btn-ghost-tx); }
+  .cap-bar  { height: 4px; border-radius: 2px; background: var(--cap-bg); overflow: hidden; margin-top: 4px; }
   .cap-fill { height: 100%; border-radius: 2px; transition: width 0.35s; }
-  .flag { font-size: 9px; background: rgba(0,0,0,0.35); border-radius: 3px; padding: 1px 3px; margin: 1px; display: inline-block; line-height: 1.3; }
+  .flag { font-size: 9px; background: rgba(0,0,0,0.22); border-radius: 3px; padding: 1px 3px; margin: 1px; display: inline-block; line-height: 1.3; }
+  body[data-theme="day"] .flag { background: rgba(0,0,0,0.10); }
 
   /* ── Room dropdown (portal, fixed) ── */
   .room-dropdown {
     position: fixed; z-index: 9999;
-    background: #1e293b; border: 1px solid #3b4f6a; border-radius: 10px;
+    background: var(--dd-bg); border: 1px solid var(--dd-border); border-radius: 10px;
     padding: 4px; min-width: 210px;
-    box-shadow: 0 12px 48px rgba(0,0,0,0.65);
+    box-shadow: 0 12px 48px rgba(0,0,0,0.55);
     animation: dd-in 0.12s ease;
+    transition: background 0.2s;
   }
   @keyframes dd-in { from { opacity:0; transform: translateY(-4px); } to { opacity:1; transform: translateY(0); } }
   .dd-item {
     display: flex; align-items: center; gap: 8px;
     padding: 7px 10px; border-radius: 6px; cursor: pointer;
-    font-size: 12px; color: #cbd5e1; transition: background 0.1s;
+    font-size: 12px; color: var(--dd-text); transition: background 0.1s;
   }
-  .dd-item:hover { background: #334155; }
-  .dd-item.active { background: #1e3a5f; }
+  .dd-item:hover { background: var(--dd-hover); }
+  .dd-item.active { background: var(--dd-active); }
+
+  /* ── Theme toggle button ── */
+  .theme-btn {
+    width: 34px; height: 20px; border-radius: 10px;
+    border: 1.5px solid var(--border-sub);
+    background: var(--bg-card);
+    cursor: pointer; position: relative;
+    display: flex; align-items: center; padding: 2px;
+    transition: background 0.25s, border-color 0.25s;
+    flex-shrink: 0;
+  }
+  .theme-btn-knob {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: #3b82f6; transition: transform 0.25s;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 8px; line-height: 1;
+  }
+  body[data-theme="day"] .theme-btn-knob { transform: translateX(14px); background: #f59e0b; }
 </style>
 </head>
 <body>
@@ -164,7 +284,7 @@ function generateRooms() {
   }
   return list; // exactly 44
 }
-const ROOM_IDS = generateRooms(); // [1101..1135B]
+const ROOM_IDS = generateRooms();
 
 function initRooms() {
   return ROOM_IDS.reduce((acc, id) => {
@@ -213,36 +333,22 @@ function checkAssignment(nurseId, roomIds, allRooms) {
   return null;
 }
 
-// ── CORRIDOR LAYOUT (dynamic — guaranteed no overlap at any panel size) ────────
-// 11 per side × 4 sides = 44 rooms
+// ── CORRIDOR LAYOUT ───────────────────────────────────────────────────────────
 function getCorridorLayout(W, H) {
   const PAD = 12, GAP = 6;
-  const N = 11; // cards per side
-
-  // Card width: largest that fits N cards across W with no overlap
-  const cw = Math.max(46, Math.min(68, Math.floor((W - 2*PAD) / N)));
-  // Card height: largest that fits N cards down each side with corner clearance
-  // Derivation: middle span = H - 2*PAD - 2*(ch+GAP); step = span/(N-1) ≥ ch
-  // → ch ≤ (H - 2*PAD - 2*GAP) / (N+2)
-  const ch = Math.max(38, Math.min(54, Math.floor((H - 2*PAD - 2*GAP) / (N+2))));
-
+  const TOP_N = 14, SIDE_N = 8;
+  const cw = Math.max(44, Math.min(72, Math.floor((W - 2*PAD - (TOP_N-1)*GAP) / TOP_N)));
+  const ch = Math.max(36, Math.min(58, Math.floor((H - 2*PAD - (SIDE_N+1)*GAP) / (SIDE_N+2))));
   const xL = PAD, xR = W - PAD - cw;
   const yT = PAD, yB = H - PAD - ch;
-  // Middle section (between corner cards) with guaranteed GAP from corners
   const yMidT = yT + ch + GAP;
   const yMidB = yB - ch - GAP;
-
   const positions = [];
-  for (let i = 0; i < N; i++) // Top: left → right
-    positions.push({ x: xL + (xR-xL)*i/(N-1), y: yT });
-  for (let i = 0; i < N; i++) // Right: top → bottom
-    positions.push({ x: xR, y: yMidT + (yMidB-yMidT)*i/(N-1) });
-  for (let i = 0; i < N; i++) // Bottom: right → left
-    positions.push({ x: xR - (xR-xL)*i/(N-1), y: yB });
-  for (let i = 0; i < N; i++) // Left: bottom → top
-    positions.push({ x: xL, y: yMidB - (yMidB-yMidT)*i/(N-1) });
-
-  return { positions, cw, ch }; // 44 positions, guaranteed gap ≥ GAP everywhere
+  for (let i = 0; i < TOP_N;  i++) positions.push({ x: xL + (xR-xL)*i/(TOP_N-1),   y: yT });
+  for (let i = 0; i < SIDE_N; i++) positions.push({ x: xR,                           y: yMidT + (yMidB-yMidT)*i/(SIDE_N-1) });
+  for (let i = 0; i < TOP_N;  i++) positions.push({ x: xR - (xR-xL)*i/(TOP_N-1),    y: yB });
+  for (let i = 0; i < SIDE_N; i++) positions.push({ x: xL,                           y: yMidB - (yMidB-yMidT)*i/(SIDE_N-1) });
+  return { positions, cw, ch };
 }
 
 // ── ROOM DROPDOWN (portal) ────────────────────────────────────────────────────
@@ -255,7 +361,6 @@ function RoomDropdown({ room, nurses, nurseRooms, anchor, onAssign, onUnassign, 
     return () => document.removeEventListener('mousedown', h, true);
   }, []);
 
-  // Flip up if near bottom
   const menuH = nurses.length * 38 + 60;
   const spaceBelow = window.innerHeight - anchor.bottom;
   const style = {
@@ -267,7 +372,7 @@ function RoomDropdown({ room, nurses, nurseRooms, anchor, onAssign, onUnassign, 
 
   return ReactDOM.createPortal(
     <div ref={ref} className="room-dropdown" style={style}>
-      <div style={{ padding:'5px 10px 6px', fontSize:10, color:'#64748b', borderBottom:'1px solid #334155', fontWeight:700, letterSpacing:'0.05em' }}>
+      <div style={{ padding:'5px 10px 6px', fontSize:10, color:'var(--dd-label)', borderBottom:'1px solid var(--border-sub)', fontWeight:700, letterSpacing:'0.05em' }}>
         ASSIGN ROOM {room.id}
       </div>
       {nurses.map(n => {
@@ -278,13 +383,13 @@ function RoomDropdown({ room, nurses, nurseRooms, anchor, onAssign, onUnassign, 
             onClick={() => { onAssign(n.id); onClose(); }}>
             <div style={{ width:8,height:8,borderRadius:'50%',background:n.color,flexShrink:0 }}/>
             <span style={{ flex:1 }}>{n.name}</span>
-            <span style={{ fontSize:10,color:'#64748b' }}>{pts}pt</span>
+            <span style={{ fontSize:10,color:'var(--dd-label)' }}>{pts}pt</span>
             {isMe && <span style={{ color:'#22c55e',fontSize:11 }}>✓</span>}
           </div>
         );
       })}
       {room.nurseId && (
-        <div className="dd-item" style={{ color:'#f87171',borderTop:'1px solid #334155',marginTop:2 }}
+        <div className="dd-item" style={{ color:'#f87171',borderTop:'1px solid var(--border-sub)',marginTop:2 }}
           onClick={() => { onUnassign(); onClose(); }}>
           <span>✕</span><span>Unassign</span>
         </div>
@@ -330,13 +435,13 @@ function RoomCard({ room, pos, cw, ch, selected, nurses, nurseRooms, onSelect, o
         onDragStart={onDragStart}
         title={`Room ${room.id}${room.occupied ? (room.type==='TELE' ? ' · TELE' : ' · M/S') : ' · Vacant'}`}
       >
-        {/* Assigned checkmark badge — prominent, nurse-colored */}
+        {/* Assigned checkmark badge */}
         {room.nurseId && room._nurseColor && (
           <div style={{
             position:'absolute', top:-7, right:-7,
             width:17, height:17, borderRadius:'50%',
             background: room._nurseColor,
-            border:'2px solid #080f1d',
+            border:'2px solid var(--bg-base)',
             display:'flex', alignItems:'center', justifyContent:'center',
             fontSize:10, fontWeight:900, color:'white', lineHeight:1,
             zIndex:3, boxShadow:'0 2px 6px rgba(0,0,0,0.5)'
@@ -357,7 +462,7 @@ function RoomCard({ room, pos, cw, ch, selected, nurses, nurseRooms, onSelect, o
           </div>
         )}
 
-        {/* Assign button (visible on hover via CSS) */}
+        {/* Assign button */}
         {room.occupied && (
           <button className="assign-btn" onClick={openMenu} title="Assign to nurse">+</button>
         )}
@@ -380,7 +485,7 @@ function RoomCard({ room, pos, cw, ch, selected, nurses, nurseRooms, onSelect, o
 function Toggle({ on, onChange, label, color='#22c55e' }) {
   return (
     <div className="toggle-row">
-      <span style={{ fontSize:13, color:'#cbd5e1' }}>{label}</span>
+      <span style={{ fontSize:13, color:'var(--text-2)' }}>{label}</span>
       <button className={`toggle${on?' on':''}`} style={on?{background:color}:{}} onClick={()=>onChange(!on)}/>
     </div>
   );
@@ -394,22 +499,22 @@ function PatientModal({ room, onClose, onSave }) {
     <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div className="modal">
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
-          <h2 style={{ margin:0, fontSize:18, fontWeight:700 }}>Room {room.id}</h2>
+          <h2 style={{ margin:0, fontSize:18, fontWeight:700, color:'var(--text-1)' }}>Room {room.id}</h2>
           <button className="btn btn-ghost" onClick={onClose}>✕</button>
         </div>
 
         <div className="toggle-row">
-          <span style={{ fontSize:13,color:'#cbd5e1' }}>Occupied</span>
+          <span style={{ fontSize:13, color:'var(--text-2)' }}>Occupied</span>
           <button className={`toggle${s.occupied?' on':''}`} onClick={()=>set('occupied',!s.occupied)}/>
         </div>
 
         {s.occupied && (<>
           <div className="toggle-row">
-            <span style={{ fontSize:13,color:'#cbd5e1' }}>Gender</span>
+            <span style={{ fontSize:13, color:'var(--text-2)' }}>Gender</span>
             <div style={{ display:'flex', gap:6 }}>
               {['male','female'].map(g=>(
                 <button key={g} className="btn" onClick={()=>set('gender',g)}
-                  style={{ background:s.gender===g?(g==='male'?'#1d4ed8':'#be185d'):'#334155', color:'white', padding:'4px 10px' }}>
+                  style={{ background:s.gender===g?(g==='male'?'#1d4ed8':'#be185d'):'var(--btn-ghost-bg)', color:s.gender===g?'white':'var(--btn-ghost-tx)', padding:'4px 10px' }}>
                   {g==='male'?'♂ Male':'♀ Female'}
                 </button>
               ))}
@@ -417,11 +522,11 @@ function PatientModal({ room, onClose, onSave }) {
           </div>
 
           <div className="toggle-row">
-            <span style={{ fontSize:13,color:'#cbd5e1' }}>Type</span>
+            <span style={{ fontSize:13, color:'var(--text-2)' }}>Type</span>
             <div style={{ display:'flex', gap:6 }}>
               {['MEDSURG','TELE'].map(t=>(
                 <button key={t} className="btn" onClick={()=>set('type',t)}
-                  style={{ background:s.type===t?(t==='TELE'?'#dc2626':'#0369a1'):'#334155', color:'white', padding:'4px 10px' }}>
+                  style={{ background:s.type===t?(t==='TELE'?'#dc2626':'#0369a1'):'var(--btn-ghost-bg)', color:s.type===t?'white':'var(--btn-ghost-tx)', padding:'4px 10px' }}>
                   {t==='TELE'?'♥ TELE':'MED/SURG'}
                 </button>
               ))}
@@ -434,7 +539,7 @@ function PatientModal({ room, onClose, onSave }) {
           <Toggle on={s.totalCare}  onChange={v=>set('totalCare',v)}  label="Total Care"      color="#be123c"/>
           <Toggle on={s.glucose}    onChange={v=>set('glucose',v)}    label="Glucose Check"   color="#16a34a"/>
           <Toggle on={s.highAcuity} onChange={v=>set('highAcuity',v)} label="High Acuity"     color="#ea580c"/>
-          <Toggle on={s.sitter}    onChange={v=>set('sitter',v)}    label="Sitter"          color="#7c3aed"/>
+          <Toggle on={s.sitter}     onChange={v=>set('sitter',v)}     label="Sitter"          color="#7c3aed"/>
         </>)}
 
         <div style={{ display:'flex', gap:8, marginTop:16, justifyContent:'flex-end' }}>
@@ -453,8 +558,8 @@ function UnassignedPopup({ rooms, onClose }) {
       <div className="modal" style={{ width:440, maxHeight:'72vh', display:'flex', flexDirection:'column' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
           <div>
-            <h2 style={{ margin:0, fontSize:16, fontWeight:700 }}>Unassigned Rooms</h2>
-            <p style={{ margin:'2px 0 0', fontSize:11, color:'#64748b' }}>
+            <h2 style={{ margin:0, fontSize:16, fontWeight:700, color:'var(--text-1)' }}>Unassigned Rooms</h2>
+            <p style={{ margin:'2px 0 0', fontSize:11, color:'var(--text-4)' }}>
               {rooms.length} occupied {rooms.length===1?'room':'rooms'} without a nurse
             </p>
           </div>
@@ -486,7 +591,7 @@ function UnassignedPopup({ rooms, onClose }) {
         </div>
 
         {rooms.length>0 && (
-          <div style={{ marginTop:14, paddingTop:12, borderTop:'1px solid #334155', display:'flex', gap:10, fontSize:11, color:'#64748b' }}>
+          <div style={{ marginTop:14, paddingTop:12, borderTop:'1px solid var(--border-sub)', display:'flex', gap:10, fontSize:11, color:'var(--text-4)' }}>
             <span>♥ = TELE</span>
             <span style={{ background:'#fce7f3', color:'#9d174d', padding:'1px 7px', borderRadius:4 }}>Pink = Female</span>
             <span style={{ background:'#dbeafe', color:'#1d4ed8', padding:'1px 7px', borderRadius:4 }}>Blue = Male</span>
@@ -506,10 +611,10 @@ function WarningModal({ warning, onOverride, onCancel }) {
           <span style={{ fontSize:32, lineHeight:1 }}>⚠️</span>
           <div>
             <h3 style={{ margin:0, fontSize:16, fontWeight:700, color:'#fbbf24' }}>Assignment Warning</h3>
-            <p style={{ margin:'8px 0 0', fontSize:13, color:'#cbd5e1', lineHeight:1.55 }}>{warning}</p>
+            <p style={{ margin:'8px 0 0', fontSize:13, color:'var(--text-2)', lineHeight:1.55 }}>{warning}</p>
           </div>
         </div>
-        <p style={{ margin:'0 0 18px', fontSize:12, color:'#64748b' }}>
+        <p style={{ margin:'0 0 18px', fontSize:12, color:'var(--text-4)' }}>
           Override this rule and assign anyway?
         </p>
         <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
@@ -560,7 +665,6 @@ function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, on
     { key:'highAcuity', label:'HA', color:'#ea580c' },
   ];
 
-  // Rooms being dragged that aren't already in this nurse's list
   const incomingPreview = dragOver
     ? (previewIds||[]).filter(id => !rooms.includes(id) && allRooms[id]?.occupied)
     : [];
@@ -583,14 +687,13 @@ function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, on
             style={{ flex:1, padding:'2px 6px', fontSize:13 }}
           />
         ) : (
-          <span style={{ flex:1, fontWeight:700, fontSize:13, cursor:'text' }}
+          <span style={{ flex:1, fontWeight:700, fontSize:13, cursor:'text', color:'var(--text-1)' }}
             onDoubleClick={()=>{ setNameVal(nurse.name); setEditing(true); }}>
             {nurse.name}
           </span>
         )}
-        <span style={{ fontSize:11, color:'#64748b', fontWeight:600 }}>{occ.length}/{cap}</span>
+        <span style={{ fontSize:11, color:'var(--text-4)', fontWeight:600 }}>{occ.length}/{cap}</span>
         {hasTele && <span style={{ fontSize:10, background:'#7f1d1d', color:'#fca5a5', borderRadius:4, padding:'1px 5px' }}>TELE</span>}
-        {/* Trash */}
         <div className={`trash-zone${trashOver?' drag-over':''}`}
           onDragOver={e=>{ e.preventDefault(); e.stopPropagation(); setTrashOver(true); setDragOver(false); }}
           onDragLeave={()=>setTrashOver(false)}
@@ -611,7 +714,7 @@ function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, on
           const c = occ.filter(r=>r[f.key]).length;
           if(!c) return null;
           return <span key={f.key} style={{ fontSize:9, padding:'1px 5px', borderRadius:4, fontWeight:700,
-            background: c>=2?f.color:'#1e293b', color: c>=2?'white':'#94a3b8', border:`1px solid ${f.color}` }}>
+            background: c>=2?f.color:'var(--bg-base)', color: c>=2?'white':'var(--text-3)', border:`1px solid ${f.color}` }}>
             {c} {f.label}
           </span>;
         })}
@@ -628,7 +731,6 @@ function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, on
             />
           );
         })}
-        {/* Drag-over preview badges */}
         {incomingPreview.map(id=>{
           const r = allRooms[id];
           return (
@@ -639,7 +741,6 @@ function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, on
         })}
       </div>
 
-      {/* Remove all */}
       {rooms.length>0 && (
         <button className="btn btn-ghost" onClick={onRemoveAll}
           style={{ fontSize:10, padding:'2px 8px', marginTop:6, width:'100%' }}>
@@ -654,8 +755,8 @@ function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, on
 function Legend() {
   const sw = (bg) => ({ width:10,height:10,borderRadius:3,background:bg,display:'inline-block' });
   return (
-    <div style={{ padding:'7px 10px', background:'#1e293b', borderRadius:8, fontSize:10, display:'flex', flexWrap:'wrap', gap:'6px 12px', color:'#7a91aa' }}>
-      <span style={{ display:'flex',alignItems:'center',gap:4 }}><span style={sw('#2d3f55')}/>Vacant</span>
+    <div style={{ padding:'7px 10px', background:'var(--legend-bg)', borderRadius:8, fontSize:10, display:'flex', flexWrap:'wrap', gap:'6px 12px', color:'var(--text-3)', transition:'background 0.25s' }}>
+      <span style={{ display:'flex',alignItems:'center',gap:4 }}><span style={sw('var(--room-vacant-bg)')}/>Vacant</span>
       <span style={{ display:'flex',alignItems:'center',gap:4 }}><span style={sw('#bfdbfe')}/>Male</span>
       <span style={{ display:'flex',alignItems:'center',gap:4 }}><span style={sw('#f9a8d4')}/>Female</span>
       <span>♥ TELE</span><span>F=Foley</span><span>IV=Drip</span><span>TC=Total Care</span><span>BG=Glucose</span><span>HA=High Acuity</span>
@@ -680,33 +781,28 @@ function CorridorGrid({ allRooms, selected, nurses, nurseRooms, dragPreviewIds, 
   const { w, h } = dims;
   const { positions, cw, ch } = getCorridorLayout(w, h);
 
-  // nurse color lookup
   const nurseColorMap = {};
   nurses.forEach(n=>(nurseRooms[n.id]||[]).forEach(id=>{ nurseColorMap[id]=n.color; }));
 
-  // SVG corridor outline — inset to card centers
   const PAD=12;
   const rx=PAD, ry=PAD, rw=w-2*PAD-cw, rh=h-2*PAD-ch;
 
   return (
     <div ref={ref} className="corridor-container">
-      {/* Click empty space to clear selection */}
       <div style={{ position:'absolute', inset:0, zIndex:0 }} onClick={onClearSelection}/>
-      {/* Dashed corridor rectangle */}
       <svg style={{ position:'absolute',inset:0,width:'100%',height:'100%',pointerEvents:'none' }}>
-        <rect x={rx+CW/2} y={ry+CH/2} width={rw} height={rh} rx={18} ry={18} className="corridor-path"/>
+        <rect x={rx+cw/2} y={ry+ch/2} width={rw} height={rh} rx={18} ry={18} className="corridor-path"/>
       </svg>
 
       {/* Nursing Station center */}
       <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'none' }}>
-        <div style={{ textAlign:'center', background:'rgba(15,23,42,0.9)', border:'1px solid #1e3a5f', borderRadius:14, padding:'14px 28px' }}>
-          <div style={{ fontSize:22, fontWeight:800, letterSpacing:'-0.5px', color:'#1d4ed8', opacity:0.9 }}>MED/TELE</div>
-          <div style={{ fontSize:11, color:'#475569', marginTop:2 }}>44 Beds</div>
-          <div style={{ fontSize:10, color:'#334155', marginTop:1 }}>Nursing Station</div>
+        <div style={{ textAlign:'center', background:'var(--station-bg)', border:'1px solid var(--station-border)', borderRadius:14, padding:'14px 28px', transition:'background 0.25s' }}>
+          <div style={{ fontSize:22, fontWeight:800, letterSpacing:'-0.5px', color:'var(--station-label)', opacity:0.9 }}>MED/TELE</div>
+          <div style={{ fontSize:11, color:'var(--text-4)', marginTop:2 }}>44 Beds</div>
+          <div style={{ fontSize:10, color:'var(--text-5)', marginTop:1 }}>Nursing Station</div>
         </div>
       </div>
 
-      {/* Room cards */}
       {ROOM_IDS.map((id,i)=>{
         const room = {...allRooms[id], _nurseColor: nurseColorMap[id]};
         return (
@@ -723,11 +819,20 @@ function CorridorGrid({ allRooms, selected, nurses, nurseRooms, dragPreviewIds, 
         );
       })}
 
-      {/* Hint */}
-      <div style={{ position:'absolute', bottom:8, right:12, fontSize:9, color:'#334155' }}>
-        Double-click to edit · Ctrl+click multi-select · Drag to nurse · hover + to assign
+      <div style={{ position:'absolute', bottom:8, right:12, fontSize:9, color:'var(--text-5)' }}>
+        Double-click to edit · Click to select · Drag to nurse · hover + to assign
       </div>
     </div>
+  );
+}
+
+// ── THEME TOGGLE ──────────────────────────────────────────────────────────────
+function ThemeToggle({ theme, onToggle }) {
+  const isDay = theme === 'day';
+  return (
+    <button className="theme-btn" onClick={onToggle} title={isDay ? 'Switch to Night mode' : 'Switch to Day mode'}>
+      <div className="theme-btn-knob">{isDay ? '☀' : '🌙'}</div>
+    </button>
   );
 }
 
@@ -743,11 +848,18 @@ function App() {
   const [newNurseName, setNewNurseName] = useState('');
   const [dragRoomIds, setDragRoomIds] = useState([]);
   const [pendingAssignment, setPendingAssignment] = useState(null);
+  const [theme, setTheme] = useState(()=>localStorage.getItem('careflow_theme')||'night');
   const toastRef = useRef();
   const autoSaveRef = useRef();
   const colorIdx = useRef(_saved?.nurses?.length ?? DEFAULT_NURSES.length);
 
-  // Auto-save on any rooms/nurses change (debounced)
+  // Apply theme to body
+  useEffect(()=>{
+    document.body.dataset.theme = theme;
+    localStorage.setItem('careflow_theme', theme);
+  }, [theme]);
+
+  // Auto-save
   useEffect(()=>{
     clearTimeout(autoSaveRef.current);
     autoSaveRef.current = setTimeout(()=>{
@@ -775,7 +887,7 @@ function App() {
 
   function selectRoom(id, e) {
     if(!rooms[id].occupied) return;
-    e.stopPropagation(); // don't bubble to corridor background
+    e.stopPropagation();
     setSelected(prev=>{
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
@@ -783,7 +895,6 @@ function App() {
     });
   }
 
-  // Escape or click on empty corridor space clears selection
   useEffect(()=>{
     const h = e => { if(e.key==='Escape') setSelected(new Set()); };
     window.addEventListener('keydown', h);
@@ -797,7 +908,6 @@ function App() {
     setDragRoomIds(ids);
   }
 
-  // Core commit — called immediately or after override confirmation
   function commitAssign(nurseId, roomIds) {
     setRooms(prev=>{ const n={...prev}; roomIds.forEach(id=>{n[id]={...n[id],nurseId};}); return n; });
     setSelected(new Set());
@@ -805,7 +915,7 @@ function App() {
     setPendingAssignment(null);
   }
 
-  function tryAssign(nurseId, roomIds, onConflictToast) {
+  function tryAssign(nurseId, roomIds) {
     const cand = [...new Set([...(nurseRooms[nurseId]||[]),...roomIds])];
     const err = checkAssignment(nurseId, cand, rooms);
     if(err) {
@@ -819,21 +929,18 @@ function App() {
     const badgeRoomId = e.dataTransfer.getData('badgeRoomId');
     const fromNurseId = e.dataTransfer.getData('fromNurseId');
 
-    // Badge dragged to trash
     if(toTrash && badgeRoomId) {
       setRooms(prev=>({...prev,[badgeRoomId]:{...prev[badgeRoomId],nurseId:null}}));
       return;
     }
     if(toTrash) return;
 
-    // Badge moved between nurse cards
     if(badgeRoomId && fromNurseId) {
       if(fromNurseId===nurseId) return;
       tryAssign(nurseId, [badgeRoomId]);
       return;
     }
 
-    // Room cards dragged from grid
     const rawIds = e.dataTransfer.getData('roomIds');
     if(!rawIds) return;
     const ids = JSON.parse(rawIds);
@@ -899,30 +1006,32 @@ function App() {
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100vh', overflow:'hidden' }}>
       {/* ── Header ── */}
-      <div style={{ background:'#0a1628', borderBottom:'1px solid #1e293b', padding:'9px 20px', display:'flex', alignItems:'center', gap:16, flexShrink:0 }}>
+      <div style={{ background:'var(--bg-panel)', borderBottom:'1px solid var(--border)', padding:'9px 20px', display:'flex', alignItems:'center', gap:16, flexShrink:0, transition:'background 0.25s' }}>
         <div>
           <span style={{ fontSize:21, fontWeight:800, background:'linear-gradient(90deg,#3b82f6,#22c55e)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>CareFlow</span>
-          <span style={{ fontSize:12, color:'#475569', marginLeft:8 }}>MED/TELE</span>
+          <span style={{ fontSize:12, color:'var(--text-4)', marginLeft:8 }}>MED/TELE</span>
         </div>
-        <div style={{ marginLeft:'auto', display:'flex', gap:16, fontSize:11, color:'#64748b', alignItems:'center' }}>
-          <span><b style={{ color:'#64748b' }}>{ROOM_IDS.length - totalOcc}</b> empty</span>
-          <span><b style={{ color:'#f1f5f9' }}>{totalOcc}</b> occupied</span>
+        <div style={{ marginLeft:'auto', display:'flex', gap:16, fontSize:11, color:'var(--text-4)', alignItems:'center' }}>
+          <span><b style={{ color:'var(--text-4)' }}>{ROOM_IDS.length - totalOcc}</b> empty</span>
+          <span><b style={{ color:'var(--text-1)' }}>{totalOcc}</b> occupied</span>
           <span><b style={{ color:'#22c55e' }}>{totalAsg}</b> assigned</span>
           <span onClick={()=>setShowUnassigned(true)}
             style={{ cursor:'pointer', borderBottom:'1px dashed #f59e0b', paddingBottom:1 }}
             title="Click to see unassigned rooms">
             <b style={{ color:'#f59e0b' }}>{totalOcc-totalAsg}</b> unassigned
           </span>
-          <span style={{ color:'#334155' }}>|</span>
+          <span style={{ color:'var(--stat-border)' }}>|</span>
           <span><b style={{ color:'#f87171' }}>♥ {totalTele}</b> TELE</span>
           <span><b style={{ color:'#a78bfa' }}>👤 {totalSitter}</b> sitter</span>
-          <span style={{ color:'#334155' }}>|</span>
+          <span style={{ color:'var(--stat-border)' }}>|</span>
           <span>{new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}</span>
           {lastSaved && (
             <span style={{ fontSize:10, color:'#22c55e', display:'flex', alignItems:'center', gap:4 }}>
               ✓ saved {new Date(lastSaved).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}
             </span>
           )}
+          {/* Theme toggle */}
+          <ThemeToggle theme={theme} onToggle={()=>setTheme(t=>t==='night'?'day':'night')}/>
           <button className="btn btn-ghost" onClick={()=>{
             setRooms(prev=>{
               const next={};
@@ -933,7 +1042,7 @@ function App() {
               return next;
             });
             setSelected(new Set());
-          }} style={{ fontSize:11, padding:'4px 12px', border:'1px solid #334155' }}>
+          }} style={{ fontSize:11, padding:'4px 12px', border:'1px solid var(--border-sub)' }}>
             ↺ Reset
           </button>
         </div>
@@ -942,11 +1051,11 @@ function App() {
       {/* ── Main ── */}
       <div style={{ display:'flex', flex:1, overflow:'hidden' }}>
         {/* Nurse panel */}
-        <div className="nurse-panel" style={{ background:'#0a1628', borderRight:'1px solid #1e293b', display:'flex', flexDirection:'column', overflow:'hidden' }}>
-          <div style={{ padding:'12px 12px 8px', borderBottom:'1px solid #1e293b' }}>
-            <div style={{ fontSize:11, fontWeight:700, color:'#475569', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:8, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+        <div className="nurse-panel" style={{ background:'var(--bg-panel)', borderRight:'1px solid var(--border)', display:'flex', flexDirection:'column', overflow:'hidden', transition:'background 0.25s' }}>
+          <div style={{ padding:'12px 12px 8px', borderBottom:'1px solid var(--border)' }}>
+            <div style={{ fontSize:11, fontWeight:700, color:'var(--text-4)', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:8, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
               <span>Nursing Staff</span>
-              <span style={{ background:'#334155', color:'#94a3b8', borderRadius:10, padding:'1px 8px', fontSize:11, fontWeight:700, letterSpacing:0 }}>{nurses.length}</span>
+              <span style={{ background:'var(--btn-ghost-bg)', color:'var(--btn-ghost-tx)', borderRadius:10, padding:'1px 8px', fontSize:11, fontWeight:700, letterSpacing:0 }}>{nurses.length}</span>
             </div>
             <div style={{ display:'flex', gap:6 }}>
               <input type="text" placeholder="Add nurse name…" value={newNurseName}
@@ -959,7 +1068,7 @@ function App() {
           </div>
 
           {selected.size>0 && (
-            <div style={{ padding:'6px 12px', background:'#1c2a3a', borderBottom:'1px solid #1e3a5f', fontSize:11, color:'#93c5fd', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <div style={{ padding:'6px 12px', background:'var(--sel-bar-bg)', borderBottom:'1px solid var(--sel-bar-border)', fontSize:11, color:'var(--sel-bar-text)', display:'flex', alignItems:'center', justifyContent:'space-between', transition:'background 0.25s' }}>
               <span>🔵 {selected.size} room{selected.size>1?'s':''} selected — drag to a nurse</span>
               <button className="btn btn-ghost" onClick={()=>setSelected(new Set())} style={{ fontSize:10, padding:'2px 8px' }}>Clear</button>
             </div>
@@ -967,7 +1076,7 @@ function App() {
 
           <div style={{ flex:1, overflowY:'auto', padding:12 }}>
             {nurses.length===0 && (
-              <div style={{ textAlign:'center', color:'#475569', fontSize:13, marginTop:40 }}>No nurses added yet</div>
+              <div style={{ textAlign:'center', color:'var(--text-4)', fontSize:13, marginTop:40 }}>No nurses added yet</div>
             )}
             {nurses.map(nurse=>(
               <NurseCard key={nurse.id} nurse={nurse}
@@ -982,13 +1091,13 @@ function App() {
             ))}
           </div>
 
-          <div style={{ padding:8, borderTop:'1px solid #1e293b' }}>
+          <div style={{ padding:8, borderTop:'1px solid var(--border)' }}>
             <Legend/>
           </div>
         </div>
 
         {/* Room grid */}
-        <div className="room-panel" style={{ background:'#080f1d' }}>
+        <div className="room-panel" style={{ background:'var(--bg-base)', transition:'background 0.25s' }}>
           <CorridorGrid
             allRooms={rooms}
             selected={selected}
