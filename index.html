@@ -334,20 +334,75 @@ function checkAssignment(nurseId, roomIds, allRooms) {
 }
 
 // ── CORRIDOR LAYOUT ───────────────────────────────────────────────────────────
+// A/B rooms get a tight PAIR_GAP; different room numbers get the normal GAP.
+// placeLine distributes cards along [start → end], scaling the normal gaps to fill
+// the available span while keeping pair gaps fixed and small.
 function getCorridorLayout(W, H) {
-  const PAD = 12, GAP = 6;
+  const PAD = 12, GAP = 6, PAIR_GAP = 2;
   const TOP_N = 14, SIDE_N = 8;
+
   const cw = Math.max(44, Math.min(72, Math.floor((W - 2*PAD - (TOP_N-1)*GAP) / TOP_N)));
   const ch = Math.max(36, Math.min(58, Math.floor((H - 2*PAD - (SIDE_N+1)*GAP) / (SIDE_N+2))));
+
   const xL = PAD, xR = W - PAD - cw;
   const yT = PAD, yB = H - PAD - ch;
   const yMidT = yT + ch + GAP;
   const yMidB = yB - ch - GAP;
-  const positions = [];
-  for (let i = 0; i < TOP_N;  i++) positions.push({ x: xL + (xR-xL)*i/(TOP_N-1),   y: yT });
-  for (let i = 0; i < SIDE_N; i++) positions.push({ x: xR,                           y: yMidT + (yMidB-yMidT)*i/(SIDE_N-1) });
-  for (let i = 0; i < TOP_N;  i++) positions.push({ x: xR - (xR-xL)*i/(TOP_N-1),    y: yB });
-  for (let i = 0; i < SIDE_N; i++) positions.push({ x: xL,                           y: yMidB - (yMidB-yMidT)*i/(SIDE_N-1) });
+
+  // Returns true when idA/idB are the A and B beds of the same room number
+  function isPair(idA, idB) {
+    return idA.endsWith('A') && idB.endsWith('B') && idA.slice(0,-1) === idB.slice(0,-1);
+  }
+
+  // Place n cards from start to end with pair-aware gaps.
+  // cardSize = cw (horizontal) or ch (vertical).
+  // Direction is inferred from start vs end.
+  function placeLine(ids, start, end, cardSize) {
+    const n = ids.length;
+    if (n === 1) return [start];
+    const gapTypes = ids.slice(1).map((id, i) => isPair(ids[i], id) ? 'pair' : 'room');
+    const pairCnt  = gapTypes.filter(t => t === 'pair').length;
+    const roomCnt  = gapTypes.length - pairCnt;
+    const span     = Math.abs(end - start);          // from first-card start to last-card start
+    const S        = span - (n - 1) * cardSize;      // total gap pixels to distribute
+
+    // Minimum pair gap; scale room gaps to fill remaining space
+    let pairG, roomG;
+    if (S <= 0) {
+      pairG = roomG = 0;                             // cards touch — shouldn't happen at normal sizes
+    } else if (pairCnt > 0 && S < pairCnt * PAIR_GAP) {
+      pairG = roomG = S / (n - 1);                  // not enough room even for small pair gap, go uniform
+    } else {
+      pairG = PAIR_GAP;
+      roomG = roomCnt > 0 ? (S - pairCnt * PAIR_GAP) / roomCnt : PAIR_GAP;
+    }
+
+    const dir = end >= start ? 1 : -1;
+    const out = [start];
+    for (let i = 0; i < n - 1; i++) {
+      out.push(out[i] + dir * (cardSize + (gapTypes[i] === 'pair' ? pairG : roomG)));
+    }
+    return out;
+  }
+
+  // Slice ROOM_IDS into the four corridor sides
+  const topIds    = ROOM_IDS.slice(0,          TOP_N);
+  const rightIds  = ROOM_IDS.slice(TOP_N,      TOP_N + SIDE_N);
+  const bottomIds = ROOM_IDS.slice(TOP_N + SIDE_N, TOP_N + SIDE_N + TOP_N);
+  const leftIds   = ROOM_IDS.slice(TOP_N + SIDE_N + TOP_N);
+
+  const topX    = placeLine(topIds,    xL,    xR,    cw);   // left → right
+  const rightY  = placeLine(rightIds,  yMidT, yMidB, ch);   // top → bottom
+  const bottomX = placeLine(bottomIds, xR,    xL,    cw);   // right → left
+  const leftY   = placeLine(leftIds,   yMidB, yMidT, ch);   // bottom → top
+
+  const positions = [
+    ...topX.map(x    => ({ x, y: yT })),
+    ...rightY.map(y  => ({ x: xR, y })),
+    ...bottomX.map(x => ({ x, y: yB })),
+    ...leftY.map(y   => ({ x: xL, y })),
+  ];
+
   return { positions, cw, ch };
 }
 
@@ -449,11 +504,20 @@ function RoomCard({ room, pos, cw, ch, selected, nurses, nurseRooms, onSelect, o
         )}
 
         {/* Room number + TELE heart */}
-        <div style={{ fontSize: Math.max(9, Math.round(cw*0.17)), fontWeight:700, letterSpacing:'-0.2px', lineHeight:1.1 }}>
-          {room.id}
-          {room.occupied && room.type==='TELE' &&
-            <span style={{ color:'#f87171', marginLeft:2, fontSize: Math.max(8, Math.round(cw*0.14)) }}>♥</span>}
-        </div>
+        {(() => {
+          const isAB  = room.id.endsWith('A') || room.id.endsWith('B');
+          const base  = isAB ? room.id.slice(0, -1) : room.id;
+          const suf   = isAB ? room.id.slice(-1) : '';
+          const fsz   = Math.max(9, Math.round(cw * 0.17));
+          return (
+            <div style={{ fontSize: fsz, fontWeight:700, letterSpacing:'-0.2px', lineHeight:1.1, display:'flex', alignItems:'baseline', gap:1 }}>
+              <span>{base}</span>
+              {suf && <span style={{ fontSize: Math.max(7, Math.round(fsz*0.78)), fontWeight:800, opacity:0.75 }}>{suf}</span>}
+              {room.occupied && room.type==='TELE' &&
+                <span style={{ color:'#f87171', marginLeft:2, fontSize: Math.max(8, Math.round(cw*0.14)) }}>♥</span>}
+            </div>
+          );
+        })()}
 
         {/* Flags */}
         {room.occupied && flags.length > 0 && (
@@ -787,12 +851,40 @@ function CorridorGrid({ allRooms, selected, nurses, nurseRooms, dragPreviewIds, 
   const PAD=12;
   const rx=PAD, ry=PAD, rw=w-2*PAD-cw, rh=h-2*PAD-ch;
 
+  // Build A/B pair groups for background highlight
+  const pairGroups = [];
+  ROOM_IDS.forEach((id, i) => {
+    if (!id.endsWith('A')) return;
+    const bId = id.slice(0,-1) + 'B';
+    const bIdx = ROOM_IDS.indexOf(bId);
+    if (bIdx < 0) return;
+    const aPos = positions[i], bPos = positions[bIdx];
+    pairGroups.push({ key: id, aPos, bPos });
+  });
+
   return (
     <div ref={ref} className="corridor-container">
       <div style={{ position:'absolute', inset:0, zIndex:0 }} onClick={onClearSelection}/>
       <svg style={{ position:'absolute',inset:0,width:'100%',height:'100%',pointerEvents:'none' }}>
         <rect x={rx+cw/2} y={ry+ch/2} width={rw} height={rh} rx={18} ry={18} className="corridor-path"/>
       </svg>
+
+      {/* A/B pair grouping backgrounds */}
+      {pairGroups.map(({ key, aPos, bPos }) => {
+        const INSET = 3;
+        const x1 = Math.min(aPos.x, bPos.x) - INSET;
+        const y1 = Math.min(aPos.y, bPos.y) - INSET;
+        const x2 = Math.max(aPos.x, bPos.x) + cw + INSET;
+        const y2 = Math.max(aPos.y, bPos.y) + ch + INSET;
+        return (
+          <div key={key+'-grp'} style={{
+            position:'absolute', left:x1, top:y1, width:x2-x1, height:y2-y1,
+            borderRadius:11, zIndex:0, pointerEvents:'none',
+            border:'1.5px solid rgba(139,92,246,0.32)',
+            background:'rgba(139,92,246,0.07)',
+          }}/>
+        );
+      })}
 
       {/* Nursing Station center */}
       <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'none' }}>
