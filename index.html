@@ -338,16 +338,21 @@ function checkAssignment(nurseId, roomIds, allRooms) {
 // placeLine distributes cards along [start → end], scaling the normal gaps to fill
 // the available span while keeping pair gaps fixed and small.
 function getCorridorLayout(W, H) {
-  const PAD = 12, GAP = 6, PAIR_GAP = 2;
+  const PAD = 12, GAP = 6, PAIR_GAP = 2, CORNER_GAP = 18;
   const TOP_N = 14, SIDE_N = 8;
 
+  // cw: fit TOP_N cards + (TOP_N-1) normal gaps across available width
   const cw = Math.max(44, Math.min(72, Math.floor((W - 2*PAD - (TOP_N-1)*GAP) / TOP_N)));
-  const ch = Math.max(36, Math.min(58, Math.floor((H - 2*PAD - (SIDE_N+1)*GAP) / (SIDE_N+2))));
+
+  // ch: total height = 2·PAD + (SIDE_N+2)·ch + 2·CORNER_GAP + (SIDE_N-1)·GAP
+  // corner cards are the top/bottom row cards at the four corners;
+  // CORNER_GAP is the breathing room between a corner card and the adjacent side card.
+  const ch = Math.max(36, Math.min(58, Math.floor((H - 2*PAD - 2*CORNER_GAP - (SIDE_N-1)*GAP) / (SIDE_N+2))));
 
   const xL = PAD, xR = W - PAD - cw;
   const yT = PAD, yB = H - PAD - ch;
-  const yMidT = yT + ch + GAP;
-  const yMidB = yB - ch - GAP;
+  const yMidT = yT + ch + CORNER_GAP;   // top edge of first side-column card
+  const yMidB = yB - ch - CORNER_GAP;   // top edge of last side-column card
 
   // Returns true when idA/idB are the A and B beds of the same room number
   function isPair(idA, idB) {
