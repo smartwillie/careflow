@@ -268,6 +268,53 @@
     font-size: 8px; line-height: 1;
   }
   body[data-theme="day"] .theme-btn-knob { transform: translateX(14px); background: #f59e0b; }
+
+  /* ── Center Dashboard ── */
+  .dash-card {
+    position: relative;
+    isolation: isolate;   /* own stacking context so ::before stays behind content */
+    border-radius: 20px;
+    transition: background 0.25s;
+  }
+  /* Animated gradient border via ::before */
+  .dash-card::before {
+    content: '';
+    position: absolute; inset: -2.5px;
+    border-radius: 22.5px;
+    background: linear-gradient(135deg, #3b82f6, #22c55e, #a855f7, #f59e0b, #3b82f6);
+    background-size: 300% 300%;
+    animation: grad-border 5s ease infinite;
+    z-index: -1;
+  }
+  @keyframes grad-border {
+    0%   { background-position: 0%   50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0%   50%; }
+  }
+  /* Animated shimmer title */
+  .dash-title {
+    background: linear-gradient(90deg, #3b82f6, #22c55e, #a855f7, #f59e0b, #3b82f6);
+    background-size: 300% 100%;
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent; color: transparent;
+    animation: title-shimmer 4s linear infinite;
+    display: inline-block;
+  }
+  @keyframes title-shimmer {
+    0%   { background-position:   0% 50%; }
+    100% { background-position: 300% 50%; }
+  }
+  /* Subtle pulse on subtitle */
+  .dash-sub {
+    animation: sub-pulse 4s ease-in-out infinite;
+  }
+  @keyframes sub-pulse {
+    0%,100% { opacity: 0.55; }
+    50%     { opacity: 0.90; }
+  }
+  /* Stat cell hover */
+  .stat-cell { transition: background 0.15s, transform 0.12s; }
+  .stat-cell:hover { transform: scale(1.04); }
 </style>
 </head>
 <body>
@@ -290,12 +337,27 @@ function initRooms() {
   return ROOM_IDS.reduce((acc, id) => {
     acc[id] = { id, occupied: false, gender: 'male', type: 'MEDSURG',
                 foley: false, drip: false, prisoner: false, totalCare: false,
-                glucose: false, highAcuity: false, sitter: false, nurseId: null };
+                glucose: false, highAcuity: false, sitter: false,
+                discharge: false, isolation: false, nurseId: null };
     return acc;
   }, {});
 }
 
 const NURSE_COLORS = ['#3b82f6','#22c55e','#f59e0b','#a855f7','#ec4899','#14b8a6','#f97316','#6366f1','#84cc16','#06b6d4'];
+
+// ── FLAG DEFINITIONS ─────────────────────────────────────────────────────────
+// Centralized so RoomCard and NurseCard share the same colour palette.
+const FLAG_DEFS = [
+  { key:'foley',      label:'F',   bg:'#7c3aed', tc:'#fff' },
+  { key:'drip',       label:'IV',  bg:'#0369a1', tc:'#fff' },
+  { key:'prisoner',   label:'🔒',  bg:'#78350f', tc:'#fff' },
+  { key:'totalCare',  label:'TC',  bg:'#9f1239', tc:'#fff' },
+  { key:'glucose',    label:'BG',  bg:'#166534', tc:'#fff' },
+  { key:'highAcuity', label:'HA',  bg:'#b91c1c', tc:'#fff', glow:'#ef4444' },
+  { key:'sitter',     label:'ST',  bg:'#5b21b6', tc:'#fff' },
+  { key:'discharge',  label:'DC',  bg:'#0369a1', tc:'#bae6fd' },
+  { key:'isolation',  label:'ISO', bg:'#c2410c', tc:'#fff' },
+];
 
 const STORAGE_KEY = 'careflow_assignment';
 const DEFAULT_NURSES = [
@@ -470,14 +532,7 @@ function RoomCard({ room, pos, cw, ch, selected, nurses, nurseRooms, onSelect, o
   else cls += 'male';
   if (selected) cls += ' selected';
 
-  const flags = [];
-  if (room.foley)      flags.push('F');
-  if (room.drip)       flags.push('IV');
-  if (room.prisoner)   flags.push('🔒');
-  if (room.totalCare)  flags.push('TC');
-  if (room.glucose)    flags.push('BG');
-  if (room.highAcuity) flags.push('HA');
-  if (room.sitter)     flags.push('ST');
+  const flags = FLAG_DEFS.filter(f => room[f.key]);
 
   function openMenu(e) {
     e.stopPropagation();
@@ -527,7 +582,14 @@ function RoomCard({ room, pos, cw, ch, selected, nurses, nurseRooms, onSelect, o
         {/* Flags */}
         {room.occupied && flags.length > 0 && (
           <div style={{ display:'flex', flexWrap:'wrap', justifyContent:'center', gap:1, marginTop:2 }}>
-            {flags.slice(0, ch > 44 ? 3 : 2).map(f => <span key={f} className="flag">{f}</span>)}
+            {flags.slice(0, ch > 44 ? 4 : 2).map(f => (
+              <span key={f.key} style={{
+                fontSize:8, fontWeight:800, borderRadius:3,
+                padding:'1px 3px', lineHeight:1.3,
+                background: f.bg, color: f.tc,
+                boxShadow: f.glow ? `0 0 5px ${f.glow}88` : 'none',
+              }}>{f.label}</span>
+            ))}
           </div>
         )}
 
@@ -609,6 +671,8 @@ function PatientModal({ room, onClose, onSave }) {
           <Toggle on={s.glucose}    onChange={v=>set('glucose',v)}    label="Glucose Check"   color="#16a34a"/>
           <Toggle on={s.highAcuity} onChange={v=>set('highAcuity',v)} label="High Acuity"     color="#ea580c"/>
           <Toggle on={s.sitter}     onChange={v=>set('sitter',v)}     label="Sitter"          color="#7c3aed"/>
+          <Toggle on={s.discharge}  onChange={v=>set('discharge',v)}  label="Discharge"       color="#0ea5e9"/>
+          <Toggle on={s.isolation}  onChange={v=>set('isolation',v)}  label="Isolation"       color="#f97316"/>
         </>)}
 
         <div style={{ display:'flex', gap:8, marginTop:16, justifyContent:'flex-end' }}>
@@ -808,13 +872,7 @@ function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, on
   const pct = Math.min((occ.length/cap)*100, 100);
   const capColor = pct>=100 ? '#ef4444' : pct>=75 ? '#f59e0b' : '#22c55e';
 
-  const flagDefs = [
-    { key:'glucose',    label:'BG', color:'#16a34a' },
-    { key:'totalCare',  label:'TC', color:'#be123c' },
-    { key:'drip',       label:'IV', color:'#0891b2' },
-    { key:'prisoner',   label:'🔒', color:'#b45309' },
-    { key:'highAcuity', label:'HA', color:'#ea580c' },
-  ];
+  const flagDefs = FLAG_DEFS; // shared definition
 
   const incomingPreview = dragOver
     ? (previewIds||[]).filter(id => !rooms.includes(id) && allRooms[id]?.occupied)
@@ -865,7 +923,10 @@ function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, on
           const c = occ.filter(r=>r[f.key]).length;
           if(!c) return null;
           return <span key={f.key} style={{ fontSize:9, padding:'1px 5px', borderRadius:4, fontWeight:700,
-            background: c>=2?f.color:'var(--bg-base)', color: c>=2?'white':'var(--text-3)', border:`1px solid ${f.color}` }}>
+            background: c>=2 ? f.bg : 'var(--bg-base)',
+            color:      c>=2 ? f.tc : 'var(--text-3)',
+            border:`1px solid ${f.bg}`,
+            boxShadow: c>=2 && f.glow ? `0 0 6px ${f.glow}66` : 'none' }}>
             {c} {f.label}
           </span>;
         })}
@@ -918,41 +979,53 @@ function Legend() {
 // ── CENTER DASHBOARD ─────────────────────────────────────────────────────────
 function StatCell({ icon, value, label, color, onClick, active, btnRef }) {
   return (
-    <div ref={btnRef} onClick={onClick} style={{
-      display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
-      padding:'9px 6px', borderRadius:10, gap:3,
-      cursor: onClick ? 'pointer' : 'default',
-      background: active   ? 'rgba(245,158,11,0.13)' : 'transparent',
-      border: onClick
-        ? `1.5px solid ${active ? '#f59e0b' : 'rgba(245,158,11,0.25)'}`
-        : '1.5px solid transparent',
-      transition:'background 0.15s, border-color 0.15s',
-    }}>
-      <div style={{ fontSize:14, lineHeight:1 }}>{icon}</div>
-      <div style={{ fontSize:24, fontWeight:800, color, lineHeight:1 }}>{value}</div>
-      <div style={{ fontSize:9, color:'var(--text-4)', fontWeight:700, letterSpacing:'0.06em', textTransform:'uppercase' }}>{label}</div>
+    <div ref={btnRef} onClick={onClick}
+      className="stat-cell"
+      style={{
+        display:'flex', flexDirection:'row', alignItems:'center', gap:10,
+        padding:'8px 12px', borderRadius:10,
+        cursor: onClick ? 'pointer' : 'default',
+        background: active ? 'rgba(245,158,11,0.14)' : 'var(--dd-hover)',
+        border: onClick
+          ? `1.5px solid ${active ? '#f59e0b' : 'rgba(245,158,11,0.28)'}`
+          : '1.5px solid var(--border)',
+      }}>
+      <div style={{ fontSize:18, lineHeight:1, flexShrink:0 }}>{icon}</div>
+      <div>
+        <div style={{ fontSize:22, fontWeight:800, color, lineHeight:1 }}>{value}</div>
+        <div style={{ fontSize:9, color:'var(--text-4)', fontWeight:700,
+          letterSpacing:'0.07em', textTransform:'uppercase', marginTop:2 }}>{label}</div>
+      </div>
     </div>
   );
 }
 
-function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter, unassignedOpen, onUnassignedClick, unassignedBtnRef }) {
+function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
+                           discharge, isolation,
+                           unassignedOpen, onUnassignedClick, unassignedBtnRef }) {
   return (
-    <div style={{
-      background:'var(--station-bg)', border:'1px solid var(--station-border)',
-      borderRadius:20, padding:'16px 20px', minWidth:270,
-      boxShadow:'0 10px 40px rgba(0,0,0,0.22)', transition:'background 0.25s',
+    <div className="dash-card" style={{
+      background:'var(--station-bg)',
+      padding:'18px 22px', minWidth:320,
+      boxShadow: `
+        inset 0 1px 0 rgba(255,255,255,0.10),
+        inset 0 -1px 0 rgba(0,0,0,0.25),
+        0 4px 8px rgba(0,0,0,0.35),
+        0 12px 28px rgba(0,0,0,0.40),
+        0 28px 56px rgba(0,0,0,0.28)`,
     }}>
-      {/* Title */}
-      <div style={{ textAlign:'center', marginBottom:12, paddingBottom:11, borderBottom:'1px solid var(--border-sub)' }}>
-        <div style={{ fontSize:17, fontWeight:800, letterSpacing:'-0.4px', color:'var(--station-label)' }}>
-          CareFlow&nbsp;
-          <span style={{ color:'var(--text-2)', fontWeight:600 }}>MED/TELE</span>
+      {/* Animated title */}
+      <div style={{ textAlign:'center', marginBottom:14, paddingBottom:12, borderBottom:'1px solid var(--border-sub)' }}>
+        <div style={{ fontSize:18, fontWeight:800, letterSpacing:'-0.5px', lineHeight:1.1 }}>
+          <span className="dash-title">CareFlow MED/TELE</span>
         </div>
-        <div style={{ fontSize:10, color:'var(--text-4)', marginTop:3 }}>44 Beds · Nursing Station</div>
+        <div className="dash-sub" style={{ fontSize:10, color:'var(--text-4)', marginTop:5, fontWeight:600, letterSpacing:'0.04em' }}>
+          44 Beds · Nursing Station
+        </div>
       </div>
 
-      {/* 2×3 stats grid */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+      {/* 2×4 stats grid */}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:5 }}>
         <StatCell icon="🛏" value={vacant}     label="empty"      color="var(--text-3)" />
         <StatCell icon="👥" value={occupied}   label="occupied"   color="var(--text-1)" />
         <StatCell icon="✓"  value={assigned}   label="assigned"   color="#22c55e" />
@@ -960,6 +1033,8 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
           onClick={onUnassignedClick} active={unassignedOpen} btnRef={unassignedBtnRef} />
         <StatCell icon="♥"  value={tele}       label="TELE"       color="#f87171" />
         <StatCell icon="👤" value={sitter}      label="sitter"     color="#a78bfa" />
+        <StatCell icon="📤" value={discharge}  label="discharge"  color="#38bdf8" />
+        <StatCell icon="🧤" value={isolation}  label="isolation"  color="#fb923c" />
       </div>
     </div>
   );
@@ -1028,9 +1103,10 @@ function CorridorGrid({ allRooms, selected, nurses, nurseRooms, dragPreviewIds, 
       <div style={{ position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'none' }}>
         <div style={{ pointerEvents:'auto' }}>
           <CenterDashboard
-            vacant={dashStats.vacant} occupied={dashStats.occupied}
+            vacant={dashStats.vacant}    occupied={dashStats.occupied}
             assigned={dashStats.assigned} unassigned={dashStats.unassigned}
-            tele={dashStats.tele} sitter={dashStats.sitter}
+            tele={dashStats.tele}        sitter={dashStats.sitter}
+            discharge={dashStats.discharge} isolation={dashStats.isolation}
             unassignedOpen={unassignedOpen}
             onUnassignedClick={onUnassignedClick}
             unassignedBtnRef={unassignedBtnRef}
@@ -1240,11 +1316,14 @@ function App() {
 
   const [unassignedAnchor, setUnassignedAnchor] = useState(null);
   const unassignedBtnRef = useRef();
-  const totalOcc    = Object.values(rooms).filter(r=>r.occupied).length;
-  const totalAsg    = Object.values(rooms).filter(r=>r.occupied&&r.nurseId).length;
-  const unassignedRooms = Object.values(rooms).filter(r=>r.occupied&&!r.nurseId);
-  const totalTele   = Object.values(rooms).filter(r=>r.occupied&&r.type==='TELE').length;
-  const totalSitter = Object.values(rooms).filter(r=>r.occupied&&r.sitter).length;
+  const allOccRooms  = Object.values(rooms).filter(r=>r.occupied);
+  const totalOcc     = allOccRooms.length;
+  const totalAsg     = allOccRooms.filter(r=>r.nurseId).length;
+  const unassignedRooms = allOccRooms.filter(r=>!r.nurseId);
+  const totalTele    = allOccRooms.filter(r=>r.type==='TELE').length;
+  const totalSitter  = allOccRooms.filter(r=>r.sitter).length;
+  const totalDischarge = allOccRooms.filter(r=>r.discharge).length;
+  const totalIsolation = allOccRooms.filter(r=>r.isolation).length;
 
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100vh', overflow:'hidden' }}>
@@ -1341,12 +1420,14 @@ function App() {
             onUnassign={unassignRoom}
             onClearSelection={()=>setSelected(new Set())}
             dashStats={{
-              vacant: ROOM_IDS.length - totalOcc,
-              occupied: totalOcc,
-              assigned: totalAsg,
+              vacant:    ROOM_IDS.length - totalOcc,
+              occupied:  totalOcc,
+              assigned:  totalAsg,
               unassigned: totalOcc - totalAsg,
-              tele: totalTele,
-              sitter: totalSitter,
+              tele:      totalTele,
+              sitter:    totalSitter,
+              discharge: totalDischarge,
+              isolation: totalIsolation,
             }}
             unassignedOpen={!!unassignedAnchor}
             unassignedBtnRef={unassignedBtnRef}
