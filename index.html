@@ -320,6 +320,57 @@
   /* Stat cell hover */
   .stat-cell { transition: background 0.15s, transform 0.12s; }
   .stat-cell:hover { transform: scale(1.04); }
+
+  /* ── Zap Assign button ── */
+  .zap-btn {
+    position: relative; overflow: hidden;
+    width: 100%; border: none; border-radius: 12px;
+    padding: 11px 14px;
+    background: linear-gradient(135deg, #6d28d9, #3b82f6, #06b6d4, #6d28d9);
+    background-size: 300% 300%;
+    animation: zap-bg 5s ease infinite;
+    color: #fff; font-weight: 800; font-size: 13px; letter-spacing: 0.05em;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+    box-shadow: 0 4px 14px rgba(109,40,217,0.45), 0 0 0 1px rgba(255,255,255,0.12) inset;
+    transition: transform 0.1s, box-shadow 0.1s, filter 0.1s;
+    user-select: none;
+  }
+  .zap-btn::after {
+    content:''; position:absolute; inset:0;
+    background: linear-gradient(180deg, rgba(255,255,255,0.14) 0%, transparent 60%);
+    border-radius: inherit; pointer-events: none;
+  }
+  .zap-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(109,40,217,0.55), 0 0 0 1px rgba(255,255,255,0.16) inset;
+    filter: brightness(1.08);
+  }
+  .zap-btn:active:not(:disabled), .zap-btn.zap-pressed {
+    transform: scale(0.96) translateY(1px);
+    box-shadow: 0 2px 6px rgba(109,40,217,0.3);
+    filter: brightness(0.95);
+  }
+  .zap-btn:disabled { opacity: 0.75; cursor: default; }
+  @keyframes zap-bg {
+    0%,100% { background-position: 0% 50%; }
+    50%      { background-position: 100% 50%; }
+  }
+  /* Icon spin */
+  @keyframes zap-spin {
+    to { transform: rotate(360deg); }
+  }
+  .zap-icon-spin { animation: zap-spin 0.3s linear infinite; display: inline-flex; }
+  /* Shimmer sweep on press */
+  @keyframes zap-shimmer {
+    0%   { left: -120%; }
+    100% { left: 140%; }
+  }
+  .zap-btn.zap-pressed::before {
+    content: ''; position: absolute; top: 0; left: -120%;
+    width: 60%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.28), transparent);
+    animation: zap-shimmer 0.4s ease forwards;
+  }
 </style>
 </head>
 <body>
@@ -337,6 +388,19 @@ function generateRooms() {
   return list; // exactly 44
 }
 const ROOM_IDS = generateRooms();
+
+// ── CIRCULAR ROOM PROXIMITY ───────────────────────────────────────────────────
+// ROOM_IDS wraps around the corridor perimeter like a clock:
+//   top-row (0-13) → right-side (14-21) → bottom-row (22-35) → left-side (36-43)
+// So 1101 (idx 0) and 1135B (idx 43) are neighbours, and
+//    1112 (idx 13) and 1113 (idx 14) are neighbours at the top-right corner, etc.
+const _RIDX = Object.fromEntries(ROOM_IDS.map((id, i) => [id, i]));
+function circDist(a, b) {
+  const i = _RIDX[a], j = _RIDX[b];
+  if (i == null || j == null) return 99;
+  const d = Math.abs(i - j);
+  return Math.min(d, ROOM_IDS.length - d);
+}
 
 function initRooms() {
   return ROOM_IDS.reduce((acc, id) => {
@@ -1005,9 +1069,42 @@ function StatCell({ icon, value, label, color, iconColor, onClick, active, btnRe
   );
 }
 
+// ── AI Zap icon (lightning + circuit nodes) ───────────────────────────────────
+function ZapAIIcon({ spinning }) {
+  return (
+    <span style={{ display:'inline-flex', alignItems:'center',
+      animation: spinning ? 'zap-spin 0.3s linear infinite' : 'none',
+      transformOrigin:'center' }}>
+      <svg width="17" height="17" viewBox="0 0 20 20" fill="none">
+        {/* Lightning bolt */}
+        <path d="M12 2L3.5 11H9L7 18l9.5-9H11L13 2z" fill="white"/>
+        {/* Circuit node top-left */}
+        <circle cx="2" cy="4" r="1.6" fill="white" opacity="0.55"/>
+        <line x1="2" y1="4" x2="5.5" y2="7.5" stroke="white" strokeWidth="0.9" opacity="0.45"/>
+        {/* Circuit node bottom-right */}
+        <circle cx="18" cy="16" r="1.6" fill="white" opacity="0.55"/>
+        <line x1="18" y1="16" x2="14.5" y2="12.5" stroke="white" strokeWidth="0.9" opacity="0.45"/>
+        {/* Circuit node mid-right */}
+        <circle cx="18.5" cy="7" r="1.2" fill="white" opacity="0.40"/>
+        <line x1="18.5" y1="7" x2="15" y2="9" stroke="white" strokeWidth="0.8" opacity="0.35"/>
+      </svg>
+    </span>
+  );
+}
+
 function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
                            discharge, isolation,
-                           unassignedOpen, onUnassignedClick, unassignedBtnRef }) {
+                           unassignedOpen, onUnassignedClick, unassignedBtnRef,
+                           onZapAssign, zapLoading }) {
+  const [pressed, setPressed] = React.useState(false);
+
+  function handleZap() {
+    if (zapLoading) return;
+    setPressed(true);
+    setTimeout(() => setPressed(false), 400);
+    onZapAssign();
+  }
+
   return (
     <div className="dash-card" style={{
       background:'var(--station-bg)',
@@ -1041,13 +1138,30 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
         <StatCell icon="📤" value={discharge}  label="discharge"  color="#38bdf8" />
         <StatCell icon="🧤" value={isolation}  label="isolation"  color="#fb923c" />
       </div>
+
+      {/* Zap Assign button */}
+      <div style={{ marginTop:10 }}>
+        <button
+          className={`zap-btn${pressed || zapLoading ? ' zap-pressed' : ''}`}
+          onClick={handleZap}
+          disabled={zapLoading}
+          title="AI auto-assign unassigned rooms to nurses"
+        >
+          <ZapAIIcon spinning={zapLoading} />
+          <span>{zapLoading ? 'Assigning…' : 'Zap Assign'}</span>
+          {!zapLoading && (
+            <span style={{ fontSize:10, fontWeight:600, opacity:0.7, marginLeft:2 }}>AI</span>
+          )}
+        </button>
+      </div>
     </div>
   );
 }
 
 // ── CORRIDOR GRID ─────────────────────────────────────────────────────────────
 function CorridorGrid({ allRooms, selected, nurses, nurseRooms, dragPreviewIds, onSelect, onDragStart, onDblClick, onAssignNurse, onUnassign, onClearSelection,
-                        dashStats, onUnassignedClick, unassignedOpen, unassignedBtnRef }) {
+                        dashStats, onUnassignedClick, unassignedOpen, unassignedBtnRef,
+                        onZapAssign, zapLoading }) {
   const ref = useRef();
   const [dims, setDims] = useState({ w:900, h:580 });
 
@@ -1115,6 +1229,8 @@ function CorridorGrid({ allRooms, selected, nurses, nurseRooms, dragPreviewIds, 
             unassignedOpen={unassignedOpen}
             onUnassignedClick={onUnassignedClick}
             unassignedBtnRef={unassignedBtnRef}
+            onZapAssign={onZapAssign}
+            zapLoading={zapLoading}
           />
         </div>
       </div>
@@ -1165,6 +1281,7 @@ function App() {
   const [dragRoomIds, setDragRoomIds] = useState([]);
   const [pendingAssignment, setPendingAssignment] = useState(null);
   const [theme, setTheme] = useState(()=>localStorage.getItem('careflow_theme')||'night');
+  const [zapLoading, setZapLoading] = useState(false);
   const toastRef = useRef();
   const autoSaveRef = useRef();
   const colorIdx = useRef(_saved?.nurses?.length ?? DEFAULT_NURSES.length);
@@ -1287,6 +1404,116 @@ function App() {
 
   function unassignRoom(roomId) {
     setRooms(prev=>({...prev,[roomId]:{...prev[roomId],nurseId:null}}));
+  }
+
+  // ── AI Zap Assign ─────────────────────────────────────────────────────────
+  function zapAssign() {
+    if (!nurses.length) { showToast('⚠ Add nurses before Zap Assign'); return; }
+
+    const unassigned = Object.values(rooms).filter(r => r.occupied && !r.nurseId);
+    if (!unassigned.length) { showToast('✓ All occupied rooms are already assigned!'); return; }
+
+    setZapLoading(true);
+
+    // Small delay so the spin animation is visible
+    setTimeout(() => {
+      try {
+        const N = nurses.length;
+
+        // Nurse state: track current + newly assigned rooms this run
+        // Randomise nurse order so each run picks a different starting distribution
+        const shuffledNurses = [...nurses].sort(() => Math.random() - 0.5);
+        const ns = {};
+        shuffledNurses.forEach(n => {
+          const existing = (nurseRooms[n.id] || []).filter(id => rooms[id]?.occupied);
+          ns[n.id] = {
+            nurse: n,
+            rooms: [...existing],
+            teleCount: existing.filter(id => rooms[id]?.type === 'TELE').length,
+            haCount:   existing.filter(id => rooms[id]?.highAcuity).length,
+          };
+        });
+
+        // Sort rooms to assign: HA first (hardest constraint), TELE next, rest random
+        const toAssign = [...unassigned].sort((a, b) => {
+          if (a.highAcuity !== b.highAcuity) return b.highAcuity ? 1 : -1;
+          if ((a.type==='TELE') !== (b.type==='TELE')) return a.type==='TELE' ? -1 : 1;
+          return Math.random() - 0.5;
+        });
+
+        // Score a nurse for a candidate room (lower = better fit)
+        function score(state, room) {
+          const { rooms: nRooms, teleCount, haCount } = state;
+
+          // ── Hard limits (mirror checkAssignment rules) ──
+          // If any TELE involved → cap 4, else cap 5
+          const projTele = teleCount + (room.type === 'TELE' ? 1 : 0);
+          const capTele  = (teleCount > 0 || room.type === 'TELE');
+          const cap      = capTele ? 4 : 5;
+          if (nRooms.length + 1 > cap)            return Infinity;
+          if (room.type === 'TELE' && teleCount >= 4) return Infinity;
+          if (room.highAcuity  && haCount >= 2)   return Infinity;
+
+          // ── Proximity: circular distance to nearest existing room ──
+          // Prefer rooms within 11 positions on the perimeter; penalise further.
+          let prox = 0;
+          if (nRooms.length > 0) {
+            const minDist = Math.min(...nRooms.map(id => circDist(room.id, id)));
+            prox = minDist <= 11 ? minDist * 2.5 : 22 + (minDist - 11) * 5;
+          }
+
+          // ── Load balance: favour less-loaded nurses ──
+          const load = nRooms.length * 5;
+
+          // ── Acuity spread: discourage stacking HA on one nurse ──
+          const acuity = room.highAcuity ? haCount * 18 : 0;
+
+          // ── Tele mix balance ──
+          const telePenalty = (room.type === 'TELE' && teleCount >= 3) ? 15 : 0;
+
+          // ── Random noise: guarantees different results each press ──
+          const noise = (Math.random() - 0.5) * 12;
+
+          return prox + load + acuity + telePenalty + noise;
+        }
+
+        const newAssignments = {};
+        for (const room of toAssign) {
+          let best = null, bestScore = Infinity;
+          for (const state of Object.values(ns)) {
+            const s = score(state, room);
+            if (s < bestScore) { bestScore = s; best = state; }
+          }
+          if (best && bestScore < Infinity) {
+            newAssignments[room.id] = best.nurse.id;
+            best.rooms.push(room.id);
+            if (room.type === 'TELE') best.teleCount++;
+            if (room.highAcuity)     best.haCount++;
+          }
+        }
+
+        const count = Object.keys(newAssignments).length;
+        const skipped = unassigned.length - count;
+
+        if (!count) {
+          showToast('⚠ Nurses are at capacity — add more nurses or unassign rooms first');
+        } else {
+          setRooms(prev => {
+            const next = { ...prev };
+            Object.entries(newAssignments).forEach(([id, nurseId]) => {
+              next[id] = { ...next[id], nurseId };
+            });
+            return next;
+          });
+          const msg = skipped
+            ? `⚡ Zap Assigned ${count} rooms · ${skipped} skipped (capacity)`
+            : `⚡ Zap Assigned ${count} room${count>1?'s':''} across ${N} nurse${N>1?'s':''}`;
+          showToast(msg);
+        }
+      } finally {
+        setZapLoading(false);
+      }
+    }, 320); // 320 ms spin — user can see the animation before result lands
   }
 
   // Drag from the Unassigned panel — reuses the same nurse-card drop handler
@@ -1440,6 +1667,8 @@ function App() {
               if (a) return null;
               return unassignedBtnRef.current?.getBoundingClientRect() ?? null;
             })}
+            onZapAssign={zapAssign}
+            zapLoading={zapLoading}
           />
         </div>
       </div>
