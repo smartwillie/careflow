@@ -332,7 +332,7 @@
   .dash-tile {
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    gap: 5px; padding: 9px 6px; border-radius: 8px;
+    gap: 5px; padding: 12px 6px; border-radius: 8px;
     flex: 1 1 0; min-width: 0;
     background: rgba(0,0,0,0.22);
     border-top:    1px solid rgba(255,255,255,0.18);
@@ -1108,17 +1108,16 @@ function DashTile({ icon, value, label, color, onClick, active, btnRef }) {
       <div style={{
         fontSize:9, fontWeight:700, letterSpacing:'0.07em',
         textTransform:'uppercase', color:'rgba(0,0,0,0.45)',
-        lineHeight:1, paddingLeft:4, paddingRight:4,
+        lineHeight:1, paddingLeft:8, paddingRight:8, textAlign:'center',
       }}>{label}</div>
-      {/* Chevron for dropdown tiles */}
-      {isBtn && (
-        <div style={{
-          fontSize:8, color, lineHeight:1, marginTop:1,
-          opacity: active ? 0.9 : 0.35,
-          transform: active ? 'rotate(180deg)' : 'none',
-          transition:'transform 0.2s, opacity 0.2s',
-        }}>▾</div>
-      )}
+      {/* Chevron — always rendered so all tiles share identical height */}
+      <div style={{
+        fontSize:8, color, lineHeight:1, marginTop:1,
+        opacity: isBtn ? (active ? 0.9 : 0.35) : 0,
+        visibility: isBtn ? 'visible' : 'hidden',
+        transform: active ? 'rotate(180deg)' : 'none',
+        transition:'transform 0.2s, opacity 0.2s',
+      }}>▾</div>
     </div>
   );
 }
@@ -1161,7 +1160,7 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
 
   return (
     <div className="dash-card dash-cockpit" style={{
-      padding:'14px 16px',
+      padding:'20px 22px',
       boxShadow:`
         inset 0 1px 0 rgba(255,255,255,0.07),
         inset 0 -1px 0 rgba(0,0,0,0.5),
@@ -1171,13 +1170,10 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
     }}>
 
       {/* ── Header ── */}
-      <div style={{ marginBottom:10, paddingBottom:8, borderBottom:'1px solid rgba(0,0,0,0.15)' }}>
-        <div style={{ fontSize:22, fontWeight:900, letterSpacing:'-0.5px', lineHeight:1.1, color:'#000' }}>
-          CareFlow MED/TELE
-        </div>
-        <div className="dash-sub" style={{ fontSize:12, color:'rgba(0,0,0,0.55)',
-          marginTop:4, fontWeight:600, letterSpacing:'0.02em', fontStyle:'italic' }}>
-          Fueled by caffeine. Driven by a crazy brain.
+      <div style={{ marginBottom:14, paddingBottom:12, borderBottom:'1px solid rgba(0,0,0,0.15)' }}>
+        <div style={{ fontSize:26, fontWeight:900, letterSpacing:'-0.5px', lineHeight:1.15,
+          color:'#000', fontStyle:'italic' }}>
+          Fueled by caffeine.<br/>Driven by a crazy brain.
         </div>
       </div>
 
