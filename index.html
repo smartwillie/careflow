@@ -621,13 +621,17 @@ function PatientModal({ room, onClose, onSave }) {
 }
 
 // ── UNASSIGNED PANEL (dropdown, portal) ──────────────────────────────────────
-function UnassignedPanel({ rooms, nurses, nurseRooms, onAssign, onDragStart, onClose, anchor }) {
+function UnassignedPanel({ rooms, nurses, nurseRooms, onAssign, onDragStart, onClose, anchor, triggerRef }) {
   const ref = useRef();
   const [dropdown, setDropdown] = useState(null); // { room, btnAnchor }
 
-  // Close on outside-click
+  // Close on outside-click — but ignore clicks on the trigger button itself
+  // (the trigger handles its own open/close toggle)
   useEffect(() => {
-    const h = e => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
+    const h = e => {
+      if (triggerRef?.current?.contains(e.target)) return;
+      if (ref.current && !ref.current.contains(e.target)) onClose();
+    };
     document.addEventListener('mousedown', h, true);
     return () => document.removeEventListener('mousedown', h, true);
   }, []);
@@ -1179,6 +1183,7 @@ function App() {
   }
 
   const [unassignedAnchor, setUnassignedAnchor] = useState(null);
+  const unassignedBtnRef = useRef();
   const totalOcc    = Object.values(rooms).filter(r=>r.occupied).length;
   const totalAsg    = Object.values(rooms).filter(r=>r.occupied&&r.nurseId).length;
   const unassignedRooms = Object.values(rooms).filter(r=>r.occupied&&!r.nurseId);
@@ -1198,8 +1203,13 @@ function App() {
           <span><b style={{ color:'var(--text-1)' }}>{totalOcc}</b> occupied</span>
           <span><b style={{ color:'#22c55e' }}>{totalAsg}</b> assigned</span>
           <span
-            onClick={e => setUnassignedAnchor(prev => prev ? null : e.currentTarget.getBoundingClientRect())}
-            style={{ cursor:'pointer', borderBottom:`1px dashed ${unassignedAnchor?'#f59e0b':'#f59e0b'}`, paddingBottom:1,
+            ref={unassignedBtnRef}
+            onClick={() => setUnassignedAnchor(a => {
+              if (a) return null;
+              // Use the ref (always valid) instead of e.currentTarget (nulled after event)
+              return unassignedBtnRef.current?.getBoundingClientRect() ?? null;
+            })}
+            style={{ cursor:'pointer', borderBottom:'1px dashed #f59e0b', paddingBottom:1,
               background: unassignedAnchor ? 'rgba(245,158,11,0.12)' : 'transparent',
               borderRadius:4, padding:'1px 5px 2px' }}
             title="Click to toggle unassigned rooms panel">
@@ -1308,6 +1318,7 @@ function App() {
           onDragStart={handleUnassignedDragStart}
           onClose={()=>setUnassignedAnchor(null)}
           anchor={unassignedAnchor}
+          triggerRef={unassignedBtnRef}
         />
       )}
       {editingRoom && <PatientModal room={editingRoom} onClose={()=>setEditingRoom(null)} onSave={saveRoom}/>}
