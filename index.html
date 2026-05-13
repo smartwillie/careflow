@@ -848,10 +848,9 @@ function UnassignedPanel({ rooms, nurses, nurseRooms, onAssign, onDragStart, onC
     return () => document.removeEventListener('mousedown', h, true);
   }, []);
 
-  // Position below the header stat that was clicked
-  const PW = 420;
-  const left = Math.min(Math.max(8, anchor.right - PW), window.innerWidth - PW - 8);
-  const top  = anchor.bottom + 6;
+  // Center horizontally on viewport; sit just below the trigger with safe bottom margin
+  const PW = 460;
+  const topPos = Math.min(anchor.bottom + 8, window.innerHeight - 80);
 
   function openRoomDropdown(e, room) {
     e.stopPropagation();
@@ -861,9 +860,14 @@ function UnassignedPanel({ rooms, nurses, nurseRooms, onAssign, onDragStart, onC
 
   return ReactDOM.createPortal(
     <>
-      {/* Panel */}
+      {/* Panel — horizontally centered, scrollable */}
       <div ref={ref} style={{
-        position:'fixed', left, top, width:PW, maxHeight:'60vh', zIndex:600,
+        position:'fixed',
+        left:'50%', transform:'translateX(-50%)',
+        top: topPos,
+        width: Math.min(PW, window.innerWidth - 24),
+        maxHeight: `calc(100vh - ${topPos + 16}px)`,
+        zIndex:600,
         background:'var(--modal-bg)', border:'1px solid var(--border-sub)',
         borderRadius:14, boxShadow:'0 16px 56px rgba(0,0,0,0.45)',
         display:'flex', flexDirection:'column', overflow:'hidden',
