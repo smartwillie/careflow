@@ -313,6 +313,45 @@
     border-color: rgba(255,255,255,0.45);
   }
 
+  /* ── Rabbit animation ── */
+  .rabbit-track {
+    position: relative;
+    height: 36px;
+    overflow: hidden;
+    margin-bottom: 6px;
+    border-radius: 8px;
+  }
+  /* Grass blades hint */
+  .rabbit-track::after {
+    content: '';
+    position: absolute; bottom: 0; left: 0; right: 0; height: 4px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 0 0 8px 8px;
+  }
+  .rabbit-runner {
+    position: absolute;
+    top: 4px;
+    left: -50px;
+    animation: rabbit-run 4.5s linear infinite;
+  }
+  .rabbit-emoji {
+    display: inline-block;
+    font-size: 26px;
+    line-height: 1;
+    /* bob = up/down hops, scaleX(-1) = face right */
+    animation: rabbit-bob 0.32s ease-in-out infinite;
+    transform-origin: center bottom;
+  }
+  @keyframes rabbit-run {
+    0%   { left: -50px; }
+    100% { left: calc(100% + 30px); }
+  }
+  @keyframes rabbit-bob {
+    0%, 100% { transform: scaleX(-1) translateY(0px)   scaleY(1);    }
+    30%      { transform: scaleX(-1) translateY(-8px)  scaleY(1.08); }
+    60%      { transform: scaleX(-1) translateY(0px)   scaleY(0.92); }
+  }
+
   /* ── Zap Assign button ── */
   .zap-btn {
     position: relative; overflow: hidden;
@@ -1124,6 +1163,13 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
         0 16px 36px rgba(0,0,0,0.55),
         0 32px 64px rgba(0,0,0,0.35)`,
     }}>
+
+      {/* ── Rabbit running across the top ── */}
+      <div className="rabbit-track">
+        <div className="rabbit-runner">
+          <span className="rabbit-emoji">🐇</span>
+        </div>
+      </div>
 
       {/* ── Header ── */}
       <div style={{ marginBottom:14, paddingBottom:12, borderBottom:'1px solid rgba(255,255,255,0.20)',
