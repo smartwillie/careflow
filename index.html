@@ -276,47 +276,41 @@
     border-radius: 20px;
     transition: background 0.25s;
   }
-  /* Static border ring */
+  /* Subtle white border ring around dashboard */
   .dash-card::before {
     content: '';
     position: absolute; inset: -2px;
     border-radius: 22px;
-    background: rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.20);
     z-index: -1;
   }
   .dash-title { display: inline-block; }
   .dash-sub   { opacity: 0.80; }
-  /* ── Dashboard background — flat orange ── */
+
+  /* ── Dashboard background — deep burnt orange ── */
   .dash-cockpit {
-    background: #f97316 !important;
+    background: #c2410c !important;
   }
 
-  /* ── Dashboard stat tiles — recessed on orange ── */
+  /* ── Dashboard stat tiles ── */
   .dash-tile {
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
     gap: 5px; padding: 12px 6px; border-radius: 8px;
     flex: 1 1 0; min-width: 0;
-    background: rgba(0,0,0,0.22);
-    border-top:    1px solid rgba(255,255,255,0.18);
-    border-left:   1px solid rgba(255,255,255,0.10);
-    border-right:  1px solid rgba(0,0,0,0.25);
-    border-bottom: 1px solid rgba(0,0,0,0.35);
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.20);
     box-shadow:
-      inset 0 3px 10px rgba(0,0,0,0.35),
-      inset 0 1px 0   rgba(255,255,255,0.10);
-    transition: background 0.12s, box-shadow 0.12s, transform 0.08s;
+      inset 0 1px 0 rgba(255,255,255,0.20),
+      inset 0 -1px 0 rgba(0,0,0,0.15);
+    transition: background 0.12s, transform 0.08s;
   }
   .dash-tile-btn { cursor: pointer; }
-  .dash-tile-btn:hover {
-    background: rgba(0,0,0,0.30);
-  }
+  .dash-tile-btn:hover { background: rgba(255,255,255,0.20); }
   .dash-tile-btn:active { transform: scale(0.95); }
   .dash-tile-active {
-    border-top-color: rgba(255,255,255,0.40);
-    box-shadow:
-      inset 0 3px 10px rgba(0,0,0,0.30),
-      0 0 10px rgba(0,0,0,0.20);
+    background: rgba(255,255,255,0.22);
+    border-color: rgba(255,255,255,0.45);
   }
 
   /* ── Zap Assign button ── */
@@ -1054,12 +1048,11 @@ function DashTile({ icon, value, label, color, onClick, active, btnRef }) {
       onClick={onClick}
       className={`dash-tile${isBtn ? ' dash-tile-btn' : ''}${active ? ' dash-tile-active' : ''}`}
     >
-      {/* Indicator dot — like a dashboard warning light */}
+      {/* Indicator dot */}
       <div style={{
         width:5, height:5, borderRadius:'50%',
-        background: color,
-        boxShadow: `0 0 6px ${color}`,
-        opacity: 0.75,
+        background: 'rgba(255,255,255,0.60)',
+        opacity: 0.9,
       }} />
       {/* Value — LED-style glow */}
       <div style={{
@@ -1070,7 +1063,7 @@ function DashTile({ icon, value, label, color, onClick, active, btnRef }) {
       {/* Label */}
       <div style={{
         fontSize:9, fontWeight:700, letterSpacing:'0.07em',
-        textTransform:'uppercase', color:'rgba(0,0,0,0.45)',
+        textTransform:'uppercase', color:'rgba(255,255,255,0.65)',
         lineHeight:1, paddingLeft:8, paddingRight:8, textAlign:'center',
       }}>{label}</div>
       {/* Chevron — always rendered so all tiles share identical height */}
@@ -1133,24 +1126,24 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
     }}>
 
       {/* ── Header ── */}
-      <div style={{ marginBottom:14, paddingBottom:12, borderBottom:'1px solid rgba(0,0,0,0.15)' }}>
+      <div style={{ marginBottom:14, paddingBottom:12, borderBottom:'1px solid rgba(255,255,255,0.20)' }}>
         <div style={{ fontSize:26, fontWeight:900, letterSpacing:'-0.5px', lineHeight:1.15,
-          color:'#ea580c', fontStyle:'italic' }}>
+          color:'#fff', fontStyle:'italic' }}>
           Drive
         </div>
       </div>
 
       {/* ── Single row: all 8 stats ── */}
       <div style={{ display:'flex', gap:3, alignItems:'stretch' }}>
-        <DashTile value={vacant}     label="Empty"      color="#f97316" />
-        <DashTile value={occupied}   label="Occupied"   color="#f97316" />
-        <DashTile value={assigned}   label="Assigned"   color="#f97316" />
-        <DashTile value={unassigned} label="Unassigned" color="#f97316"
+        <DashTile value={vacant}     label="Empty"      color="#fff" />
+        <DashTile value={occupied}   label="Occupied"   color="#fff" />
+        <DashTile value={assigned}   label="Assigned"   color="#fff" />
+        <DashTile value={unassigned} label="Unassigned" color="#fff"
           onClick={onUnassignedClick} active={unassignedOpen} btnRef={unassignedBtnRef} />
-        <DashTile value={tele}       label="TELE"       color="#f97316" />
-        <DashTile value={sitter}     label="Sitter"     color="#f97316" />
-        <DashTile value={discharge}  label="Discharge"  color="#f97316" />
-        <DashTile value={isolation}  label="Isolation"  color="#f97316" />
+        <DashTile value={tele}       label="TELE"       color="#fff" />
+        <DashTile value={sitter}     label="Sitter"     color="#fff" />
+        <DashTile value={discharge}  label="Discharge"  color="#fff" />
+        <DashTile value={isolation}  label="Isolation"  color="#fff" />
       </div>
 
       {/* Zap Assign button */}
