@@ -1104,7 +1104,7 @@ function ZapAIIcon({ spinning }) {
 function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
                            discharge, isolation,
                            unassignedOpen, onUnassignedClick, unassignedBtnRef,
-                           onZapAssign, zapLoading }) {
+                           onZapAssign, zapLoading, fuelMode, onToggleFuel }) {
   const [pressed, setPressed] = React.useState(false);
 
   function handleZap() {
@@ -1126,11 +1126,34 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
     }}>
 
       {/* ── Header ── */}
-      <div style={{ marginBottom:14, paddingBottom:12, borderBottom:'1px solid rgba(255,255,255,0.20)' }}>
+      <div style={{ marginBottom:14, paddingBottom:12, borderBottom:'1px solid rgba(255,255,255,0.20)',
+        display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:10 }}>
         <div style={{ fontSize:26, fontWeight:900, letterSpacing:'-0.5px', lineHeight:1.15,
           color:'#fff', fontStyle:'italic' }}>
-          Drive
+          Driven by Craziness
         </div>
+        {/* ── Fuel Efficiency Toggle ── */}
+        <button
+          onClick={onToggleFuel}
+          title={fuelMode ? 'Fuel Efficiency ON — MedSurg priority' : 'Fuel Efficiency OFF'}
+          style={{
+            flexShrink:0, display:'flex', alignItems:'center', gap:5,
+            padding:'5px 10px', borderRadius:20, border:'none', cursor:'pointer',
+            background: fuelMode ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.18)',
+            color: fuelMode ? '#c2410c' : 'rgba(255,255,255,0.80)',
+            fontWeight:800, fontSize:11, letterSpacing:'0.04em',
+            boxShadow: fuelMode ? '0 2px 8px rgba(0,0,0,0.25)' : 'none',
+            transition:'background 0.18s, color 0.18s, box-shadow 0.18s',
+          }}>
+          {/* Fuel gauge icon */}
+          <svg width="14" height="14" viewBox="0 0 20 20" fill="none">
+            <rect x="2" y="4" width="11" height="14" rx="2" stroke="currentColor" strokeWidth="1.8"/>
+            <path d="M13 8h2a2 2 0 012 2v2a2 2 0 01-2 2h-2" stroke="currentColor" strokeWidth="1.8"/>
+            <rect x="4" y="10" width={fuelMode ? 7 : 3} height="3" rx="1" fill="currentColor" style={{transition:'width 0.3s'}}/>
+            <line x1="4" y1="8" x2="11" y2="8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+          <span>{fuelMode ? 'ECO ON' : 'ECO'}</span>
+        </button>
       </div>
 
       {/* ── Single row: all 8 stats ── */}
@@ -1168,7 +1191,7 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
 // ── CORRIDOR GRID ─────────────────────────────────────────────────────────────
 function CorridorGrid({ allRooms, selected, nurses, nurseRooms, dragPreviewIds, onSelect, onDragStart, onDblClick, onAssignNurse, onUnassign, onClearSelection,
                         dashStats, onUnassignedClick, unassignedOpen, unassignedBtnRef,
-                        onZapAssign, zapLoading }) {
+                        onZapAssign, zapLoading, fuelMode, onToggleFuel }) {
   const ref = useRef();
   const [dims, setDims] = useState({ w:900, h:580 });
 
@@ -1238,6 +1261,8 @@ function CorridorGrid({ allRooms, selected, nurses, nurseRooms, dragPreviewIds, 
             unassignedBtnRef={unassignedBtnRef}
             onZapAssign={onZapAssign}
             zapLoading={zapLoading}
+            fuelMode={fuelMode}
+            onToggleFuel={onToggleFuel}
           />
         </div>
       </div>
@@ -1289,6 +1314,7 @@ function App() {
   const [pendingAssignment, setPendingAssignment] = useState(null);
   const [theme, setTheme] = useState(()=>localStorage.getItem('careflow_theme')||'night');
   const [zapLoading, setZapLoading] = useState(false);
+  const [fuelMode, setFuelMode] = useState(false);
   const toastRef = useRef();
   const autoSaveRef = useRef();
   const colorIdx = useRef(_saved?.nurses?.length ?? DEFAULT_NURSES.length);
@@ -1444,24 +1470,29 @@ function App() {
             nurse: n,
             rooms:          [...existing],
             teleCount:      existing.filter(id => rooms[id]?.type === 'TELE').length,
+            medCount:       existing.filter(id => rooms[id]?.type !== 'TELE').length,
             haCount:        existing.filter(id => rooms[id]?.highAcuity).length,
             acuityPts:      existing.reduce((s, id) => s + roomAcuityPts(rooms[id] || {}), 0),
             isolationCount: existing.filter(id => rooms[id]?.isolation).length,
             totalCareCount: existing.filter(id => rooms[id]?.totalCare).length,
+            glucoseCount:   existing.filter(id => rooms[id]?.glucose).length,
           };
         });
 
         // Sort rooms: heaviest acuity first (hardest to place → assign early)
+        // In fuel mode, MedSurg rooms go before TELE within same acuity weight
         const toAssign = [...unassigned].sort((a, b) => {
           const wa = (a.isolation?4:0)+(a.highAcuity?3:0)+(a.totalCare?2:0)+(a.type==='TELE'?1:0);
           const wb = (b.isolation?4:0)+(b.highAcuity?3:0)+(b.totalCare?2:0)+(b.type==='TELE'?1:0);
-          return wb - wa || Math.random() - 0.5;
+          if (wa !== wb) return wb - wa;
+          if (fuelMode && a.type !== b.type) return a.type === 'TELE' ? 1 : -1; // MedSurg first
+          return Math.random() - 0.5;
         });
 
         // Score a nurse for a candidate room (lower = better fit, Infinity = blocked)
         function score(state, room) {
-          const { rooms: nRooms, teleCount, haCount,
-                  acuityPts, isolationCount, totalCareCount } = state;
+          const { rooms: nRooms, teleCount, medCount, haCount,
+                  acuityPts, isolationCount, totalCareCount, glucoseCount } = state;
 
           // ── Hard limits ──────────────────────────────────────────────────
           const capTele = teleCount > 0 || room.type === 'TELE';
@@ -1471,6 +1502,10 @@ function App() {
           if (room.highAcuity     && haCount >= 2)    return Infinity;
           // Hard acuity cap: never exceed 6 pts
           if (acuityPts + roomAcuityPts(room) > 6)   return Infinity;
+          // Max 2 glucose-control rooms per nurse
+          if (room.glucose    && glucoseCount >= 2)   return Infinity;
+          // Max 2 total-care rooms per nurse
+          if (room.totalCare  && totalCareCount >= 2) return Infinity;
 
           // ── Soft penalties ───────────────────────────────────────────────
           let penalty = 0;
@@ -1482,9 +1517,19 @@ function App() {
           // Isolation: strongly discourage a 2nd isolation room on same nurse
           if (room.isolation && isolationCount >= 1) penalty += 90;
 
-          // If nurse already has isolation, discourage adding totalCare patients
+          // If nurse already has isolation, discourage stacking totalCare
           if (isolationCount >= 1 && room.totalCare && totalCareCount >= 1) penalty += 70;
           if (room.isolation && totalCareCount >= 2) penalty += 70;
+
+          // ── Fuel efficiency mode: keep MedSurg and TELE nurses separate ──
+          if (fuelMode) {
+            // Nurse already has TELE — heavily penalise adding MedSurg
+            if (teleCount > 0 && room.type !== 'TELE') penalty += 55;
+            // Nurse already has MedSurg — heavily penalise adding TELE
+            if (medCount > 0 && room.type === 'TELE')  penalty += 55;
+            // Reward nurses with more MedSurg rooms for MedSurg assignments
+            if (room.type !== 'TELE') penalty -= medCount * 4;
+          }
 
           // ── Proximity ────────────────────────────────────────────────────
           let prox = 0;
@@ -1499,8 +1544,8 @@ function App() {
           // ── HA spread: discourage stacking high-acuity ───────────────────
           const haSpread = room.highAcuity ? haCount * 18 : 0;
 
-          // ── Tele mix ─────────────────────────────────────────────────────
-          const telePenalty = (room.type === 'TELE' && teleCount >= 3) ? 15 : 0;
+          // ── Tele mix (normal mode) ────────────────────────────────────────
+          const telePenalty = (!fuelMode && room.type === 'TELE' && teleCount >= 3) ? 15 : 0;
 
           // ── Random noise (different result each press) ────────────────────
           const noise = (Math.random() - 0.5) * 12;
@@ -1519,10 +1564,12 @@ function App() {
             newAssignments[room.id] = best.nurse.id;
             best.rooms.push(room.id);
             if (room.type === 'TELE') best.teleCount++;
+            else                      best.medCount++;
             if (room.highAcuity)     best.haCount++;
             best.acuityPts      += roomAcuityPts(room);
             if (room.isolation)  best.isolationCount++;
             if (room.totalCare)  best.totalCareCount++;
+            if (room.glucose)    best.glucoseCount++;
           }
         }
 
@@ -1703,6 +1750,8 @@ function App() {
             })}
             onZapAssign={zapAssign}
             zapLoading={zapLoading}
+            fuelMode={fuelMode}
+            onToggleFuel={() => setFuelMode(f => !f)}
           />
         </div>
       </div>
