@@ -18,7 +18,7 @@
   /* ── Room card ── */
   .room-card {
     position: absolute;
-    width: 66px; height: 52px;
+    /* width & height set dynamically via inline style */
     border-radius: 8px;
     border: 2px solid transparent;
     cursor: pointer;
@@ -30,7 +30,7 @@
     z-index: 1;
     overflow: visible;
   }
-  .room-card:hover { transform: scale(1.13); z-index: 20; }
+  .room-card:hover { transform: scale(1.1); z-index: 20; }
   .room-card.selected { border-color: #4ade80 !important; box-shadow: 0 0 0 3px rgba(74,222,128,0.3); z-index: 10; }
   .vacant  { background: #2d3f55; border-color: #3d5068; color: #7a91aa; }
   .female  { background: #f9a8d4; border-color: #ec4899; color: #831843; }
@@ -213,33 +213,36 @@ function checkAssignment(nurseId, roomIds, allRooms) {
   return null;
 }
 
-// ── CORRIDOR POSITIONS (hospital floor plan style) ────────────────────────────
-// 44 rooms: 12 top, 10 right, 12 bottom, 10 left — no overlaps
-const CW = 66, CH = 52;
-function getCorridorPositions(W, H) {
-  const PAD = 14, GAP = 10;
-  const xL = PAD, xR = W - PAD - CW;
-  const yT = PAD, yB = H - PAD - CH;
-  const yMidT = yT + CH + GAP, yMidB = yB - GAP;
-  const pos = [];
+// ── CORRIDOR LAYOUT (dynamic — guaranteed no overlap at any panel size) ────────
+// 11 per side × 4 sides = 44 rooms
+function getCorridorLayout(W, H) {
+  const PAD = 12, GAP = 6;
+  const N = 11; // cards per side
 
-  // Top (12): left → right
-  for (let i = 0; i < 12; i++)
-    pos.push({ x: xL + (xR-xL)*i/11, y: yT });
+  // Card width: largest that fits N cards across W with no overlap
+  const cw = Math.max(46, Math.min(68, Math.floor((W - 2*PAD) / N)));
+  // Card height: largest that fits N cards down each side with corner clearance
+  // Derivation: middle span = H - 2*PAD - 2*(ch+GAP); step = span/(N-1) ≥ ch
+  // → ch ≤ (H - 2*PAD - 2*GAP) / (N+2)
+  const ch = Math.max(38, Math.min(54, Math.floor((H - 2*PAD - 2*GAP) / (N+2))));
 
-  // Right (10): top → bottom (between corners)
-  for (let i = 0; i < 10; i++)
-    pos.push({ x: xR, y: yMidT + (yMidB-yMidT)*i/9 });
+  const xL = PAD, xR = W - PAD - cw;
+  const yT = PAD, yB = H - PAD - ch;
+  // Middle section (between corner cards) with guaranteed GAP from corners
+  const yMidT = yT + ch + GAP;
+  const yMidB = yB - ch - GAP;
 
-  // Bottom (12): right → left
-  for (let i = 0; i < 12; i++)
-    pos.push({ x: xR - (xR-xL)*i/11, y: yB });
+  const positions = [];
+  for (let i = 0; i < N; i++) // Top: left → right
+    positions.push({ x: xL + (xR-xL)*i/(N-1), y: yT });
+  for (let i = 0; i < N; i++) // Right: top → bottom
+    positions.push({ x: xR, y: yMidT + (yMidB-yMidT)*i/(N-1) });
+  for (let i = 0; i < N; i++) // Bottom: right → left
+    positions.push({ x: xR - (xR-xL)*i/(N-1), y: yB });
+  for (let i = 0; i < N; i++) // Left: bottom → top
+    positions.push({ x: xL, y: yMidB - (yMidB-yMidT)*i/(N-1) });
 
-  // Left (10): bottom → top (between corners)
-  for (let i = 0; i < 10; i++)
-    pos.push({ x: xL, y: yMidB - (yMidB-yMidT)*i/9 });
-
-  return pos; // 44 positions
+  return { positions, cw, ch }; // 44 positions, guaranteed gap ≥ GAP everywhere
 }
 
 // ── ROOM DROPDOWN (portal) ────────────────────────────────────────────────────
@@ -292,7 +295,7 @@ function RoomDropdown({ room, nurses, nurseRooms, anchor, onAssign, onUnassign, 
 }
 
 // ── ROOM CARD ────────────────────────────────────────────────────────────────
-function RoomCard({ room, pos, selected, nurses, nurseRooms, onSelect, onDragStart, onDblClick, onAssignNurse, onUnassign }) {
+function RoomCard({ room, pos, cw, ch, selected, nurses, nurseRooms, onSelect, onDragStart, onDblClick, onAssignNurse, onUnassign }) {
   const [anchor, setAnchor] = useState(null);
   const cardRef = useRef();
 
@@ -309,7 +312,7 @@ function RoomCard({ room, pos, selected, nurses, nurseRooms, onSelect, onDragSta
   if (room.totalCare)  flags.push('TC');
   if (room.glucose)    flags.push('BG');
   if (room.highAcuity) flags.push('HA');
-  if (room.sitter)    flags.push('ST');
+  if (room.sitter)     flags.push('ST');
 
   function openMenu(e) {
     e.stopPropagation();
@@ -320,30 +323,38 @@ function RoomCard({ room, pos, selected, nurses, nurseRooms, onSelect, onDragSta
   return (
     <>
       <div ref={cardRef} className={cls}
-        style={{ left: pos.x, top: pos.y }}
+        style={{ left: pos.x, top: pos.y, width: cw, height: ch }}
         onClick={onSelect}
         onDoubleClick={onDblClick}
         draggable={room.occupied}
         onDragStart={onDragStart}
         title={`Room ${room.id}${room.occupied ? (room.type==='TELE' ? ' · TELE' : ' · M/S') : ' · Vacant'}`}
       >
+        {/* Assigned checkmark badge — prominent, nurse-colored */}
+        {room.nurseId && room._nurseColor && (
+          <div style={{
+            position:'absolute', top:-7, right:-7,
+            width:17, height:17, borderRadius:'50%',
+            background: room._nurseColor,
+            border:'2px solid #080f1d',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            fontSize:10, fontWeight:900, color:'white', lineHeight:1,
+            zIndex:3, boxShadow:'0 2px 6px rgba(0,0,0,0.5)'
+          }}>✓</div>
+        )}
+
         {/* Room number + TELE heart */}
-        <div style={{ fontSize:11, fontWeight:700, letterSpacing:'-0.2px', lineHeight:1.1 }}>
+        <div style={{ fontSize: Math.max(9, Math.round(cw*0.17)), fontWeight:700, letterSpacing:'-0.2px', lineHeight:1.1 }}>
           {room.id}
           {room.occupied && room.type==='TELE' &&
-            <span style={{ color:'#f87171', marginLeft:2, fontSize:10 }}>♥</span>}
+            <span style={{ color:'#f87171', marginLeft:2, fontSize: Math.max(8, Math.round(cw*0.14)) }}>♥</span>}
         </div>
 
         {/* Flags */}
         {room.occupied && flags.length > 0 && (
           <div style={{ display:'flex', flexWrap:'wrap', justifyContent:'center', gap:1, marginTop:2 }}>
-            {flags.slice(0,3).map(f => <span key={f} className="flag">{f}</span>)}
+            {flags.slice(0, ch > 44 ? 3 : 2).map(f => <span key={f} className="flag">{f}</span>)}
           </div>
-        )}
-
-        {/* Nurse color dot */}
-        {room.nurseId && room._nurseColor && (
-          <div style={{ width:6,height:6,borderRadius:'50%',background:room._nurseColor,marginTop:2 }}/>
         )}
 
         {/* Assign button (visible on hover via CSS) */}
@@ -667,15 +678,15 @@ function CorridorGrid({ allRooms, selected, nurses, nurseRooms, dragPreviewIds, 
   },[]);
 
   const { w, h } = dims;
-  const positions = getCorridorPositions(w, h);
+  const { positions, cw, ch } = getCorridorLayout(w, h);
 
   // nurse color lookup
   const nurseColorMap = {};
   nurses.forEach(n=>(nurseRooms[n.id]||[]).forEach(id=>{ nurseColorMap[id]=n.color; }));
 
-  // SVG corridor outline
-  const PAD=14;
-  const rx=PAD, ry=PAD, rw=w-2*PAD-CW, rh=h-2*PAD-CH;
+  // SVG corridor outline — inset to card centers
+  const PAD=12;
+  const rx=PAD, ry=PAD, rw=w-2*PAD-cw, rh=h-2*PAD-ch;
 
   return (
     <div ref={ref} className="corridor-container">
@@ -699,7 +710,7 @@ function CorridorGrid({ allRooms, selected, nurses, nurseRooms, dragPreviewIds, 
       {ROOM_IDS.map((id,i)=>{
         const room = {...allRooms[id], _nurseColor: nurseColorMap[id]};
         return (
-          <RoomCard key={id} room={room} pos={positions[i]}
+          <RoomCard key={id} room={room} pos={positions[i]} cw={cw} ch={ch}
             selected={selected.has(id)}
             nurses={nurses}
             nurseRooms={nurseRooms}
