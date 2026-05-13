@@ -323,9 +323,9 @@
     0%,100% { opacity: 0.75; }
     50%     { opacity: 0.95; }
   }
-  /* ── Dashboard background — vivid orange ── */
+  /* ── Dashboard background — flat orange ── */
   .dash-cockpit {
-    background: linear-gradient(150deg, #f97316 0%, #ea580c 55%, #c2410c 100%) !important;
+    background: #f97316 !important;
   }
 
   /* ── Dashboard stat tiles — recessed on orange ── */
@@ -1172,11 +1172,11 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
 
       {/* ── Header ── */}
       <div style={{ marginBottom:10, paddingBottom:8, borderBottom:'1px solid rgba(0,0,0,0.15)' }}>
-        <div style={{ fontSize:16, fontWeight:900, letterSpacing:'-0.5px', lineHeight:1.1, color:'#000' }}>
+        <div style={{ fontSize:22, fontWeight:900, letterSpacing:'-0.5px', lineHeight:1.1, color:'#000' }}>
           CareFlow MED/TELE
         </div>
-        <div className="dash-sub" style={{ fontSize:8.5, color:'rgba(0,0,0,0.50)',
-          marginTop:3, fontWeight:600, letterSpacing:'0.05em', fontStyle:'italic' }}>
+        <div className="dash-sub" style={{ fontSize:12, color:'rgba(0,0,0,0.55)',
+          marginTop:4, fontWeight:600, letterSpacing:'0.02em', fontStyle:'italic' }}>
           Fueled by caffeine. Driven by a crazy brain.
         </div>
       </div>
