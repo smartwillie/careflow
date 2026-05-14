@@ -1602,6 +1602,33 @@ function App() {
           return Math.random() - 0.5;
         });
 
+        // ── Chain-gap: max consecutive corridor step within a nurse's cluster ──
+        // Algorithm: sort rooms by corridor index, compute all n circular gaps
+        // (including wrap-around), cut the LARGEST gap (inter-cluster void),
+        // return the max of the remaining n-1 intra-cluster steps.
+        // A perfect tight cluster of 5 rooms spanning 4 steps → gap = 4.
+        // 1105,1106,1109,1110A → steps 1,3,1 → gap = 3  ✓
+        // 1104,1115,1135A,1135B → steps 11,20,1 → cut 20, max = 11  ✗
+        function maxChainGap(roomIds) {
+          if (roomIds.length <= 1) return 0;
+          const N   = ROOM_IDS.length; // 44
+          const idxs = roomIds.map(id => _RIDX[id]).sort((a, b) => a - b);
+          const n   = idxs.length;
+          // Compute all n circular gaps
+          const gaps = [];
+          for (let i = 0; i < n - 1; i++) gaps.push(idxs[i + 1] - idxs[i]);
+          gaps.push(N - idxs[n - 1] + idxs[0]); // wrap-around gap
+          // Cut the largest gap (the void between cluster ends)
+          const maxGapIdx = gaps.reduce((mi, g, i) => g > gaps[mi] ? i : mi, 0);
+          const inner = gaps.filter((_, i) => i !== maxGapIdx);
+          return inner.length === 0 ? 0 : Math.max(...inner);
+        }
+
+        // Penalty table indexed by maxChainGap (0-9); > 9 → hard block
+        //   gap ≤ 5  = ideal (tight corridor cluster)
+        //   gap 6-9  = escalating soft penalty
+        const CHAIN_PEN = [0, 0, 0, 0, 0, 0, 40, 95, 175, 280];
+
         // Score a nurse for a candidate room (lower = better fit, Infinity = blocked)
         function score(state, room) {
           const { rooms: nRooms, teleCount, medCount, haCount,
@@ -1620,9 +1647,24 @@ function App() {
           // Max 2 total-care rooms per nurse
           if (room.totalCare  && totalCareCount >= 2) return Infinity;
 
+          // ── Chain-gap hard limit: corridor cluster must span ≤ 9 steps ──
+          const projRooms = [...nRooms, room.id];
+          const gap = maxChainGap(projRooms);
+          if (gap > 9) return Infinity;
+
           // ── Soft penalties ───────────────────────────────────────────────
           let penalty = 0;
           const projAcuity = acuityPts + roomAcuityPts(room);
+
+          // Chain-gap penalty: strongly prefer tight clusters (gap ≤ 5)
+          penalty += CHAIN_PEN[gap] || 0;
+
+          // Small cohesion nudge: rooms closer to existing cluster score better
+          // (within the allowed gap; this breaks ties inside the same gap bucket)
+          if (nRooms.length > 0) {
+            const minDist = Math.min(...nRooms.map(id => circDist(room.id, id)));
+            penalty += minDist * 3;
+          }
 
           // Soft acuity cap: each point over 4 costs heavily
           if (projAcuity > 4) penalty += 60 * (projAcuity - 4);
@@ -1636,19 +1678,9 @@ function App() {
 
           // ── Fuel efficiency mode: keep MedSurg and TELE nurses separate ──
           if (fuelMode) {
-            // Nurse already has TELE — heavily penalise adding MedSurg
             if (teleCount > 0 && room.type !== 'TELE') penalty += 55;
-            // Nurse already has MedSurg — heavily penalise adding TELE
-            if (medCount > 0 && room.type === 'TELE')  penalty += 55;
-            // Reward nurses with more MedSurg rooms for MedSurg assignments
+            if (medCount > 0  && room.type === 'TELE') penalty += 55;
             if (room.type !== 'TELE') penalty -= medCount * 4;
-          }
-
-          // ── Proximity ────────────────────────────────────────────────────
-          let prox = 0;
-          if (nRooms.length > 0) {
-            const minDist = Math.min(...nRooms.map(id => circDist(room.id, id)));
-            prox = minDist <= 11 ? minDist * 2.5 : 22 + (minDist - 11) * 5;
           }
 
           // ── Load balance: favour less-loaded nurses ──────────────────────
@@ -1661,9 +1693,9 @@ function App() {
           const telePenalty = (!fuelMode && room.type === 'TELE' && teleCount >= 3) ? 15 : 0;
 
           // ── Random noise (different result each press) ────────────────────
-          const noise = (Math.random() - 0.5) * 12;
+          const noise = (Math.random() - 0.5) * 10;
 
-          return prox + load + haSpread + telePenalty + penalty + noise;
+          return load + haSpread + telePenalty + penalty + noise;
         }
 
         const newAssignments = {};
