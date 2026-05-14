@@ -1602,32 +1602,51 @@ function App() {
           return Math.random() - 0.5;
         });
 
-        // ── Chain-gap: max consecutive corridor step within a nurse's cluster ──
-        // Algorithm: sort rooms by corridor index, compute all n circular gaps
-        // (including wrap-around), cut the LARGEST gap (inter-cluster void),
-        // return the max of the remaining n-1 intra-cluster steps.
-        // A perfect tight cluster of 5 rooms spanning 4 steps → gap = 4.
-        // 1105,1106,1109,1110A → steps 1,3,1 → gap = 3  ✓
-        // 1104,1115,1135A,1135B → steps 11,20,1 → cut 20, max = 11  ✗
+        // ── Proximity: diameter = max circDist between ANY two rooms ────────
+        // This checks EVERY pair, not just consecutive sorted neighbors.
+        // Example: {1116(17),1120(21),1124(25),1126(27)} looks fine by
+        // consecutive gaps [4,4,2] but has diameter circDist(1116,1126)=10 — not ideal.
+        // Example: {1105(4),1106(5),1111B(12),1123(24)} tight core at 1105/1106,
+        // diameter circDist(1105,1123)=20 — heavy penalty but acuity may justify it.
+        function clusterDiameter(roomIds) {
+          if (roomIds.length <= 1) return 0;
+          let maxD = 0;
+          for (let i = 0; i < roomIds.length; i++)
+            for (let j = i + 1; j < roomIds.length; j++) {
+              const d = circDist(roomIds[i], roomIds[j]);
+              if (d > maxD) maxD = d;
+            }
+          return maxD;
+        }
+
+        // Also: chain-gap = max consecutive step in sorted circular cluster.
+        // Used as a secondary tiebreaker below diameter.
         function maxChainGap(roomIds) {
           if (roomIds.length <= 1) return 0;
-          const N   = ROOM_IDS.length; // 44
+          const N    = ROOM_IDS.length;
           const idxs = roomIds.map(id => _RIDX[id]).sort((a, b) => a - b);
-          const n   = idxs.length;
-          // Compute all n circular gaps
           const gaps = [];
-          for (let i = 0; i < n - 1; i++) gaps.push(idxs[i + 1] - idxs[i]);
-          gaps.push(N - idxs[n - 1] + idxs[0]); // wrap-around gap
-          // Cut the largest gap (the void between cluster ends)
+          for (let i = 0; i < idxs.length - 1; i++) gaps.push(idxs[i+1] - idxs[i]);
+          gaps.push(N - idxs[idxs.length-1] + idxs[0]);
           const maxGapIdx = gaps.reduce((mi, g, i) => g > gaps[mi] ? i : mi, 0);
           const inner = gaps.filter((_, i) => i !== maxGapIdx);
           return inner.length === 0 ? 0 : Math.max(...inner);
         }
 
-        // Penalty table indexed by maxChainGap (0-9); > 9 → hard block
-        //   gap ≤ 5  = ideal (tight corridor cluster)
-        //   gap 6-9  = escalating soft penalty
-        const CHAIN_PEN = [0, 0, 0, 0, 0, 0, 40, 95, 175, 280];
+        // Diameter penalty table (index = circDist steps between farthest pair)
+        //   0-5  : ideal — all rooms within a tight corridor pocket
+        //   6-9  : soft stretch — acceptable when acuity forces it
+        //   10-13: significant spread — "1116 too far from 1126" territory
+        //   14+  : hard block — nurse would be covering too large a territory
+        const DIAM_PEN = [
+          0,  0,  0,  0,  0,  0,  //  0-5  ideal
+         20, 45, 80,125,            //  6-9  soft stretch
+        180,250,340,450,            // 10-13 significant
+        ];
+        const DIAM_HARD = 14; // diameter > 13 → Infinity
+
+        // Chain-gap secondary penalty (used alongside diameter)
+        const CHAIN_PEN = [0, 0, 0, 0, 0, 0, 15, 35, 65, 105, 155, 210, 275, 350];
 
         // Score a nurse for a candidate room (lower = better fit, Infinity = blocked)
         function score(state, room) {
@@ -1640,30 +1659,30 @@ function App() {
           if (nRooms.length + 1 > cap)               return Infinity;
           if (room.type === 'TELE' && teleCount >= 4) return Infinity;
           if (room.highAcuity     && haCount >= 2)    return Infinity;
-          // Hard acuity cap: never exceed 6 pts
           if (acuityPts + roomAcuityPts(room) > 6)   return Infinity;
-          // Max 2 glucose-control rooms per nurse
           if (room.glucose    && glucoseCount >= 2)   return Infinity;
-          // Max 2 total-care rooms per nurse
           if (room.totalCare  && totalCareCount >= 2) return Infinity;
 
-          // ── Chain-gap hard limit: corridor cluster must span ≤ 9 steps ──
+          // ── Proximity hard limit: diameter > 13 → blocked ────────────────
           const projRooms = [...nRooms, room.id];
-          const gap = maxChainGap(projRooms);
-          if (gap > 9) return Infinity;
+          const diam = clusterDiameter(projRooms);
+          if (diam >= DIAM_HARD) return Infinity;
 
           // ── Soft penalties ───────────────────────────────────────────────
           let penalty = 0;
           const projAcuity = acuityPts + roomAcuityPts(room);
 
-          // Chain-gap penalty: strongly prefer tight clusters (gap ≤ 5)
-          penalty += CHAIN_PEN[gap] || 0;
+          // Primary: penalise large diameter (farthest pair of rooms)
+          penalty += diam < DIAM_PEN.length ? DIAM_PEN[diam] : 450 + (diam - 13) * 80;
 
-          // Small cohesion nudge: rooms closer to existing cluster score better
-          // (within the allowed gap; this breaks ties inside the same gap bucket)
+          // Secondary: penalise large consecutive steps in the sorted cluster
+          const gap = maxChainGap(projRooms);
+          penalty += gap < CHAIN_PEN.length ? CHAIN_PEN[gap] : 350 + (gap - 13) * 60;
+
+          // Cohesion nudge: prefer rooms near the existing cluster centroid
           if (nRooms.length > 0) {
             const minDist = Math.min(...nRooms.map(id => circDist(room.id, id)));
-            penalty += minDist * 3;
+            penalty += minDist * 2.5;
           }
 
           // Soft acuity cap: each point over 4 costs heavily
