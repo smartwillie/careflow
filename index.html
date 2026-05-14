@@ -486,7 +486,8 @@ function initRooms() {
     acc[id] = { id, occupied: false, gender: 'male', type: 'MEDSURG',
                 foley: false, drip: false, prisoner: false, totalCare: false,
                 glucose: false, highAcuity: false, sitter: false,
-                discharge: false, isolation: false, nurseId: null };
+                discharge: false, isolation: false,
+                restraint: false, centralLine: false, nurseId: null };
     return acc;
   }, {});
 }
@@ -503,8 +504,10 @@ const FLAG_DEFS = [
   { key:'glucose',    label:'BG',  bg:'#166534', tc:'#fff' },
   { key:'highAcuity', label:'HA',  bg:'#b91c1c', tc:'#fff', glow:'#ef4444' },
   { key:'sitter',     label:'ST',  bg:'#5b21b6', tc:'#fff' },
-  { key:'discharge',  label:'DC',  bg:'#0369a1', tc:'#bae6fd' },
-  { key:'isolation',  label:'ISO', bg:'#c2410c', tc:'#fff' },
+  { key:'discharge',   label:'DC',  bg:'#0369a1', tc:'#bae6fd' },
+  { key:'isolation',   label:'ISO', bg:'#c2410c', tc:'#fff' },
+  { key:'restraint',   label:'RST', bg:'#7f1d1d', tc:'#fca5a5' },
+  { key:'centralLine', label:'CVL', bg:'#1e3a5f', tc:'#93c5fd' },
 ];
 
 const STORAGE_KEY = 'careflow_assignment';
@@ -819,8 +822,10 @@ function PatientModal({ room, onClose, onSave }) {
           <Toggle on={s.glucose}    onChange={v=>set('glucose',v)}    label="Glucose Check"   color="#16a34a"/>
           <Toggle on={s.highAcuity} onChange={v=>set('highAcuity',v)} label="High Acuity"     color="#ea580c"/>
           <Toggle on={s.sitter}     onChange={v=>set('sitter',v)}     label="Sitter"          color="#7c3aed"/>
-          <Toggle on={s.discharge}  onChange={v=>set('discharge',v)}  label="Discharge"       color="#0ea5e9"/>
-          <Toggle on={s.isolation}  onChange={v=>set('isolation',v)}  label="Isolation"       color="#f97316"/>
+          <Toggle on={s.discharge}   onChange={v=>set('discharge',v)}   label="Discharge"       color="#0ea5e9"/>
+          <Toggle on={s.isolation}   onChange={v=>set('isolation',v)}   label="Isolation"       color="#f97316"/>
+          <Toggle on={s.restraint}   onChange={v=>set('restraint',v)}   label="Restraint"       color="#dc2626"/>
+          <Toggle on={s.centralLine} onChange={v=>set('centralLine',v)} label="Central Line"    color="#3b82f6"/>
         </>)}
 
         <div style={{ display:'flex', gap:8, marginTop:16, justifyContent:'flex-end' }}>
@@ -1193,7 +1198,7 @@ function ZapAIIcon({ spinning }) {
 }
 
 function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
-                           discharge, isolation,
+                           discharge, isolation, restraint, centralLine,
                            unassignedOpen, onUnassignedClick, unassignedBtnRef,
                            onZapAssign, zapLoading, fuelMode, onToggleFuel }) {
   const [pressed, setPressed] = React.useState(false);
@@ -1269,9 +1274,11 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
         <DashTile value={unassigned} label="Unassigned" color="#fff"
           onClick={onUnassignedClick} active={unassignedOpen} btnRef={unassignedBtnRef} />
         <DashTile value={tele}       label="TELE"       color="#fff" />
-        <DashTile value={sitter}     label="Sitter"     color="#fff" />
-        <DashTile value={discharge}  label="Discharge"  color="#fff" />
-        <DashTile value={isolation}  label="Isolation"  color="#fff" />
+        <DashTile value={sitter}      label="Sitter"      color="#fff" />
+        <DashTile value={discharge}   label="Discharge"   color="#fff" />
+        <DashTile value={isolation}   label="Isolation"   color="#fff" />
+        <DashTile value={restraint}   label="Restraint"   color="#fff" />
+        <DashTile value={centralLine} label="Central Line" color="#fff" />
       </div>
 
       {/* Zap Assign button */}
@@ -1361,6 +1368,7 @@ function CorridorGrid({ allRooms, selected, nurses, nurseRooms, dragPreviewIds, 
             assigned={dashStats.assigned} unassigned={dashStats.unassigned}
             tele={dashStats.tele}        sitter={dashStats.sitter}
             discharge={dashStats.discharge} isolation={dashStats.isolation}
+            restraint={dashStats.restraint} centralLine={dashStats.centralLine}
             unassignedOpen={unassignedOpen}
             onUnassignedClick={onUnassignedClick}
             unassignedBtnRef={unassignedBtnRef}
@@ -1739,9 +1747,11 @@ function App() {
   const totalAsg     = allOccRooms.filter(r=>r.nurseId).length;
   const unassignedRooms = allOccRooms.filter(r=>!r.nurseId);
   const totalTele    = allOccRooms.filter(r=>r.type==='TELE').length;
-  const totalSitter  = allOccRooms.filter(r=>r.sitter).length;
-  const totalDischarge = allOccRooms.filter(r=>r.discharge).length;
-  const totalIsolation = allOccRooms.filter(r=>r.isolation).length;
+  const totalSitter     = allOccRooms.filter(r=>r.sitter).length;
+  const totalDischarge  = allOccRooms.filter(r=>r.discharge).length;
+  const totalIsolation  = allOccRooms.filter(r=>r.isolation).length;
+  const totalRestraint  = allOccRooms.filter(r=>r.restraint).length;
+  const totalCentralLine = allOccRooms.filter(r=>r.centralLine).length;
 
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100vh', overflow:'hidden' }}>
@@ -1764,7 +1774,8 @@ function App() {
               const next={};
               Object.keys(prev).forEach(id=>{
                 next[id]={...prev[id], occupied:true, gender:'female', type:'TELE',
-                  foley:false, drip:false, prisoner:false, totalCare:false, glucose:false, highAcuity:false, nurseId:null};
+                  foley:false, drip:false, prisoner:false, totalCare:false, glucose:false, highAcuity:false,
+                  restraint:false, centralLine:false, nurseId:null};
               });
               return next;
             });
@@ -1843,9 +1854,11 @@ function App() {
               assigned:  totalAsg,
               unassigned: totalOcc - totalAsg,
               tele:      totalTele,
-              sitter:    totalSitter,
-              discharge: totalDischarge,
-              isolation: totalIsolation,
+              sitter:      totalSitter,
+              discharge:   totalDischarge,
+              isolation:   totalIsolation,
+              restraint:   totalRestraint,
+              centralLine: totalCentralLine,
             }}
             unassignedOpen={!!unassignedAnchor}
             unassignedBtnRef={unassignedBtnRef}
