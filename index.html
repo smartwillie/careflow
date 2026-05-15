@@ -505,7 +505,7 @@ const FLAG_DEFS = [
   { key:'highAcuity', label:'HA',  bg:'#b91c1c', tc:'#fff', glow:'#ef4444' },
   { key:'sitter',     label:'ST',  bg:'#5b21b6', tc:'#fff' },
   { key:'discharge',   label:'DC',  bg:'#0369a1', tc:'#bae6fd' },
-  { key:'isolation',   label:'ISO', bg:'#c2410c', tc:'#fff' },
+  { key:'isolation',   label:'☣',   bg:'#c2410c', tc:'#fff' },
   { key:'restraint',   label:'RST', bg:'#7f1d1d', tc:'#fca5a5' },
   { key:'centralLine', label:'CVL', bg:'#1e3a5f', tc:'#93c5fd' },
 ];
@@ -1013,7 +1013,7 @@ function NurseBadge({ room, onDragStart }) {
 }
 
 // ── NURSE CARD ────────────────────────────────────────────────────────────────
-function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, onRename, onDelete }) {
+function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, onRename, onDelete, locked, onToggleLock }) {
   const [dragOver, setDragOver] = useState(false);
   const [trashOver, setTrashOver] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -1060,6 +1060,17 @@ function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, on
         )}
         <span style={{ fontSize:11, color:'var(--text-4)', fontWeight:600 }}>{occ.length}/{cap}</span>
         {hasTele && <span style={{ fontSize:10, background:'#7f1d1d', color:'#fca5a5', borderRadius:4, padding:'1px 5px' }}>TELE</span>}
+        {/* Lock toggle — protects this nurse's rooms from Zap Assign reset */}
+        <button
+          onClick={onToggleLock}
+          title={locked ? 'Locked — rooms kept on Zap Assign' : 'Unlocked — rooms reset on Zap Assign'}
+          style={{
+            background: locked ? 'rgba(251,191,36,0.18)' : 'transparent',
+            border: locked ? '1px solid rgba(251,191,36,0.55)' : '1px solid transparent',
+            borderRadius: 6, padding:'2px 5px', cursor:'pointer', fontSize:13, lineHeight:1,
+            transition:'background 0.15s, border-color 0.15s',
+          }}
+        >{locked ? '🔒' : '🔓'}</button>
         <div className={`trash-zone${trashOver?' drag-over':''}`}
           onDragOver={e=>{ e.preventDefault(); e.stopPropagation(); setTrashOver(true); setDragOver(false); }}
           onDragLeave={()=>setTrashOver(false)}
@@ -1420,6 +1431,7 @@ function App() {
   const [nurses, setNurses] = useState(()=>_saved?.nurses || DEFAULT_NURSES);
   const [lastSaved, setLastSaved] = useState(()=>_saved?.savedAt || null);
   const [selected, setSelected] = useState(new Set());
+  const [lockedNurses, setLockedNurses] = useState(new Set()); // nurse IDs whose assignments are protected from Zap reset
   const [editingRoom, setEditingRoom] = useState(null);
   const [toast, setToast] = useState(null);
   const [newNurseName, setNewNurseName] = useState('');
@@ -1556,9 +1568,6 @@ function App() {
   function zapAssign() {
     if (!nurses.length) { showToast('⚠ Add nurses before Zap Assign'); return; }
 
-    const unassigned = Object.values(rooms).filter(r => r.occupied && !r.nurseId);
-    if (!unassigned.length) { showToast('✓ All occupied rooms are already assigned!'); return; }
-
     setZapLoading(true);
 
     // Small delay so the spin animation is visible
@@ -1566,34 +1575,60 @@ function App() {
       try {
         const N = nurses.length;
 
+        // ── Snapshot rooms at the moment Zap is pressed ──────────────────
+        // Rooms belonging to LOCKED nurses are preserved; all others are
+        // cleared back to unassigned so the AI gets a clean slate.
+        const lockedRoomIds = new Set();
+        nurses.forEach(n => {
+          if (lockedNurses.has(n.id)) {
+            (nurseRooms[n.id] || []).forEach(id => {
+              if (rooms[id]?.occupied) lockedRoomIds.add(id);
+            });
+          }
+        });
+
+        // Reset: strip nurseId from every occupied room NOT protected by a lock
+        const resetRooms = { ...rooms };
+        Object.values(resetRooms).forEach(r => {
+          if (r.occupied && !lockedRoomIds.has(r.id)) {
+            resetRooms[r.id] = { ...r, nurseId: null };
+          }
+        });
+
+        // Sync UI immediately so the list view reflects the reset
+        setRooms(resetRooms);
+
         // ── Acuity point value per room ──────────────────────────────────
-        // highAcuity=2, isolation=2, totalCare=2
-        // Soft cap: 4 pts/nurse  |  Hard cap: 6 pts/nurse
         function roomAcuityPts(r) {
           return (r.highAcuity ? 2 : 0) + (r.isolation ? 2 : 0) + (r.totalCare ? 2 : 0);
         }
 
-        // Nurse state: track current + newly assigned rooms this run
-        // Randomise nurse order so each run picks a different starting distribution
+        // Nurse state: locked nurses seed with their preserved rooms;
+        // unlocked nurses start empty.
         const shuffledNurses = [...nurses].sort(() => Math.random() - 0.5);
         const ns = {};
         shuffledNurses.forEach(n => {
-          const existing = (nurseRooms[n.id] || []).filter(id => rooms[id]?.occupied);
+          const isLocked = lockedNurses.has(n.id);
+          const existing = isLocked
+            ? (nurseRooms[n.id] || []).filter(id => resetRooms[id]?.occupied)
+            : [];
           ns[n.id] = {
             nurse: n,
             rooms:          [...existing],
-            teleCount:      existing.filter(id => rooms[id]?.type === 'TELE').length,
-            medCount:       existing.filter(id => rooms[id]?.type !== 'TELE').length,
-            haCount:        existing.filter(id => rooms[id]?.highAcuity).length,
-            acuityPts:      existing.reduce((s, id) => s + roomAcuityPts(rooms[id] || {}), 0),
-            isolationCount: existing.filter(id => rooms[id]?.isolation).length,
-            totalCareCount: existing.filter(id => rooms[id]?.totalCare).length,
-            glucoseCount:   existing.filter(id => rooms[id]?.glucose).length,
+            teleCount:      existing.filter(id => resetRooms[id]?.type === 'TELE').length,
+            medCount:       existing.filter(id => resetRooms[id]?.type !== 'TELE').length,
+            haCount:        existing.filter(id => resetRooms[id]?.highAcuity).length,
+            acuityPts:      existing.reduce((s, id) => s + roomAcuityPts(resetRooms[id] || {}), 0),
+            isolationCount: existing.filter(id => resetRooms[id]?.isolation).length,
+            totalCareCount: existing.filter(id => resetRooms[id]?.totalCare).length,
+            glucoseCount:   existing.filter(id => resetRooms[id]?.glucose).length,
           };
         });
 
+        // All occupied rooms that are NOT locked get re-assigned
+        const unassigned = Object.values(resetRooms).filter(r => r.occupied && !lockedRoomIds.has(r.id));
+
         // Sort rooms: heaviest acuity first (hardest to place → assign early)
-        // In fuel mode, MedSurg rooms go before TELE within same acuity weight
         const toAssign = [...unassigned].sort((a, b) => {
           const wa = (a.isolation?4:0)+(a.highAcuity?3:0)+(a.totalCare?2:0)+(a.type==='TELE'?1:0);
           const wb = (b.isolation?4:0)+(b.highAcuity?3:0)+(b.totalCare?2:0)+(b.type==='TELE'?1:0);
@@ -1740,19 +1775,19 @@ function App() {
         const count = Object.keys(newAssignments).length;
         const skipped = unassigned.length - count;
 
-        if (!count) {
-          showToast('⚠ Nurses are at capacity — add more nurses or unassign rooms first');
+        if (!count && !lockedRoomIds.size) {
+          showToast('⚠ Nurses are at capacity — add more nurses or clear assignments first');
         } else {
-          setRooms(prev => {
-            const next = { ...prev };
-            Object.entries(newAssignments).forEach(([id, nurseId]) => {
-              next[id] = { ...next[id], nurseId };
-            });
-            return next;
+          // Apply new assignments on top of the already-reset room map
+          const finalRooms = { ...resetRooms };
+          Object.entries(newAssignments).forEach(([id, nurseId]) => {
+            finalRooms[id] = { ...finalRooms[id], nurseId };
           });
+          setRooms(finalRooms);
+          const lockedCount = lockedRoomIds.size;
           const msg = skipped
-            ? `⚡ Zap Assigned ${count} rooms · ${skipped} skipped (capacity)`
-            : `⚡ Zap Assigned ${count} room${count>1?'s':''} across ${N} nurse${N>1?'s':''}`;
+            ? `⚡ Assigned ${count} rooms · ${skipped} skipped (capacity)${lockedCount ? ` · ${lockedCount} locked` : ''}`
+            : `⚡ Assigned ${count} room${count>1?'s':''} across ${N} nurse${N>1?'s':''}${lockedCount ? ` · ${lockedCount} locked` : ''}`;
           showToast(msg);
         }
       } finally {
@@ -1885,6 +1920,12 @@ function App() {
                 onDrop={(e,trash)=>handleDropOnNurse(nurse.id,e,trash)}
                 onRename={name=>setNurses(prev=>prev.map(n=>n.id===nurse.id?{...n,name}:n))}
                 onDelete={()=>deleteNurse(nurse.id)}
+                locked={lockedNurses.has(nurse.id)}
+                onToggleLock={()=>setLockedNurses(prev=>{
+                  const next=new Set(prev);
+                  next.has(nurse.id)?next.delete(nurse.id):next.add(nurse.id);
+                  return next;
+                })}
               />
             ))}
           </div>
