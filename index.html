@@ -1787,7 +1787,16 @@ function App() {
   }
 
   function saveRoom(updated) {
-    setRooms(prev=>({...prev,[updated.id]:updated}));
+    const wasOccupied = rooms[updated.id]?.occupied;
+    const becomingVacant = wasOccupied && !updated.occupied;
+    // When toggling a room to vacant: clear its nurse assignment and deselect it
+    const finalRoom = becomingVacant
+      ? { ...updated, nurseId: null }
+      : updated;
+    setRooms(prev => ({ ...prev, [updated.id]: finalRoom }));
+    if (becomingVacant) {
+      setSelected(prev => { const next = new Set(prev); next.delete(updated.id); return next; });
+    }
     setEditingRoom(null);
   }
 
