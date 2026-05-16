@@ -457,6 +457,17 @@
 <script type="text/babel">
 const { useState, useRef, useEffect, useMemo } = React;
 
+// ── FEEDBACK / REINFORCEMENT STORE ────────────────────────────────────────────
+const FB_KEY = 'careflow_feedback_v1';
+const FB_BASELINE = { diam:1.0, load:1.0, acuity:1.0, teleCluster:1.0 };
+function loadFB() {
+  try { const s = JSON.parse(localStorage.getItem(FB_KEY)); return s || { entries:[], weights:{...FB_BASELINE} }; }
+  catch { return { entries:[], weights:{...FB_BASELINE} }; }
+}
+function saveFB(store) {
+  try { localStorage.setItem(FB_KEY, JSON.stringify(store)); } catch {}
+}
+
 // ── ROOM GENERATION ───────────────────────────────────────────────────────────
 const DOUBLE_ROOMS = new Set([1110,1111,1129,1130,1131,1132,1133,1134,1135]);
 function generateRooms() {
@@ -1208,11 +1219,79 @@ function ZapAIIcon({ spinning }) {
   );
 }
 
+// ── FEEDBACK BAR ──────────────────────────────────────────────────────────────
+const FB_REASONS = [
+  { key:'spread',     label:'Rooms too spread out', icon:'📍' },
+  { key:'load',       label:'Uneven workload',       icon:'⚖️' },
+  { key:'heavy',      label:'Too many heavy rooms',  icon:'🔴' },
+  { key:'mix',        label:'TELE/Med mixed',        icon:'💔' },
+];
+
+function FeedbackBar({ onGood, onBad }) {
+  const [phase, setPhase] = React.useState('ask'); // 'ask' | 'reason' | 'done-good' | 'done-bad'
+
+  function handleGood() {
+    onGood();
+    setPhase('done-good');
+  }
+  function handleBad(key) {
+    onBad(key);
+    setPhase('done-bad');
+  }
+
+  const base = {
+    marginTop:10, borderRadius:10, padding:'9px 12px', fontSize:12,
+    display:'flex', alignItems:'center', gap:8, flexWrap:'wrap',
+    background:'rgba(0,0,0,0.22)', border:'1px solid rgba(255,255,255,0.12)',
+  };
+
+  if (phase === 'done-good') return (
+    <div style={{...base, justifyContent:'center', color:'#86efac'}}>
+      ✓ Got it — reinforcing this pattern
+    </div>
+  );
+  if (phase === 'done-bad') return (
+    <div style={{...base, justifyContent:'center', color:'#fca5a5'}}>
+      ✓ Noted — adjusting for next time
+    </div>
+  );
+  if (phase === 'reason') return (
+    <div style={base}>
+      <span style={{color:'rgba(255,255,255,0.6)', fontSize:11, flexShrink:0}}>What's wrong?</span>
+      {FB_REASONS.map(r => (
+        <button key={r.key} onClick={() => handleBad(r.key)} style={{
+          background:'rgba(239,68,68,0.18)', border:'1px solid rgba(239,68,68,0.4)',
+          color:'#fca5a5', borderRadius:16, padding:'3px 10px', fontSize:11,
+          cursor:'pointer', display:'flex', alignItems:'center', gap:4,
+        }}>{r.icon} {r.label}</button>
+      ))}
+      <button onClick={()=>setPhase('ask')} style={{marginLeft:'auto',background:'transparent',border:'none',color:'rgba(255,255,255,0.4)',cursor:'pointer',fontSize:12}}>✕</button>
+    </div>
+  );
+  return (
+    <div style={base}>
+      <span style={{color:'rgba(255,255,255,0.65)', fontSize:11, flex:1}}>How was this assignment?</span>
+      <button onClick={handleGood} style={{
+        background:'rgba(34,197,94,0.18)', border:'1px solid rgba(34,197,94,0.4)',
+        color:'#86efac', borderRadius:16, padding:'4px 14px', fontSize:12, cursor:'pointer', fontWeight:700,
+      }}>👍 Good</button>
+      <button onClick={()=>setPhase('reason')} style={{
+        background:'rgba(239,68,68,0.18)', border:'1px solid rgba(239,68,68,0.4)',
+        color:'#fca5a5', borderRadius:16, padding:'4px 14px', fontSize:12, cursor:'pointer', fontWeight:700,
+      }}>👎 Needs work</button>
+    </div>
+  );
+}
+
 function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
                            discharge, isolation, restraint, centralLine,
                            unassignedOpen, onUnassignedClick, unassignedBtnRef,
-                           onZapAssign, zapLoading, fuelMode, onToggleFuel }) {
+                           onZapAssign, zapLoading, fuelMode, onToggleFuel,
+                           zapFeedback, onFeedbackGood, onFeedbackBad, fbWeights }) {
   const [pressed, setPressed] = React.useState(false);
+
+  // Is the model tuned away from baseline?
+  const isTuned = fbWeights && Object.entries(fbWeights).some(([,v]) => Math.abs(v - 1.0) > 0.05);
 
   function handleZap() {
     if (zapLoading) return;
@@ -1293,20 +1372,37 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
       </div>
 
       {/* Zap Assign button */}
-      <div style={{ marginTop:18, paddingBottom:6 }}>
+      <div style={{ marginTop:18, paddingBottom: zapFeedback ? 0 : 6 }}>
         <button
           className={`zap-btn${pressed || zapLoading ? ' zap-pressed' : ''}`}
           onClick={handleZap}
           disabled={zapLoading}
           title="AI auto-assign unassigned rooms to nurses"
+          style={{ position:'relative' }}
         >
           <ZapAIIcon spinning={zapLoading} />
           <span>{zapLoading ? 'Assigning…' : 'Zap Assign'}</span>
           {!zapLoading && (
             <span style={{ fontSize:10, fontWeight:600, opacity:0.7, marginLeft:2 }}>AI</span>
           )}
+          {/* Tuning indicator dot — lit when model weights have drifted from baseline */}
+          {isTuned && !zapLoading && (
+            <span title="Model tuned by your feedback" style={{
+              position:'absolute', top:6, right:8,
+              width:7, height:7, borderRadius:'50%',
+              background:'#86efac',
+              boxShadow:'0 0 6px #86efac',
+            }}/>
+          )}
         </button>
       </div>
+
+      {/* Feedback bar — appears after each Zap run */}
+      {zapFeedback && (
+        <div style={{ paddingBottom:6 }}>
+          <FeedbackBar onGood={onFeedbackGood} onBad={onFeedbackBad} />
+        </div>
+      )}
     </div>
   );
 }
@@ -1314,7 +1410,8 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
 // ── CORRIDOR GRID ─────────────────────────────────────────────────────────────
 function CorridorGrid({ allRooms, selected, nurses, nurseRooms, dragPreviewIds, onSelect, onDragStart, onDblClick, onAssignNurse, onUnassign, onClearSelection,
                         dashStats, onUnassignedClick, unassignedOpen, unassignedBtnRef,
-                        onZapAssign, zapLoading, fuelMode, onToggleFuel }) {
+                        onZapAssign, zapLoading, fuelMode, onToggleFuel,
+                        zapFeedback, onFeedbackGood, onFeedbackBad, fbWeights }) {
   const ref = useRef();
   const [dims, setDims] = useState({ w:900, h:580 });
 
@@ -1387,6 +1484,10 @@ function CorridorGrid({ allRooms, selected, nurses, nurseRooms, dragPreviewIds, 
             zapLoading={zapLoading}
             fuelMode={fuelMode}
             onToggleFuel={onToggleFuel}
+            zapFeedback={zapFeedback}
+            onFeedbackGood={onFeedbackGood}
+            onFeedbackBad={onFeedbackBad}
+            fbWeights={fbWeights}
           />
         </div>
       </div>
@@ -1440,9 +1541,38 @@ function App() {
   const [theme, setTheme] = useState(()=>localStorage.getItem('careflow_theme')||'night');
   const [zapLoading, setZapLoading] = useState(false);
   const [fuelMode, setFuelMode] = useState(false);
+  const [feedbackStore, setFeedbackStore] = useState(() => loadFB());
+  const [zapFeedback, setZapFeedback] = useState(false); // true = feedback bar visible
   const toastRef = useRef();
   const autoSaveRef = useRef();
   const colorIdx = useRef(_saved?.nurses?.length ?? DEFAULT_NURSES.length);
+
+  // ── Feedback handlers ──────────────────────────────────────────────────────
+  function handleFeedbackGood() {
+    setFeedbackStore(prev => {
+      const weights = { ...prev.weights };
+      // Nudge every weight 8% back toward 1.0 (baseline relaxation)
+      Object.keys(weights).forEach(k => { weights[k] = +(weights[k] * 0.92 + 1.0 * 0.08).toFixed(3); });
+      const entry = { ts: Date.now(), rating:'good', reason:null };
+      const next = { entries:[...prev.entries.slice(-99), entry], weights };
+      saveFB(next); return next;
+    });
+    setZapFeedback(false);
+  }
+  function handleFeedbackBad(reason) {
+    setFeedbackStore(prev => {
+      const weights = { ...prev.weights };
+      const BOOST = 1.28, CAP = 4.0;
+      if (reason === 'spread')   weights.diam        = +Math.min(weights.diam        * BOOST, CAP).toFixed(3);
+      if (reason === 'load')     weights.load        = +Math.min(weights.load        * BOOST, CAP).toFixed(3);
+      if (reason === 'heavy')    weights.acuity      = +Math.min(weights.acuity      * BOOST, CAP).toFixed(3);
+      if (reason === 'mix')      weights.teleCluster = +Math.min(weights.teleCluster * BOOST, CAP).toFixed(3);
+      const entry = { ts: Date.now(), rating:'bad', reason };
+      const next = { entries:[...prev.entries.slice(-99), entry], weights };
+      saveFB(next); return next;
+    });
+    setZapFeedback(false);
+  }
 
   // Apply theme to body
   useEffect(()=>{
@@ -1625,6 +1755,9 @@ function App() {
           };
         });
 
+        // Snapshot learned weights from feedback store
+        const fbW = feedbackStore.weights;
+
         // All occupied rooms that are NOT locked get re-assigned
         const unassigned = Object.values(resetRooms).filter(r => r.occupied && !lockedRoomIds.has(r.id));
 
@@ -1707,8 +1840,8 @@ function App() {
           let penalty = 0;
           const projAcuity = acuityPts + roomAcuityPts(room);
 
-          // Primary: penalise large diameter (farthest pair of rooms)
-          penalty += diam < DIAM_PEN.length ? DIAM_PEN[diam] : 450 + (diam - 13) * 80;
+          // Primary: penalise large diameter — scaled by learned weight
+          penalty += (diam < DIAM_PEN.length ? DIAM_PEN[diam] : 450 + (diam - 13) * 80) * fbW.diam;
 
           // Secondary: penalise large consecutive steps in the sorted cluster
           const gap = maxChainGap(projRooms);
@@ -1720,8 +1853,8 @@ function App() {
             penalty += minDist * 2.5;
           }
 
-          // Soft acuity cap: each point over 4 costs heavily
-          if (projAcuity > 4) penalty += 60 * (projAcuity - 4);
+          // Soft acuity cap — scaled by learned weight
+          if (projAcuity > 4) penalty += 60 * (projAcuity - 4) * fbW.acuity;
 
           // Isolation: strongly discourage a 2nd isolation room on same nurse
           if (room.isolation && isolationCount >= 1) penalty += 90;
@@ -1730,15 +1863,15 @@ function App() {
           if (isolationCount >= 1 && room.totalCare && totalCareCount >= 1) penalty += 70;
           if (room.isolation && totalCareCount >= 2) penalty += 70;
 
-          // ── Fuel efficiency mode: keep MedSurg and TELE nurses separate ──
+          // ── Fuel efficiency mode — teleCluster weight applied ─────────────
           if (fuelMode) {
-            if (teleCount > 0 && room.type !== 'TELE') penalty += 55;
-            if (medCount > 0  && room.type === 'TELE') penalty += 55;
+            if (teleCount > 0 && room.type !== 'TELE') penalty += 55 * fbW.teleCluster;
+            if (medCount > 0  && room.type === 'TELE') penalty += 55 * fbW.teleCluster;
             if (room.type !== 'TELE') penalty -= medCount * 4;
           }
 
-          // ── Load balance: favour less-loaded nurses ──────────────────────
-          const load = nRooms.length * 5;
+          // ── Load balance — scaled by learned weight ───────────────────────
+          const load = nRooms.length * 5 * fbW.load;
 
           // ── HA spread: discourage stacking high-acuity ───────────────────
           const haSpread = room.highAcuity ? haCount * 18 : 0;
@@ -1789,6 +1922,7 @@ function App() {
             ? `⚡ Assigned ${count} rooms · ${skipped} skipped (capacity)${lockedCount ? ` · ${lockedCount} locked` : ''}`
             : `⚡ Assigned ${count} room${count>1?'s':''} across ${N} nurse${N>1?'s':''}${lockedCount ? ` · ${lockedCount} locked` : ''}`;
           showToast(msg);
+          setZapFeedback(true); // show feedback bar
         }
       } finally {
         setZapLoading(false);
@@ -1972,6 +2106,10 @@ function App() {
             zapLoading={zapLoading}
             fuelMode={fuelMode}
             onToggleFuel={() => setFuelMode(f => !f)}
+            zapFeedback={zapFeedback}
+            onFeedbackGood={handleFeedbackGood}
+            onFeedbackBad={handleFeedbackBad}
+            fbWeights={feedbackStore.weights}
           />
         </div>
       </div>
