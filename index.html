@@ -479,6 +479,177 @@ function generateRooms() {
 }
 const ROOM_IDS = generateRooms();
 
+// ── HOSPITAL PHONE DIRECTORY — seed data from Hospital_Phone_Directory.xlsx ──
+const PHONE_DIR_KEY = 'careflow_phonedir_v1';
+const PHONE_DIR_SEED = {
+  internal: [
+    {id:'i1',  dept:'ACU (Acute Care Unit)',                  phone:'916-983-7503', ext:'37503', notes:''},
+    {id:'i2',  dept:'Admin Fax',                              phone:'916-986-4536', ext:'64536', notes:''},
+    {id:'i3',  dept:'Administration (Admin)',                 phone:'916-983-7410', ext:'37410', notes:''},
+    {id:'i4',  dept:'Admitting',                             phone:'',             ext:'37451', notes:''},
+    {id:'i5',  dept:'Admitting Fax',                         phone:'916-983-7554', ext:'37554', notes:''},
+    {id:'i6',  dept:'Aly Angeletti (CNEO)',                  phone:'916-984-7268', ext:'47268', notes:''},
+    {id:'i7',  dept:'Ambulatory Fax',                        phone:'916-983-7545', ext:'37545', notes:''},
+    {id:'i8',  dept:'ANS',                                   phone:'916-984-7288', ext:'47288', notes:''},
+    {id:'i9',  dept:'Bed Control',                           phone:'',             ext:'37586', notes:'Same as Patient Reg ER / ED Admitting'},
+    {id:'i10', dept:'Bio Med',                               phone:'916-986-4408', ext:'64408', notes:''},
+    {id:'i11', dept:'Birth Center Fax',                      phone:'916-983-7556', ext:'37556', notes:''},
+    {id:'i12', dept:'Cardiopulmonary',                       phone:'916-983-7456', ext:'37456', notes:''},
+    {id:'i13', dept:'Care Coordinator / Care Coordination',  phone:'916-983-7420', ext:'37420', notes:''},
+    {id:'i14', dept:'Case Management Fax',                   phone:'916-984-7308', ext:'47308', notes:''},
+    {id:'i15', dept:'Cashier Admitting',                     phone:'916-983-7451', ext:'37451', notes:''},
+    {id:'i16', dept:'Cashier Fax',                           phone:'916-984-7395', ext:'47395', notes:''},
+    {id:'i17', dept:'Chaplain',                              phone:'916-983-7436', ext:'37436', notes:''},
+    {id:'i18', dept:'CSPD',                                  phone:'',             ext:'37483', notes:''},
+    {id:'i19', dept:'David B P Hall (CFO)',                  phone:'916-984-7379', ext:'47379', notes:''},
+    {id:'i20', dept:'Dietary',                               phone:'',             ext:'37433', notes:''},
+    {id:'i21', dept:'Dietary Fax',                           phone:'916-983-7444', ext:'37444', notes:''},
+    {id:'i22', dept:'ED (Emergency Dept)',                   phone:'916-983-7470', ext:'37470', notes:''},
+    {id:'i23', dept:'ED Admitting / Patient Reg ER',         phone:'',             ext:'37586', notes:''},
+    {id:'i24', dept:'EEG',                                   phone:'916-537-5149', ext:'37455', notes:'MSJ EEG line'},
+    {id:'i25', dept:'EKG',                                   phone:'',             ext:'47362', notes:''},
+    {id:'i26', dept:'Elevator 1',                            phone:'',             ext:'46193', notes:''},
+    {id:'i27', dept:'Elevator 2',                            phone:'',             ext:'46195', notes:''},
+    {id:'i28', dept:'Elevator 3',                            phone:'',             ext:'46194', notes:''},
+    {id:'i29', dept:'Employee Health',                       phone:'916-984-7266', ext:'47266', notes:''},
+    {id:'i30', dept:'Endoscopy',                             phone:'',             ext:'47394', notes:''},
+    {id:'i31', dept:'Engineering',                           phone:'916-983-7585', ext:'37585', notes:''},
+    {id:'i32', dept:'ER Fax',                                phone:'916-983-7540', ext:'37540', notes:''},
+    {id:'i33', dept:'EVS (Environmental Services)',          phone:'',             ext:'47200', notes:''},
+    {id:'i34', dept:'Fax Machine',                           phone:'916-984-7315', ext:'47315', notes:''},
+    {id:'i35', dept:'FBC (Family Birth Center)',             phone:'916-983-7440', ext:'37440', notes:''},
+    {id:'i36', dept:'Food Services (Café)',                  phone:'916-983-7433', ext:'37433', notes:''},
+    {id:'i37', dept:'Front Desk',                            phone:'',             ext:'37411', notes:''},
+    {id:'i38', dept:'GI',                                    phone:'',             ext:'47215', notes:''},
+    {id:'i39', dept:'GI Lab',                                phone:'',             ext:'47394', notes:''},
+    {id:'i40', dept:'Gift Shop',                             phone:'916-983-7588', ext:'37588', notes:''},
+    {id:'i41', dept:'HIM Fax',                               phone:'916-983-7564', ext:'37564', notes:''},
+    {id:'i42', dept:'Hospitalist 4',                         phone:'916-986-4426', ext:'64426', notes:''},
+    {id:'i43', dept:'HR Fax',                                phone:'844-200-0124', ext:'',      notes:''},
+    {id:'i44', dept:'HR Folsom',                             phone:'916-537-5149', ext:'',      notes:''},
+    {id:'i45', dept:'HR — National',                         phone:'855-475-4747', ext:'',      notes:''},
+    {id:'i46', dept:'ICU (Intensive Care Unit)',             phone:'916-983-7465', ext:'37465', notes:''},
+    {id:'i47', dept:'ICU Fax',                               phone:'916-983-7542', ext:'37542', notes:''},
+    {id:'i48', dept:'Imaging Service Fax',                   phone:'916-983-7459', ext:'37459', notes:''},
+    {id:'i49', dept:'Infection Control Fax',                 phone:'916-986-4572', ext:'64572', notes:''},
+    {id:'i50', dept:'IT',                                    phone:'',             ext:'47340', notes:''},
+    {id:'i51', dept:'IV Therapy',                            phone:'',             ext:'64419', notes:''},
+    {id:'i52', dept:'John Gisla (VP CMO)',                   phone:'916-983-7466', ext:'37466', notes:''},
+    {id:'i53', dept:'Lab / Laboratory',                      phone:'916-983-7473', ext:'37473', notes:''},
+    {id:'i54', dept:'Lab Fax',                               phone:'916-984-7336', ext:'47336', notes:''},
+    {id:'i55', dept:'Labor & Delivery',                      phone:'916-983-7440', ext:'37440', notes:''},
+    {id:'i56', dept:'Lisa Hausmann (MSN/RN)',                phone:'916-984-7203', ext:'47203', notes:''},
+    {id:'i57', dept:'Lower ED Fax',                          phone:'916-984-7318', ext:'37567', notes:''},
+    {id:'i58', dept:'Main Entrance',                         phone:'916-883-7400', ext:'0',     notes:''},
+    {id:'i59', dept:'Marcy',                                 phone:'',             ext:'47209', notes:''},
+    {id:'i60', dept:'Material Management',                   phone:'916-983-7483', ext:'37483', notes:''},
+    {id:'i61', dept:'Med Tele NSM',                          phone:'',             ext:'64406', notes:''},
+    {id:'i62', dept:'Medical Records',                       phone:'916-983-7445', ext:'37445', notes:''},
+    {id:'i63', dept:'Medical Telemetry (MT)',                phone:'916-983-7460', ext:'37460', notes:''},
+    {id:'i64', dept:'Medical Telemetry Fax',                 phone:'916-983-7548', ext:'37548', notes:''},
+    {id:'i65', dept:'Monitor Tech',                          phone:'',             ext:'64452', notes:''},
+    {id:'i66', dept:'MRI',                                   phone:'',             ext:'64360', notes:''},
+    {id:'i67', dept:'MRI Fax',                               phone:'916-986-4580', ext:'64580', notes:''},
+    {id:'i68', dept:'MSO',                                   phone:'',             ext:'37503', notes:''},
+    {id:'i69', dept:'MSO Fax #2',                            phone:'916-983-7524', ext:'37524', notes:''},
+    {id:'i70', dept:'Nuclear Medicine (Nuc Med)',            phone:'916-983-7480', ext:'37480', notes:''},
+    {id:'i71', dept:'Nursing Fax',                           phone:'916-984-7324', ext:'47324', notes:''},
+    {id:'i72', dept:'Nutrition Services',                    phone:'916-983-7433', ext:'37433', notes:''},
+    {id:'i73', dept:'OR',                                    phone:'',             ext:'47366', notes:''},
+    {id:'i74', dept:'PACU',                                  phone:'916-983-7516', ext:'37516', notes:''},
+    {id:'i75', dept:'Palliative Care',                       phone:'916-986-4447', ext:'64447', notes:''},
+    {id:'i76', dept:'Patient Registration',                  phone:'916-983-7451', ext:'37451', notes:''},
+    {id:'i77', dept:'Patient Support Fax',                   phone:'916-983-7546', ext:'37546', notes:''},
+    {id:'i78', dept:'Pharmacy',                              phone:'916-983-7493', ext:'37493', notes:''},
+    {id:'i79', dept:'Pharmacy Fax',                          phone:'916-983-7517', ext:'37517', notes:''},
+    {id:'i80', dept:'Pharmis Fax',                           phone:'916-983-7589', ext:'37589', notes:''},
+    {id:'i81', dept:'Physical Therapy',                      phone:'',             ext:'37457', notes:''},
+    {id:'i82', dept:'Purchasing Fax',                        phone:'916-983-7482', ext:'37482', notes:''},
+    {id:'i83', dept:'Radiology',                             phone:'916-983-7476', ext:'37476', notes:''},
+    {id:'i84', dept:'Radiology Fax',                         phone:'916-983-7474', ext:'37474', notes:''},
+    {id:'i85', dept:'Rehab',                                 phone:'916-983-7457', ext:'37457', notes:''},
+    {id:'i86', dept:'Respiratory Therapy',                   phone:'916-984-7263', ext:'47263', notes:''},
+    {id:'i87', dept:'Riley / Riley West',                    phone:'',             ext:'37525', notes:''},
+    {id:'i88', dept:'Rita (Executive Coordinator)',          phone:'916-983-7426', ext:'37426', notes:''},
+    {id:'i89', dept:'SAU (Surgical Acute)',                  phone:'916-986-7740', ext:'67740', notes:'Also listed as 64440'},
+    {id:'i90', dept:'SAU Fax',                               phone:'916-986-4530', ext:'64530', notes:''},
+    {id:'i91', dept:'SAU NSM',                               phone:'',             ext:'64503', notes:''},
+    {id:'i92', dept:'Security (1)',                          phone:'916-984-7291', ext:'47291', notes:''},
+    {id:'i93', dept:'Security (2)',                          phone:'916-984-7277', ext:'47277', notes:''},
+    {id:'i94', dept:'Social Services',                       phone:'916-983-7570', ext:'37570', notes:''},
+    {id:'i95', dept:'Sonia (Executive Coordinator)',         phone:'916-984-7317', ext:'47317', notes:''},
+    {id:'i96', dept:'Sterile',                               phone:'',             ext:'47382', notes:''},
+    {id:'i97', dept:'Surgery',                               phone:'916-984-7339', ext:'47339', notes:'Also listed as XRAY ext'},
+    {id:'i98', dept:'Surgery Fax',                           phone:'916-983-7541', ext:'37541', notes:''},
+    {id:'i99', dept:'Surgery Office Fax',                    phone:'916-984-7270', ext:'47270', notes:''},
+    {id:'i100',dept:'Telecommunications',                    phone:'916-983-7599', ext:'37599', notes:''},
+    {id:'i101',dept:'TR',                                    phone:'',             ext:'47254', notes:''},
+    {id:'i102',dept:'Wound Care',                            phone:'',             ext:'64387', notes:''},
+    {id:'i103',dept:'Wound Care Fax',                        phone:'916-986-4534', ext:'64534', notes:''},
+    {id:'i104',dept:'X-Ray',                                 phone:'916-984-7339', ext:'47339', notes:''},
+    {id:'i105',dept:'X-Ray Tech',                            phone:'',             ext:'47338', notes:''},
+  ],
+  external: [
+    {id:'e1', name:'Kaiser Transfer Center',                phone:'888-327-0509', notes:'Main Kaiser transfer line'},
+    {id:'e2', name:'Transfer Center',                       phone:'916-851-2878', notes:''},
+    {id:'e3', name:'Pro Transport',                         phone:'877-225-9392', notes:'Patient transport'},
+    {id:'e4', name:'Alpha One',                             phone:'916-635-1111', notes:'Transport'},
+    {id:'e5', name:'Apria',                                 phone:'888-492-7742', notes:'DME / respiratory'},
+    {id:'e6', name:'DART',                                  phone:'855-788-3278', notes:'Help Desk: 888-307-0222'},
+    {id:'e7', name:'Abbott PaceInter (Pacemakers)',         phone:'800-722-3423', notes:''},
+    {id:'e8', name:'St Jude',                               phone:'800-722-3423', notes:'Pacemaker / device'},
+    {id:'e9', name:'Boston Scientific',                     phone:'800-227-3422', notes:'Pacemaker / device'},
+    {id:'e10',name:'Biotronik Pacemakers',                  phone:'800-547-0394', notes:''},
+    {id:'e11',name:'Anchor Orthotics & Prosthetics',        phone:'916-484-0685', notes:''},
+    {id:'e12',name:'Davita Dialysis',                       phone:'888-849-3342', notes:'OB'},
+    {id:'e13',name:'Poison Control',                        phone:'800-411-8080', notes:''},
+    {id:'e14',name:'Methodist MRI — Main',                  phone:'916-423-5956', notes:'Also used as fax'},
+    {id:'e15',name:'Methodist MRI Fax (alt)',               phone:'916-681-1704', notes:'Older listing — verify'},
+    {id:'e16',name:'Methodist MRI Direct',                  phone:'916-733-6496', notes:''},
+    {id:'e17',name:'MSJ MRI',                               phone:'916-864-8450', notes:''},
+    {id:'e18',name:'MSJ MRI Fax',                           phone:'916-537-5234', notes:''},
+    {id:'e19',name:'ANG / Moth Fax',                        phone:'916-453-4996', notes:''},
+    {id:'e20',name:'Woodland MRI',                          phone:'530-666-5336', notes:'MRI: option 2, ext 4969'},
+    {id:'e21',name:'Cerner Help (EIM)',                     phone:'916-851-2674', notes:'EHR support'},
+  ],
+  quickNotes: [
+    {id:'q1', note:'MSJ EEG',              detail:'(916) 537-5149'},
+    {id:'q2', note:'Kaiser Transfer Center',detail:'888-327-0509'},
+    {id:'q3', note:'Transfer Center',      detail:'(916) 851-2878'},
+    {id:'q4', note:'Riley',                detail:'37525'},
+    {id:'q5', note:'Davita Dialysis (OB)', detail:'888-849-3342'},
+    {id:'q6', note:'Boston Scientific',    detail:'800-227-3422'},
+    {id:'q7', note:'GI Lab',               detail:'47394'},
+    {id:'q8', note:'TR',                   detail:'47254'},
+    {id:'q9', note:'Marcy',                detail:'47209'},
+    {id:'q10',note:'ANG / Moth Fax',       detail:'916-453-4996'},
+    {id:'q11',note:'Methodist MRI Direct', detail:'733-6496'},
+    {id:'q12',note:'Methodist MRI Fax',    detail:'916-537-5234'},
+    {id:'q13',note:'Woodland MRI',         detail:'530-666-5336 (MRI: option 2, ext 4969)'},
+    {id:'q14',note:'National HR #',        detail:'855-475-4747'},
+    {id:'q15',note:'HR Fax #',             detail:'844-200-0124'},
+    {id:'q16',note:'HR Folsom',            detail:'(916) 537-5149'},
+    {id:'q17',note:'Bed Control',          detail:'37586'},
+    {id:'q18',note:'Sterile',              detail:'47382'},
+    {id:'q19',note:'X-Ray Tech',           detail:'47338'},
+    {id:'q20',note:'GI',                   detail:'47215'},
+    {id:'q21',note:'EKG',                  detail:'47362'},
+    {id:'q22',note:'Pharmacy',             detail:'37493'},
+    {id:'q23',note:'Abbott PaceInter',     detail:'800-722-3423'},
+    {id:'q24',note:'Apria',                detail:'888-492-7742'},
+    {id:'q25',note:'DART',                 detail:'855-788-3278 (Help Desk: 888-307-0222)'},
+  ],
+};
+function loadPhoneDir() {
+  try { const s = JSON.parse(localStorage.getItem(PHONE_DIR_KEY)); return s || PHONE_DIR_SEED; }
+  catch { return PHONE_DIR_SEED; }
+}
+function savePhoneDir(data) {
+  try { localStorage.setItem(PHONE_DIR_KEY, JSON.stringify(data)); } catch {}
+}
+let _pdIdCtr = 9000;
+function pdId() { return 'pd' + (++_pdIdCtr); }
+
 // ── CIRCULAR ROOM PROXIMITY ───────────────────────────────────────────────────
 // ROOM_IDS wraps around the corridor perimeter like a clock:
 //   top-row (0-13) → right-side (14-21) → bottom-row (22-35) → left-side (36-43)
@@ -1525,6 +1696,155 @@ function ThemeToggle({ theme, onToggle }) {
   );
 }
 
+// ── PHONE DIRECTORY MODAL ─────────────────────────────────────────────────────
+const PD_TABS = [
+  { key:'internal',   label:'📋 Internal',      cols:['dept','phone','ext','notes'],         headers:['Department / Person','Direct Phone #','Extension','Notes'] },
+  { key:'external',   label:'🌐 External',       cols:['name','phone','notes'],               headers:['Name / Service','Phone Number','Notes'] },
+  { key:'quickNotes', label:'📌 Quick Notes',    cols:['note','detail'],                      headers:['Note','Detail'] },
+];
+
+function PhoneDirectory({ onClose }) {
+  const [data,     setData]    = React.useState(() => loadPhoneDir());
+  const [tab,      setTab]     = React.useState('internal');
+  const [search,   setSearch]  = React.useState('');
+  const [editing,  setEditing] = React.useState(null); // {id, col}
+  const [editVal,  setEditVal] = React.useState('');
+  const inputRef = React.useRef();
+
+  React.useEffect(() => { if (editing && inputRef.current) inputRef.current.focus(); }, [editing]);
+
+  const tabDef = PD_TABS.find(t => t.key === tab);
+  const rows   = data[tab] || [];
+  const q      = search.toLowerCase();
+  const visible = q
+    ? rows.filter(r => tabDef.cols.some(c => (r[c]||'').toLowerCase().includes(q)))
+    : rows;
+
+  function persist(next) { setData(next); savePhoneDir(next); }
+
+  function startEdit(id, col, val) { setEditing({id,col}); setEditVal(val||''); }
+  function commitEdit() {
+    if (!editing) return;
+    persist({ ...data, [tab]: data[tab].map(r => r.id===editing.id ? {...r,[editing.col]:editVal} : r) });
+    setEditing(null);
+  }
+
+  function addRow() {
+    const blank = Object.fromEntries([['id',pdId()], ...tabDef.cols.map(c=>[c,''])]);
+    const next = { ...data, [tab]: [...data[tab], blank] };
+    persist(next);
+    // auto-edit first col of new row
+    setEditing({ id: blank.id, col: tabDef.cols[0] }); setEditVal('');
+  }
+  function deleteRow(id) { persist({ ...data, [tab]: data[tab].filter(r => r.id !== id) }); }
+
+  function resetToSeed() {
+    if (!window.confirm('Reset this tab to the original directory data?')) return;
+    persist({ ...data, [tab]: PHONE_DIR_SEED[tab] });
+  }
+
+  const cellStyle = { padding:'6px 10px', borderBottom:'1px solid var(--border-sub)', fontSize:12, color:'var(--text-1)', verticalAlign:'middle' };
+  const hdrStyle  = { padding:'7px 10px', fontWeight:700, fontSize:11, textTransform:'uppercase', letterSpacing:'0.06em',
+                      color:'var(--text-3)', borderBottom:'2px solid var(--border)', background:'var(--bg-panel)', position:'sticky', top:0, zIndex:2 };
+
+  return ReactDOM.createPortal(
+    <div style={{ position:'fixed', inset:0, zIndex:900, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.55)', backdropFilter:'blur(4px)' }}
+         onMouseDown={e=>{ if(e.target===e.currentTarget) onClose(); }}>
+      <div style={{ width:'min(860px,96vw)', height:'min(680px,92vh)', background:'var(--modal-bg)', borderRadius:18,
+                    display:'flex', flexDirection:'column', boxShadow:'0 24px 72px rgba(0,0,0,0.55)', overflow:'hidden' }}>
+
+        {/* Header */}
+        <div style={{ padding:'14px 18px 0', background:'var(--bg-panel)', borderBottom:'1px solid var(--border)', flexShrink:0 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
+            <span style={{ fontSize:20 }}>📞</span>
+            <span style={{ fontWeight:800, fontSize:16, color:'var(--text-1)', flex:1 }}>Hospital Phone Directory</span>
+            {/* Search */}
+            <div style={{ display:'flex', alignItems:'center', gap:6, background:'var(--bg-base)', border:'1px solid var(--border-sub)', borderRadius:8, padding:'4px 10px' }}>
+              <span style={{ opacity:0.45, fontSize:13 }}>🔍</span>
+              <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search…"
+                style={{ border:'none', background:'transparent', fontSize:12, color:'var(--text-1)', width:160, outline:'none' }}/>
+              {search && <button onClick={()=>setSearch('')} style={{ border:'none',background:'transparent',cursor:'pointer',color:'var(--text-4)',fontSize:12 }}>✕</button>}
+            </div>
+            <button onClick={onClose} style={{ background:'transparent',border:'none',fontSize:18,cursor:'pointer',color:'var(--text-3)',lineHeight:1,padding:'2px 4px' }}>✕</button>
+          </div>
+          {/* Tabs */}
+          <div style={{ display:'flex', gap:2 }}>
+            {PD_TABS.map(t=>(
+              <button key={t.key} onClick={()=>{ setTab(t.key); setSearch(''); setEditing(null); }}
+                style={{ padding:'7px 14px', border:'none', borderRadius:'8px 8px 0 0', cursor:'pointer', fontSize:12, fontWeight:tab===t.key?700:500,
+                  background: tab===t.key ? 'var(--modal-bg)' : 'transparent',
+                  color: tab===t.key ? 'var(--text-1)' : 'var(--text-3)',
+                  borderBottom: tab===t.key ? '2px solid var(--accent)' : '2px solid transparent',
+                }}>
+                {t.label} <span style={{ fontSize:10, opacity:0.6 }}>({data[t.key]?.length||0})</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Table */}
+        <div style={{ flex:1, overflowY:'auto' }}>
+          <table style={{ width:'100%', borderCollapse:'collapse' }}>
+            <thead>
+              <tr>
+                {tabDef.headers.map((h,i)=><th key={i} style={hdrStyle}>{h}</th>)}
+                <th style={{...hdrStyle, width:36}}/>
+              </tr>
+            </thead>
+            <tbody>
+              {visible.length === 0 && (
+                <tr><td colSpan={tabDef.cols.length+1} style={{ textAlign:'center', padding:32, color:'var(--text-4)', fontSize:13 }}>
+                  {search ? 'No matches' : 'No entries yet'}
+                </td></tr>
+              )}
+              {visible.map(row=>(
+                <tr key={row.id} style={{ transition:'background 0.1s' }}
+                  onMouseEnter={e=>e.currentTarget.style.background='var(--bg-panel)'}
+                  onMouseLeave={e=>e.currentTarget.style.background=''}>
+                  {tabDef.cols.map(col=>(
+                    <td key={col} style={cellStyle} onClick={()=>startEdit(row.id,col,row[col])}>
+                      {editing?.id===row.id && editing?.col===col
+                        ? <input ref={inputRef} value={editVal} onChange={e=>setEditVal(e.target.value)}
+                            onBlur={commitEdit}
+                            onKeyDown={e=>{ if(e.key==='Enter') commitEdit(); if(e.key==='Escape'){setEditing(null);} }}
+                            style={{ width:'100%', border:'1px solid var(--accent)', borderRadius:4, padding:'2px 6px', fontSize:12,
+                              background:'var(--bg-base)', color:'var(--text-1)', outline:'none' }}/>
+                        : <span style={{ display:'block', minHeight:18, cursor:'text',
+                            color: row[col] ? 'var(--text-1)' : 'var(--text-4)',
+                            fontFamily: (col==='ext'||col==='phone'||col==='detail') ? 'monospace' : 'inherit',
+                          }}>{row[col] || (editing ? '' : '—')}</span>
+                      }
+                    </td>
+                  ))}
+                  <td style={{...cellStyle, textAlign:'center', padding:'4px 6px'}}>
+                    <button onClick={()=>deleteRow(row.id)} title="Delete row"
+                      style={{ background:'transparent',border:'none',cursor:'pointer',color:'var(--text-4)',fontSize:13,lineHeight:1,
+                        padding:'2px 4px', borderRadius:4, transition:'color 0.15s' }}
+                      onMouseEnter={e=>e.currentTarget.style.color='#ef4444'}
+                      onMouseLeave={e=>e.currentTarget.style.color=''}>✕</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding:'10px 16px', borderTop:'1px solid var(--border)', display:'flex', gap:8, alignItems:'center', background:'var(--bg-panel)', flexShrink:0 }}>
+          <button onClick={addRow} style={{ display:'flex',alignItems:'center',gap:6,padding:'6px 14px',borderRadius:8,border:'none',cursor:'pointer',
+            background:'var(--accent)',color:'#fff',fontWeight:700,fontSize:12 }}>
+            + Add Row
+          </button>
+          <span style={{ flex:1, fontSize:11, color:'var(--text-4)' }}>Click any cell to edit · Changes auto-save</span>
+          <button onClick={resetToSeed} style={{ padding:'5px 12px',borderRadius:8,border:'1px solid var(--border-sub)',cursor:'pointer',
+            background:'transparent',color:'var(--text-3)',fontSize:11 }}>↺ Reset tab</button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 // ── APP ───────────────────────────────────────────────────────────────────────
 function App() {
   const _saved = useMemo(loadFromStorage, []);
@@ -1540,6 +1860,7 @@ function App() {
   const [pendingAssignment, setPendingAssignment] = useState(null);
   const [theme, setTheme] = useState(()=>localStorage.getItem('careflow_theme')||'night');
   const [zapLoading, setZapLoading] = useState(false);
+  const [phoneDir,   setPhoneDir]   = useState(false);
   const [fuelMode, setFuelMode] = useState(false);
   const [feedbackStore, setFeedbackStore] = useState(() => loadFB());
   const [zapFeedback, setZapFeedback] = useState(false); // true = feedback bar visible
@@ -1997,6 +2318,16 @@ function App() {
               ✓ saved {new Date(lastSaved).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})}
             </span>
           )}
+          <button onClick={()=>setPhoneDir(true)}
+            title="Hospital Phone Directory"
+            style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 11px',
+              borderRadius:8, border:'1px solid var(--border-sub)', background:'transparent',
+              cursor:'pointer', fontSize:12, color:'var(--text-2)', fontWeight:600,
+              transition:'background 0.15s' }}
+            onMouseEnter={e=>e.currentTarget.style.background='var(--bg-panel)'}
+            onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+            📞 <span>Directory</span>
+          </button>
           <ThemeToggle theme={theme} onToggle={()=>setTheme(t=>t==='night'?'day':'night')}/>
           <button className="btn btn-ghost" onClick={()=>{
             setRooms(prev=>{
@@ -2134,6 +2465,7 @@ function App() {
           onCancel={()=>setPendingAssignment(null)}
         />
       )}
+      {phoneDir && <PhoneDirectory onClose={()=>setPhoneDir(false)}/>}
       {toast && <div className="warn-toast">{toast}</div>}
     </div>
   );
