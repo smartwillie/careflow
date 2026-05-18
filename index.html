@@ -1194,8 +1194,57 @@ function NurseBadge({ room, onDragStart }) {
   );
 }
 
+// ── NURSE FEEDBACK STRIP (inline, per-nurse) ──────────────────────────────────
+const NURSE_FB_REASONS = [
+  { key:'spread', label:'Too spread',   icon:'📍' },
+  { key:'load',   label:'Too many rooms', icon:'⚖️' },
+  { key:'heavy',  label:'Too heavy',    icon:'🔴' },
+  { key:'mix',    label:'TELE/Med mix', icon:'💔' },
+];
+function NurseFeedbackStrip({ onGood, onBad, nurseColor }) {
+  const [phase, setPhase] = React.useState('ask'); // ask | reason | done
+
+  if (phase === 'done') return (
+    <div style={{ marginTop:6, padding:'5px 8px', borderRadius:7, fontSize:10, textAlign:'center',
+      background:'rgba(34,197,94,0.08)', color:'#86efac', border:'1px solid rgba(34,197,94,0.2)' }}>
+      ✓ Feedback saved
+    </div>
+  );
+
+  if (phase === 'reason') return (
+    <div style={{ marginTop:6, padding:'6px 8px', borderRadius:7,
+      background:'rgba(239,68,68,0.07)', border:'1px solid rgba(239,68,68,0.2)' }}>
+      <div style={{ fontSize:9, color:'var(--text-4)', marginBottom:4, fontWeight:600, textTransform:'uppercase', letterSpacing:'0.05em' }}>What's wrong?</div>
+      <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
+        {NURSE_FB_REASONS.map(r=>(
+          <button key={r.key} onClick={()=>{ onBad(r.key); setPhase('done'); }}
+            style={{ fontSize:9, padding:'3px 7px', borderRadius:10, border:'1px solid rgba(239,68,68,0.35)',
+              background:'rgba(239,68,68,0.12)', color:'#fca5a5', cursor:'pointer', display:'flex', alignItems:'center', gap:3 }}>
+            {r.icon} {r.label}
+          </button>
+        ))}
+        <button onClick={()=>setPhase('ask')}
+          style={{ fontSize:9, padding:'2px 5px', borderRadius:10, border:'none', background:'transparent', color:'var(--text-4)', cursor:'pointer', marginLeft:'auto' }}>✕</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ marginTop:6, padding:'5px 8px', borderRadius:7, display:'flex', alignItems:'center', gap:6,
+      background:'rgba(255,255,255,0.04)', border:'1px solid rgba(255,255,255,0.08)' }}>
+      <span style={{ fontSize:9, color:'var(--text-4)', flex:1, fontWeight:600 }}>This assignment?</span>
+      <button onClick={()=>{ onGood(); setPhase('done'); }}
+        style={{ fontSize:10, padding:'3px 9px', borderRadius:10, border:'1px solid rgba(34,197,94,0.4)',
+          background:'rgba(34,197,94,0.12)', color:'#86efac', cursor:'pointer', fontWeight:700 }}>👍</button>
+      <button onClick={()=>setPhase('reason')}
+        style={{ fontSize:10, padding:'3px 9px', borderRadius:10, border:'1px solid rgba(239,68,68,0.4)',
+          background:'rgba(239,68,68,0.12)', color:'#fca5a5', cursor:'pointer', fontWeight:700 }}>👎</button>
+    </div>
+  );
+}
+
 // ── NURSE CARD ────────────────────────────────────────────────────────────────
-function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, onRename, onDelete, locked, onToggleLock }) {
+function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, onRename, onDelete, locked, onToggleLock, showFeedback, onFeedbackGood, onFeedbackBad }) {
   const [dragOver, setDragOver] = useState(false);
   const [trashOver, setTrashOver] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -1309,6 +1358,9 @@ function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, on
           Remove All Rooms
         </button>
       )}
+
+      {/* Per-nurse Zap feedback strip */}
+      {showFeedback && <NurseFeedbackStrip onGood={onFeedbackGood} onBad={onFeedbackBad} nurseColor={nurse.color} />}
     </div>
   );
 }
@@ -1552,7 +1604,7 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
                            nurses, nurseRooms,
                            unassignedOpen, onUnassignedClick, unassignedBtnRef,
                            onZapAssign, zapLoading, fuelMode, onToggleFuel,
-                           zapFeedback, onFeedbackGood, onFeedbackBad, fbWeights }) {
+                           fbWeights }) {
   const [pressed, setPressed] = React.useState(false);
   // popup state: null | { key, anchor }
   const [statPopup, setStatPopup] = React.useState(null);
@@ -1680,7 +1732,7 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
       )}
 
       {/* Zap Assign button */}
-      <div style={{ marginTop:18, paddingBottom: zapFeedback ? 0 : 6 }}>
+      <div style={{ marginTop:18, paddingBottom:6 }}>
         <button
           className={`zap-btn${pressed || zapLoading ? ' zap-pressed' : ''}`}
           onClick={handleZap}
@@ -1704,13 +1756,6 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
           )}
         </button>
       </div>
-
-      {/* Feedback bar — appears after each Zap run */}
-      {zapFeedback && (
-        <div style={{ paddingBottom:6 }}>
-          <FeedbackBar onGood={onFeedbackGood} onBad={onFeedbackBad} />
-        </div>
-      )}
     </div>
   );
 }
@@ -1718,8 +1763,7 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
 // ── CORRIDOR GRID ─────────────────────────────────────────────────────────────
 function CorridorGrid({ allRooms, selected, nurses, nurseRooms, dragPreviewIds, onSelect, onDragStart, onDblClick, onAssignNurse, onUnassign, onClearSelection,
                         dashStats, onUnassignedClick, unassignedOpen, unassignedBtnRef,
-                        onZapAssign, zapLoading, fuelMode, onToggleFuel,
-                        zapFeedback, onFeedbackGood, onFeedbackBad, fbWeights }) {
+                        onZapAssign, zapLoading, fuelMode, onToggleFuel, fbWeights }) {
   const ref = useRef();
   const [dims, setDims] = useState({ w:900, h:580 });
 
@@ -1800,9 +1844,6 @@ function CorridorGrid({ allRooms, selected, nurses, nurseRooms, dragPreviewIds, 
             zapLoading={zapLoading}
             fuelMode={fuelMode}
             onToggleFuel={onToggleFuel}
-            zapFeedback={zapFeedback}
-            onFeedbackGood={onFeedbackGood}
-            onFeedbackBad={onFeedbackBad}
             fbWeights={fbWeights}
           />
         </div>
@@ -2008,24 +2049,24 @@ function App() {
   const [phoneDir,   setPhoneDir]   = useState(false);
   const [fuelMode, setFuelMode] = useState(false);
   const [feedbackStore, setFeedbackStore] = useState(() => loadFB());
-  const [zapFeedback, setZapFeedback] = useState(false); // true = feedback bar visible
+  const [zapFeedbackNurses, setZapFeedbackNurses] = useState(new Set()); // Set of nurseIds awaiting per-nurse feedback
   const toastRef = useRef();
   const autoSaveRef = useRef();
   const colorIdx = useRef(_saved?.nurses?.length ?? DEFAULT_NURSES.length);
 
-  // ── Feedback handlers ──────────────────────────────────────────────────────
-  function handleFeedbackGood() {
+  // ── Feedback handlers (per-nurse) ─────────────────────────────────────────
+  function handleFeedbackGood(nurseId) {
     setFeedbackStore(prev => {
       const weights = { ...prev.weights };
       // Nudge every weight 8% back toward 1.0 (baseline relaxation)
       Object.keys(weights).forEach(k => { weights[k] = +(weights[k] * 0.92 + 1.0 * 0.08).toFixed(3); });
-      const entry = { ts: Date.now(), rating:'good', reason:null };
+      const entry = { ts: Date.now(), rating:'good', nurseId, reason:null };
       const next = { entries:[...prev.entries.slice(-99), entry], weights };
       saveFB(next); return next;
     });
-    setZapFeedback(false);
+    setZapFeedbackNurses(prev => { const s = new Set(prev); s.delete(nurseId); return s; });
   }
-  function handleFeedbackBad(reason) {
+  function handleFeedbackBad(nurseId, reason) {
     setFeedbackStore(prev => {
       const weights = { ...prev.weights };
       const BOOST = 1.28, CAP = 4.0;
@@ -2033,11 +2074,11 @@ function App() {
       if (reason === 'load')     weights.load        = +Math.min(weights.load        * BOOST, CAP).toFixed(3);
       if (reason === 'heavy')    weights.acuity      = +Math.min(weights.acuity      * BOOST, CAP).toFixed(3);
       if (reason === 'mix')      weights.teleCluster = +Math.min(weights.teleCluster * BOOST, CAP).toFixed(3);
-      const entry = { ts: Date.now(), rating:'bad', reason };
+      const entry = { ts: Date.now(), rating:'bad', nurseId, reason };
       const next = { entries:[...prev.entries.slice(-99), entry], weights };
       saveFB(next); return next;
     });
-    setZapFeedback(false);
+    setZapFeedbackNurses(prev => { const s = new Set(prev); s.delete(nurseId); return s; });
   }
 
   // Apply theme to body
@@ -2388,7 +2429,7 @@ function App() {
             ? `⚡ Assigned ${count} rooms · ${skipped} skipped (capacity)${lockedCount ? ` · ${lockedCount} locked` : ''}`
             : `⚡ Assigned ${count} room${count>1?'s':''} across ${N} nurse${N>1?'s':''}${lockedCount ? ` · ${lockedCount} locked` : ''}`;
           showToast(msg);
-          setZapFeedback(true); // show feedback bar
+          setZapFeedbackNurses(new Set(nurses.map(n => n.id))); // show per-nurse feedback strips
         }
       } finally {
         setZapLoading(false);
@@ -2538,6 +2579,9 @@ function App() {
                   next.has(nurse.id)?next.delete(nurse.id):next.add(nurse.id);
                   return next;
                 })}
+                showFeedback={zapFeedbackNurses.has(nurse.id)}
+                onFeedbackGood={()=>handleFeedbackGood(nurse.id)}
+                onFeedbackBad={reason=>handleFeedbackBad(nurse.id, reason)}
               />
             ))}
           </div>
@@ -2589,9 +2633,6 @@ function App() {
             zapLoading={zapLoading}
             fuelMode={fuelMode}
             onToggleFuel={() => setFuelMode(f => !f)}
-            zapFeedback={zapFeedback}
-            onFeedbackGood={handleFeedbackGood}
-            onFeedbackBad={handleFeedbackBad}
             fbWeights={feedbackStore.weights}
           />
         </div>
