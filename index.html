@@ -1390,6 +1390,98 @@ function ZapAIIcon({ spinning }) {
   );
 }
 
+// ── STAT ROOM POPUP — generic popup listing rooms for a given property ────────
+function StatRoomPopup({ title, icon, color, rooms, allRooms, nurseRooms, nurses, anchor, onClose }) {
+  const ref = React.useRef();
+
+  // Close on outside click
+  React.useEffect(() => {
+    const h = e => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
+    document.addEventListener('mousedown', h, true);
+    return () => document.removeEventListener('mousedown', h, true);
+  }, []);
+
+  // Center below the anchor tile
+  const PW = 380;
+  const topPos = anchor ? Math.min(anchor.bottom + 8, window.innerHeight - 80) : 200;
+
+  // Build nurse lookup: roomId → nurse name
+  const nurseByRoom = {};
+  nurses.forEach(n => { (nurseRooms[n.id]||[]).forEach(id => { nurseByRoom[id] = n; }); });
+
+  const sorted = [...rooms].sort((a,b) => _RIDX[a.id] - _RIDX[b.id]);
+
+  return ReactDOM.createPortal(
+    <div ref={ref} style={{
+      position:'fixed',
+      left:'50%', transform:'translateX(-50%)',
+      top: topPos,
+      width: Math.min(PW, window.innerWidth - 24),
+      maxHeight: `calc(100vh - ${topPos + 16}px)`,
+      zIndex:610,
+      background:'var(--modal-bg)', border:'1px solid var(--border-sub)',
+      borderRadius:14, boxShadow:'0 16px 56px rgba(0,0,0,0.45)',
+      display:'flex', flexDirection:'column', overflow:'hidden',
+      animation:'dd-in 0.15s ease',
+    }}>
+      {/* Header */}
+      <div style={{ padding:'11px 14px 9px', borderBottom:'1px solid var(--border-sub)',
+        display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
+        <div style={{ fontWeight:700, fontSize:13, color:'var(--text-1)', display:'flex', alignItems:'center', gap:8 }}>
+          <span style={{ fontSize:16 }}>{icon}</span>
+          {title}
+          <span style={{ background:color, color:'#fff', borderRadius:10, padding:'1px 9px', fontSize:11, fontWeight:700 }}>
+            {rooms.length}
+          </span>
+        </div>
+        <button className="btn btn-ghost" onClick={onClose} style={{ padding:'3px 8px', fontSize:12 }}>✕</button>
+      </div>
+      {/* Room list */}
+      <div style={{ overflowY:'auto', flex:1, padding:'10px 12px' }}>
+        {rooms.length === 0 ? (
+          <div style={{ textAlign:'center', padding:'22px 0', color:'var(--text-4)', fontSize:13 }}>
+            No rooms with this flag
+          </div>
+        ) : (
+          <div style={{ display:'flex', flexWrap:'wrap', gap:7 }}>
+            {sorted.map(r => {
+              const nurse = nurseByRoom[r.id];
+              const fem   = r.gender === 'female';
+              return (
+                <div key={r.id} style={{
+                  padding:'6px 10px', borderRadius:8, fontSize:12, fontWeight:700,
+                  display:'flex', alignItems:'center', gap:6,
+                  background: fem ? '#fce7f3' : '#dbeafe',
+                  color:      fem ? '#9d174d'  : '#1d4ed8',
+                  border:`1.5px solid ${fem ? '#f9a8d4' : '#93c5fd'}`,
+                }}>
+                  <span>{r.id}</span>
+                  {r.type==='TELE' && <span style={{ color:'#f87171' }}>♥</span>}
+                  {nurse && (
+                    <span style={{
+                      fontSize:9, fontWeight:700, padding:'1px 5px', borderRadius:4,
+                      background: nurse.color+'33', color: nurse.color,
+                      border:`1px solid ${nurse.color}66`,
+                    }}>{nurse.name.split(' ')[0]}</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      {/* Legend */}
+      <div style={{ padding:'7px 12px', borderTop:'1px solid var(--border-sub)',
+        display:'flex', gap:10, fontSize:10, color:'var(--text-4)', flexShrink:0 }}>
+        <span style={{ background:'#fce7f3', color:'#9d174d', padding:'1px 6px', borderRadius:4 }}>Pink = Female</span>
+        <span style={{ background:'#dbeafe', color:'#1d4ed8', padding:'1px 6px', borderRadius:4 }}>Blue = Male</span>
+        <span style={{ marginLeft:'auto' }}>♥ = TELE</span>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 // ── FEEDBACK BAR ──────────────────────────────────────────────────────────────
 const FB_REASONS = [
   { key:'spread',     label:'Rooms too spread out', icon:'📍' },
@@ -1455,11 +1547,24 @@ function FeedbackBar({ onGood, onBad }) {
 }
 
 function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
-                           discharge, isolation, restraint, centralLine,
+                           discharge, isolation, restraint, centralLine, foley,
+                           sitterRooms, dischargeRooms, isolationRooms, centralLineRooms, foleyRooms,
+                           nurses, nurseRooms,
                            unassignedOpen, onUnassignedClick, unassignedBtnRef,
                            onZapAssign, zapLoading, fuelMode, onToggleFuel,
                            zapFeedback, onFeedbackGood, onFeedbackBad, fbWeights }) {
   const [pressed, setPressed] = React.useState(false);
+  // popup state: null | { key, anchor }
+  const [statPopup, setStatPopup] = React.useState(null);
+  const sitterRef      = React.useRef();
+  const dischargeRef   = React.useRef();
+  const isolationRef   = React.useRef();
+  const centralLineRef = React.useRef();
+  const foleyRef       = React.useRef();
+
+  function toggleStatPopup(key, ref) {
+    setStatPopup(prev => prev?.key === key ? null : { key, anchor: ref.current?.getBoundingClientRect() });
+  }
 
   // Is the model tuned away from baseline?
   const isTuned = fbWeights && Object.entries(fbWeights).some(([,v]) => Math.abs(v - 1.0) > 0.05);
@@ -1535,12 +1640,44 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
         <DashTile value={unassigned} label="Unassigned" color="#fff"
           onClick={onUnassignedClick} active={unassignedOpen} btnRef={unassignedBtnRef} />
         <DashTile value={tele}       label="TELE"       color="#fff" />
-        <DashTile value={sitter}      label="Sitter"      color="#fff" />
-        <DashTile value={discharge}   label="Discharge"   color="#fff" />
-        <DashTile value={isolation}   label="Isolation"   color="#fff" />
-        <DashTile value={restraint}   label="Restraint"   color="#fff" />
-        <DashTile value={centralLine} label="Central Line" color="#fff" />
+        <DashTile value={sitter}     label="Sitter"     color="#fff"
+          onClick={()=>toggleStatPopup('sitter',sitterRef)} active={statPopup?.key==='sitter'} btnRef={sitterRef} />
+        <DashTile value={discharge}  label="Discharge"  color="#fff"
+          onClick={()=>toggleStatPopup('discharge',dischargeRef)} active={statPopup?.key==='discharge'} btnRef={dischargeRef} />
+        <DashTile value={isolation}  label="Isolation"  color="#fff"
+          onClick={()=>toggleStatPopup('isolation',isolationRef)} active={statPopup?.key==='isolation'} btnRef={isolationRef} />
+        <DashTile value={foley}      label="Foley"      color="#fff"
+          onClick={()=>toggleStatPopup('foley',foleyRef)} active={statPopup?.key==='foley'} btnRef={foleyRef} />
+        <DashTile value={centralLine} label="CVL"       color="#fff"
+          onClick={()=>toggleStatPopup('centralLine',centralLineRef)} active={statPopup?.key==='centralLine'} btnRef={centralLineRef} />
       </div>
+
+      {/* Stat room popups */}
+      {statPopup?.key==='sitter' && (
+        <StatRoomPopup title="Sitter Rooms" icon="👁" color="#5b21b6"
+          rooms={sitterRooms} allRooms={{}} nurseRooms={nurseRooms} nurses={nurses}
+          anchor={statPopup.anchor} onClose={()=>setStatPopup(null)} />
+      )}
+      {statPopup?.key==='discharge' && (
+        <StatRoomPopup title="Discharge Rooms" icon="🚪" color="#0369a1"
+          rooms={dischargeRooms} allRooms={{}} nurseRooms={nurseRooms} nurses={nurses}
+          anchor={statPopup.anchor} onClose={()=>setStatPopup(null)} />
+      )}
+      {statPopup?.key==='isolation' && (
+        <StatRoomPopup title="Isolation Rooms" icon="☣" color="#c2410c"
+          rooms={isolationRooms} allRooms={{}} nurseRooms={nurseRooms} nurses={nurses}
+          anchor={statPopup.anchor} onClose={()=>setStatPopup(null)} />
+      )}
+      {statPopup?.key==='foley' && (
+        <StatRoomPopup title="Foley Catheter Rooms" icon="💧" color="#7c3aed"
+          rooms={foleyRooms} allRooms={{}} nurseRooms={nurseRooms} nurses={nurses}
+          anchor={statPopup.anchor} onClose={()=>setStatPopup(null)} />
+      )}
+      {statPopup?.key==='centralLine' && (
+        <StatRoomPopup title="Central Line Rooms" icon="🩺" color="#1e3a5f"
+          rooms={centralLineRooms} allRooms={{}} nurseRooms={nurseRooms} nurses={nurses}
+          anchor={statPopup.anchor} onClose={()=>setStatPopup(null)} />
+      )}
 
       {/* Zap Assign button */}
       <div style={{ marginTop:18, paddingBottom: zapFeedback ? 0 : 6 }}>
@@ -1648,6 +1785,14 @@ function CorridorGrid({ allRooms, selected, nurses, nurseRooms, dragPreviewIds, 
             tele={dashStats.tele}        sitter={dashStats.sitter}
             discharge={dashStats.discharge} isolation={dashStats.isolation}
             restraint={dashStats.restraint} centralLine={dashStats.centralLine}
+            foley={dashStats.foley}
+            sitterRooms={dashStats.sitterRooms}
+            dischargeRooms={dashStats.dischargeRooms}
+            isolationRooms={dashStats.isolationRooms}
+            centralLineRooms={dashStats.centralLineRooms}
+            foleyRooms={dashStats.foleyRooms}
+            nurses={nurses}
+            nurseRooms={nurseRooms}
             unassignedOpen={unassignedOpen}
             onUnassignedClick={onUnassignedClick}
             unassignedBtnRef={unassignedBtnRef}
@@ -2302,6 +2447,7 @@ function App() {
   const totalIsolation  = allOccRooms.filter(r=>r.isolation).length;
   const totalRestraint  = allOccRooms.filter(r=>r.restraint).length;
   const totalCentralLine = allOccRooms.filter(r=>r.centralLine).length;
+  const totalFoley       = allOccRooms.filter(r=>r.foley).length;
 
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100vh', overflow:'hidden' }}>
@@ -2426,6 +2572,12 @@ function App() {
               isolation:   totalIsolation,
               restraint:   totalRestraint,
               centralLine: totalCentralLine,
+              foley:       totalFoley,
+              foleyRooms:       allOccRooms.filter(r=>r.foley),
+              sitterRooms:      allOccRooms.filter(r=>r.sitter),
+              dischargeRooms:   allOccRooms.filter(r=>r.discharge),
+              isolationRooms:   allOccRooms.filter(r=>r.isolation),
+              centralLineRooms: allOccRooms.filter(r=>r.centralLine),
             }}
             unassignedOpen={!!unassignedAnchor}
             unassignedBtnRef={unassignedBtnRef}
