@@ -690,7 +690,26 @@ function pdId() { return 'pd' + (++_pdIdCtr); }
 // So 1101 (idx 0) and 1135B (idx 43) are neighbours, and
 //    1112 (idx 13) and 1113 (idx 14) are neighbours at the top-right corner, etc.
 const _RIDX = Object.fromEntries(ROOM_IDS.map((id, i) => [id, i]));
+
+// Physical proximity overrides: rooms that share a real-world corner pocket
+// but appear far apart on the simple perimeter walk.
+// Cluster: 1121, 1122, 1123 (bottom-right) + 1111B, 1114, 1118 (right side).
+// Keys are always sorted so lookup is order-independent.
+const _PROX_OVERRIDE = new Map([
+  ['1111B|1114',  3],   // already 3, kept for explicitness
+  ['1111B|1118',  4],   // was 7
+  ['1111B|1121',  5],   // was 10
+  ['1111B|1122',  6],   // was 11
+  ['1111B|1123',  7],   // was 12
+  ['1114|1118',   4],   // already 4, kept for explicitness
+  ['1114|1121',   4],   // was 7
+  ['1114|1122',   5],   // was 8
+  ['1114|1123',   6],   // was 9
+  // 1118↔1121 (3), 1118↔1122 (4), 1118↔1123 (5) — corridor already correct
+]);
 function circDist(a, b) {
+  const key = a < b ? `${a}|${b}` : `${b}|${a}`;
+  if (_PROX_OVERRIDE.has(key)) return _PROX_OVERRIDE.get(key);
   const i = _RIDX[a], j = _RIDX[b];
   if (i == null || j == null) return 99;
   const d = Math.abs(i - j);
