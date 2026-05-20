@@ -2487,6 +2487,67 @@ function App() {
           const remaining = [...pool]; // mutated throughout
           const assigned  = {};
 
+          // ── Phase 0 (MedSurg only): guaranteed full-load assignment ───────
+          // When the pool has enough rooms to give every nurse a full load
+          // (remaining ≥ nurses × cap), skip the seeding dance and assign
+          // each nurse exactly cap rooms in one greedy sweep, processing
+          // nurses in fewest-rooms-first order. Uses spatial sections so
+          // nurses don't compete for the same corridor segment.
+          if (!isTele && remaining.length >= nurseList.length * cap) {
+            const bySection = [...remaining].sort((a, b) => _RIDX[a.id] - _RIDX[b.id]);
+            const sec       = Math.ceil(bySection.length / nurseList.length);
+
+            for (let ni = 0; ni < nurseList.length; ni++) {
+              const n     = nurseList[ni];
+              const state = ns[n.id];
+
+              // This nurse's corridor section (with wraparound fallback from any section)
+              const sectionIds = new Set(bySection.slice(ni * sec, ni * sec + sec).map(r => r.id));
+
+              // Two-pass fill: first prefer rooms in this nurse's section, then any
+              for (const preferSection of [true, false]) {
+                while (state.rooms.length < cap && remaining.length > 0) {
+                  let bestIdx = -1, bestScore = Infinity;
+                  for (let i = 0; i < remaining.length; i++) {
+                    const r = remaining[i];
+                    if (preferSection && !sectionIds.has(r.id))            continue;
+                    if (r.highAcuity && state.haCount >= 2)                continue;
+                    if (state.acuityPts + roomAcuityPts(r) > 6)           continue;
+                    if (r.glucose   && state.glucoseCount   >= 2)          continue;
+                    if (r.totalCare && state.totalCareCount >= 2)          continue;
+                    const projRooms = [...state.rooms, r.id];
+                    const diam = clusterDiameter(projRooms);
+                    if (diam >= DIAM_HARD)                                 continue;
+                    let s = 0;
+                    s += (diam < DIAM_PEN.length ? DIAM_PEN[diam] : 450+(diam-13)*80) * fbW.diam;
+                    if (state.rooms.length > 0) {
+                      const minDist = Math.min(...state.rooms.map(id => circDist(r.id, id)));
+                      s += minDist * 20;
+                    }
+                    s -= roomAcuityPts(r) * 14 * fbW.acuity;
+                    if (r.isolation && state.isolationCount >= 1)                              s += 90;
+                    if (state.isolationCount >= 1 && r.totalCare && state.totalCareCount >= 1) s += 70;
+                    if (r.isolation && state.totalCareCount >= 2)                              s += 70;
+                    s += (Math.random() - 0.5) * 6;
+                    if (s < bestScore) { bestScore = s; bestIdx = i; }
+                  }
+                  if (bestIdx === -1) break;
+                  const room = remaining[bestIdx];
+                  remaining.splice(bestIdx, 1);
+                  assigned[room.id] = n.id;
+                  commitToState(state, room);
+                }
+              }
+            }
+
+            // If every nurse reached cap, nothing left to do — return now.
+            if (nurseList.every(n => ns[n.id].rooms.length >= cap)) {
+              return { assigned, overflow: remaining };
+            }
+            // Otherwise fall through: remaining phases mop up nurses/rooms
+            // that Phase 0 couldn't fully resolve (acuity / diameter blocked).
+          }
+
           // ── Phase A: spatial seeding ─────────────────────────────────────
           // Sort a separate view by corridor index to identify spatial sections.
           const byCorr = [...remaining].sort((a, b) => _RIDX[a.id] - _RIDX[b.id]);
