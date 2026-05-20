@@ -143,14 +143,15 @@
   /* ── Nurse card ── */
   .nurse-card {
     background: var(--bg-card);
-    border: 2px solid var(--border-sub);
-    border-radius: 12px;
-    padding: 10px; margin-bottom: 8px; position: relative;
+    border: 1px solid var(--border-sub);
+    border-radius: 10px;
+    padding: 9px 10px; margin-bottom: 7px; position: relative;
     transition: border-color 0.15s, box-shadow 0.15s, background 0.25s;
   }
   .nurse-card.drag-over {
     border-color: #22c55e;
-    box-shadow: 0 0 0 3px rgba(34,197,94,0.25);
+    box-shadow: 0 0 0 3px rgba(34,197,94,0.18);
+    background: rgba(34,197,94,0.04);
   }
 
   /* ── Badges ── */
@@ -175,12 +176,14 @@
 
   /* ── Trash zone ── */
   .trash-zone {
-    width: 28px; height: 28px; border-radius: 6px;
-    background: var(--trash-bg); border: 1px dashed var(--trash-border);
+    width: 26px; height: 26px; border-radius: 6px;
+    background: transparent; border: 1px solid var(--border-sub);
     display: flex; align-items: center; justify-content: center;
-    font-size: 14px; transition: all 0.15s; cursor: pointer; flex-shrink: 0;
+    font-size: 13px; transition: all 0.15s; cursor: pointer; flex-shrink: 0;
+    opacity: 0.55;
   }
-  .trash-zone.drag-over { background: #7f1d1d; border-color: #ef4444; }
+  .trash-zone:hover { opacity: 1; background: rgba(239,68,68,0.12); border-color: #ef4444; }
+  .trash-zone.drag-over { background: #7f1d1d; border-color: #ef4444; opacity: 1; }
 
   /* ── Modal ── */
   .modal-overlay {
@@ -217,7 +220,7 @@
   ::-webkit-scrollbar { width: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--scrollbar); border-radius: 3px; }
-  .nurse-color-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .nurse-color-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 6px currentColor; }
   input[type=text] {
     background: var(--input-bg); border: 1px solid var(--border-sub); color: var(--text-1);
     border-radius: 6px; padding: 6px 10px; font-size: 13px; width: 100%; outline: none;
@@ -228,8 +231,8 @@
   .btn:hover { opacity: 0.82; }
   .btn-primary { background: #3b82f6; color: white; }
   .btn-ghost   { background: var(--btn-ghost-bg); color: var(--btn-ghost-tx); }
-  .cap-bar  { height: 4px; border-radius: 2px; background: var(--cap-bg); overflow: hidden; margin-top: 4px; }
-  .cap-fill { height: 100%; border-radius: 2px; transition: width 0.35s; }
+  .cap-bar  { height: 5px; border-radius: 3px; background: var(--cap-bg); overflow: hidden; margin-top: 5px; }
+  .cap-fill { height: 100%; border-radius: 3px; transition: width 0.35s; }
   .flag { font-size: 9px; background: rgba(0,0,0,0.22); border-radius: 3px; padding: 1px 3px; margin: 1px; display: inline-block; line-height: 1.3; }
   body[data-theme="day"] .flag { background: rgba(0,0,0,0.10); }
 
@@ -296,21 +299,22 @@
   .dash-tile {
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    gap: 5px; padding: 12px 6px; border-radius: 8px;
+    gap: 4px; padding: 10px 6px 8px; border-radius: 9px;
     flex: 1 1 0; min-width: 0;
-    background: rgba(255,255,255,0.12);
-    border: 1px solid rgba(255,255,255,0.20);
+    background: rgba(255,255,255,0.10);
+    border: 1px solid rgba(255,255,255,0.16);
     box-shadow:
-      inset 0 1px 0 rgba(255,255,255,0.20),
-      inset 0 -1px 0 rgba(0,0,0,0.15);
+      inset 0 1px 0 rgba(255,255,255,0.18),
+      inset 0 -1px 0 rgba(0,0,0,0.12);
     transition: background 0.12s, transform 0.08s;
   }
   .dash-tile-btn { cursor: pointer; }
-  .dash-tile-btn:hover { background: rgba(255,255,255,0.20); }
+  .dash-tile-btn:hover { background: rgba(255,255,255,0.18); border-color: rgba(255,255,255,0.30); }
   .dash-tile-btn:active { transform: scale(0.95); }
   .dash-tile-active {
-    background: rgba(255,255,255,0.22);
-    border-color: rgba(255,255,255,0.45);
+    background: rgba(255,255,255,0.20);
+    border-color: rgba(255,255,255,0.42);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 0 0 2px rgba(255,255,255,0.08);
   }
 
   /* ── Rabbit animation ── */
@@ -379,22 +383,26 @@
   /* ── ECO Toggle button ── */
   .eco-toggle {
     flex-shrink: 0;
-    display: flex; align-items: center; gap: 6px;
-    padding: 6px 12px; border-radius: 20px; border: none; cursor: pointer;
-    font-weight: 800; font-size: 11px; letter-spacing: 0.06em;
-    /* Fixed width prevents label change from shifting the title */
-    min-width: 80px; justify-content: center;
-    transition: background 0.22s, color 0.22s, box-shadow 0.22s;
+    display: flex; align-items: center; gap: 5px;
+    padding: 5px 11px; border-radius: 18px; border: 1px solid rgba(255,255,255,0.2); cursor: pointer;
+    font-weight: 700; font-size: 10px; letter-spacing: 0.07em;
+    min-width: 76px; justify-content: center;
+    transition: background 0.22s, color 0.22s, box-shadow 0.22s, border-color 0.22s;
   }
   .eco-toggle-off {
-    background: rgba(255,255,255,0.15);
-    color: rgba(255,255,255,0.75);
-    box-shadow: none;
+    background: rgba(255,255,255,0.10);
+    color: rgba(255,255,255,0.60);
+    border-color: rgba(255,255,255,0.15);
+  }
+  .eco-toggle-off:hover {
+    background: rgba(255,255,255,0.17);
+    color: rgba(255,255,255,0.85);
   }
   .eco-toggle-on {
-    background: rgba(255,255,255,0.95);
-    color: #c2410c;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    background: rgba(255,255,255,0.92);
+    color: #9a3412;
+    border-color: rgba(255,255,255,0.7);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.28), 0 0 0 1px rgba(255,255,255,0.15);
   }
   .eco-icon {
     display: inline-flex; align-items: center; justify-content: center;
@@ -1269,6 +1277,7 @@ function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, on
   return (
     <div
       className={`nurse-card${dragOver&&!trashOver?' drag-over':''}`}
+      style={{ borderLeft:`3px solid ${nurse.color}` }}
       onDragOver={e=>{ e.preventDefault(); if(!trashOver) setDragOver(true); }}
       onDragLeave={e=>{ if(!e.currentTarget.contains(e.relatedTarget)) setDragOver(false); }}
       onDrop={e=>{ e.preventDefault(); setDragOver(false); onDrop(e,false); }}
@@ -1289,8 +1298,14 @@ function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, on
             {nurse.name}
           </span>
         )}
-        <span style={{ fontSize:11, color:'var(--text-4)', fontWeight:600 }}>{occ.length}/{cap}</span>
-        {hasTele && <span style={{ fontSize:10, background:'#7f1d1d', color:'#fca5a5', borderRadius:4, padding:'1px 5px' }}>TELE</span>}
+        <span style={{
+          fontSize:11, fontWeight:700, letterSpacing:'0.02em',
+          color: pct>=100 ? '#ef4444' : pct>=75 ? '#f59e0b' : 'var(--text-3)',
+          background: pct>=100 ? 'rgba(239,68,68,0.12)' : pct>=75 ? 'rgba(245,158,11,0.12)' : 'transparent',
+          padding: pct>=75 ? '1px 5px' : '0', borderRadius:4,
+          transition:'color 0.2s, background 0.2s',
+        }}>{occ.length}/{cap}</span>
+        {hasTele && <span style={{ fontSize:10, background:'rgba(127,29,29,0.7)', color:'#fca5a5', borderRadius:4, padding:'1px 6px', letterSpacing:'0.04em' }}>TELE</span>}
         {/* Lock toggle — protects this nurse's rooms from Zap Assign reset */}
         <button
           onClick={onToggleLock}
@@ -1332,7 +1347,14 @@ function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, on
       </div>
 
       {/* Room badges — sorted in natural corridor order (1101, 1102 … 1110A, 1110B …) */}
-      <div style={{ display:'flex', flexWrap:'wrap', marginTop:6, gap:3, minHeight:10 }}>
+      <div style={{ display:'flex', flexWrap:'wrap', marginTop:6, gap:3, minHeight: occ.length===0 ? 28 : 10,
+        alignItems:'center', justifyContent: occ.length===0 ? 'center' : 'flex-start' }}>
+        {occ.length===0 && !dragOver && (
+          <span style={{ fontSize:10, color:'var(--text-5)', letterSpacing:'0.04em', userSelect:'none',
+            display:'flex', alignItems:'center', gap:4 }}>
+            <span style={{ opacity:0.5 }}>↓</span> drag rooms here
+          </span>
+        )}
         {[...rooms].sort((a,b) => _RIDX[a] - _RIDX[b]).map(id=>{
           const r = allRooms[id];
           if(!r?.occupied) return null;
@@ -1381,36 +1403,35 @@ function Legend() {
 // ── CENTER DASHBOARD ─────────────────────────────────────────────────────────
 // Unified car-dashboard tile: same shape for all stats.
 // Pass onClick to make it interactive (unassigned dropdown trigger).
-function DashTile({ icon, value, label, color, onClick, active, btnRef }) {
+function DashTile({ icon, value, label, color, accentColor, onClick, active, btnRef }) {
   const isBtn = !!onClick;
+  const numColor = accentColor || color;
   return (
     <div
       ref={btnRef}
       onClick={onClick}
       className={`dash-tile${isBtn ? ' dash-tile-btn' : ''}${active ? ' dash-tile-active' : ''}`}
     >
-      {/* Indicator dot */}
+      {/* Icon */}
+      {icon && (
+        <div style={{ fontSize:12, lineHeight:1, opacity:0.75, marginBottom:1 }}>{icon}</div>
+      )}
+      {/* Value */}
       <div style={{
-        width:5, height:5, borderRadius:'50%',
-        background: 'rgba(255,255,255,0.60)',
-        opacity: 0.9,
-      }} />
-      {/* Value — LED-style glow */}
-      <div style={{
-        fontSize:22, fontWeight:900, color, lineHeight:1,
-        textShadow: `0 0 10px ${color}55, 0 0 20px ${color}22`,
+        fontSize:24, fontWeight:900, color: numColor, lineHeight:1,
+        textShadow: `0 0 12px ${numColor}66`,
         letterSpacing:'-0.5px',
       }}>{value}</div>
       {/* Label */}
       <div style={{
-        fontSize:9, fontWeight:700, letterSpacing:'0.07em',
-        textTransform:'uppercase', color:'rgba(255,255,255,0.65)',
-        lineHeight:1, paddingLeft:8, paddingRight:8, textAlign:'center',
+        fontSize:9, fontWeight:700, letterSpacing:'0.06em',
+        textTransform:'uppercase', color:'rgba(255,255,255,0.60)',
+        lineHeight:1, paddingLeft:4, paddingRight:4, textAlign:'center',
       }}>{label}</div>
-      {/* Chevron — always rendered so all tiles share identical height */}
+      {/* Chevron */}
       <div style={{
-        fontSize:8, color, lineHeight:1, marginTop:1,
-        opacity: isBtn ? (active ? 0.9 : 0.35) : 0,
+        fontSize:8, color: numColor, lineHeight:1, marginTop:1,
+        opacity: isBtn ? (active ? 0.9 : 0.30) : 0,
         visibility: isBtn ? 'visible' : 'hidden',
         transform: active ? 'rotate(180deg)' : 'none',
         transition:'transform 0.2s, opacity 0.2s',
@@ -1651,10 +1672,10 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
       {/* ── Header ── */}
       <div style={{ marginBottom:14, marginTop:10, paddingBottom:12, borderBottom:'1px solid transparent',
         display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:10 }}>
-        <div style={{ fontSize:26, fontWeight:900, letterSpacing:'-0.5px', lineHeight:1.15,
-          color:'#fff', fontStyle:'italic', textAlign:'center', flex:1,
-          display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
-          <span style={{ fontSize:24 }}>🧠</span>
+        <div style={{ fontSize:22, fontWeight:800, letterSpacing:'-0.3px', lineHeight:1.2,
+          color:'rgba(255,255,255,0.95)', textAlign:'center', flex:1,
+          display:'flex', alignItems:'center', justifyContent:'center', gap:7 }}>
+          <span style={{ fontSize:20 }}>🧠</span>
           Driven by a crazy mind
         </div>
         {/* ── Fuel Efficiency Toggle ── */}
@@ -1684,23 +1705,29 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
         </button>
       </div>
 
-      {/* ── Single row: all 8 stats ── */}
-      <div style={{ display:'flex', gap:7, alignItems:'stretch' }}>
-        <DashTile value={vacant}     label="Empty"      color="#fff" />
-        <DashTile value={occupied}   label="Occupied"   color="#fff" />
-        <DashTile value={assigned}   label="Assigned"   color="#fff" />
-        <DashTile value={unassigned} label="Unassigned" color="#fff"
+      {/* ── Row 1: Census stats ── */}
+      <div style={{ display:'flex', gap:6, alignItems:'stretch', marginBottom:6 }}>
+        <DashTile icon="□" value={vacant}     label="Empty"      color="rgba(255,255,255,0.55)" />
+        <DashTile icon="●" value={occupied}   label="Occupied"   color="#fff" />
+        <DashTile icon="✓" value={assigned}   label="Assigned"   color={assigned===occupied&&occupied>0 ? '#86efac' : '#fff'}
+          accentColor={assigned===occupied&&occupied>0 ? '#86efac' : undefined} />
+        <DashTile icon="!" value={unassigned} label="Unassigned"
+          color={unassigned>0 ? '#fbbf24' : '#fff'}
+          accentColor={unassigned>0 ? '#fbbf24' : undefined}
           onClick={onUnassignedClick} active={unassignedOpen} btnRef={unassignedBtnRef} />
-        <DashTile value={tele}       label="TELE"       color="#fff" />
-        <DashTile value={sitter}     label="Sitter"     color="#fff"
+      </div>
+      {/* ── Row 2: Clinical flags ── */}
+      <div style={{ display:'flex', gap:6, alignItems:'stretch' }}>
+        <DashTile icon="♥" value={tele}        label="TELE"      color={tele>0 ? '#f87171' : '#fff'} accentColor={tele>0 ? '#f87171' : undefined} />
+        <DashTile icon="👁" value={sitter}      label="Sitter"    color={sitter>0 ? '#c4b5fd' : '#fff'} accentColor={sitter>0 ? '#c4b5fd' : undefined}
           onClick={()=>toggleStatPopup('sitter',sitterRef)} active={statPopup?.key==='sitter'} btnRef={sitterRef} />
-        <DashTile value={discharge}  label="Discharge"  color="#fff"
+        <DashTile icon="🚪" value={discharge}   label="Discharge" color={discharge>0 ? '#7dd3fc' : '#fff'} accentColor={discharge>0 ? '#7dd3fc' : undefined}
           onClick={()=>toggleStatPopup('discharge',dischargeRef)} active={statPopup?.key==='discharge'} btnRef={dischargeRef} />
-        <DashTile value={isolation}  label="Isolation"  color="#fff"
+        <DashTile icon="☣" value={isolation}   label="Isolation" color={isolation>0 ? '#fb923c' : '#fff'} accentColor={isolation>0 ? '#fb923c' : undefined}
           onClick={()=>toggleStatPopup('isolation',isolationRef)} active={statPopup?.key==='isolation'} btnRef={isolationRef} />
-        <DashTile value={foley}      label="Foley"      color="#fff"
+        <DashTile icon="💧" value={foley}       label="Foley"     color={foley>0 ? '#a78bfa' : '#fff'} accentColor={foley>0 ? '#a78bfa' : undefined}
           onClick={()=>toggleStatPopup('foley',foleyRef)} active={statPopup?.key==='foley'} btnRef={foleyRef} />
-        <DashTile value={centralLine} label="CVL"       color="#fff"
+        <DashTile icon="⊕" value={centralLine} label="CVL"       color={centralLine>0 ? '#93c5fd' : '#fff'} accentColor={centralLine>0 ? '#93c5fd' : undefined}
           onClick={()=>toggleStatPopup('centralLine',centralLineRef)} active={statPopup?.key==='centralLine'} btnRef={centralLineRef} />
       </div>
 
