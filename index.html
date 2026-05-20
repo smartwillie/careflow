@@ -2586,6 +2586,50 @@ function App() {
             commitToState(state, seed);
           }
 
+          // ── Phase B.5 (MedSurg only): greedy fill-up to cap ─────────────
+          // Runs immediately after Phase A seeding, before round-robin.
+          // Each nurse (fewest-rooms-first) greedily fills to cap 5 using
+          // proximity + acuity scoring — aggressive cluster completion right
+          // after the spatial seed is placed.
+          if (!isTele && remaining.length > 0) {
+            const sortedNurses = [...nurseList]
+              .sort((a, b) => ns[a.id].rooms.length - ns[b.id].rooms.length);
+
+            for (const n of sortedNurses) {
+              const state = ns[n.id];
+              while (state.rooms.length < cap && remaining.length > 0) {
+                let bestIdx = -1, bestScore = Infinity;
+                for (let i = 0; i < remaining.length; i++) {
+                  const r = remaining[i];
+                  if (r.highAcuity && state.haCount >= 2)              continue;
+                  if (state.acuityPts + roomAcuityPts(r) > 6)         continue;
+                  if (r.glucose   && state.glucoseCount   >= 2)        continue;
+                  if (r.totalCare && state.totalCareCount >= 2)        continue;
+                  const projRooms = [...state.rooms, r.id];
+                  const diam = clusterDiameter(projRooms);
+                  if (diam >= DIAM_HARD)                               continue;
+                  let s = 0;
+                  s += (diam < DIAM_PEN.length ? DIAM_PEN[diam] : 450+(diam-13)*80) * fbW.diam;
+                  if (state.rooms.length > 0) {
+                    const minDist = Math.min(...state.rooms.map(id => circDist(r.id, id)));
+                    s += minDist * 20;
+                  }
+                  s -= roomAcuityPts(r) * 14 * fbW.acuity;
+                  if (r.isolation && state.isolationCount >= 1)                              s += 90;
+                  if (state.isolationCount >= 1 && r.totalCare && state.totalCareCount >= 1) s += 70;
+                  if (r.isolation && state.totalCareCount >= 2)                              s += 70;
+                  s += (Math.random() - 0.5) * 6;
+                  if (s < bestScore) { bestScore = s; bestIdx = i; }
+                }
+                if (bestIdx === -1) break; // acuity / diameter blocked — give up on this nurse
+                const room = remaining[bestIdx];
+                remaining.splice(bestIdx, 1);
+                assigned[room.id] = n.id;
+                commitToState(state, room);
+              }
+            }
+          }
+
           // ── Phase A.5 (TELE only): guarantee every nurse ≥1 room ────────
           // If Phase A left any TELE nurse with no seed (empty spatial section
           // or all acuity-blocked), force-assign the best available room.
@@ -2674,49 +2718,6 @@ function App() {
                 assigned[room.id] = n.id;
                 commitToState(state, room);
                 progress = true;
-              }
-            }
-          }
-
-          // ── Phase B.5 (MedSurg only): greedy fill-up to cap ─────────────
-          // After balanced round-robin, top off nurses who haven't reached cap.
-          // Process in ascending room-count order (fewest-first) to keep load
-          // balanced while aggressively filling to the 5-room cap.
-          if (!isTele && remaining.length > 0) {
-            const sortedNurses = [...nurseList]
-              .sort((a, b) => ns[a.id].rooms.length - ns[b.id].rooms.length);
-
-            for (const n of sortedNurses) {
-              const state = ns[n.id];
-              while (state.rooms.length < cap && remaining.length > 0) {
-                let bestIdx = -1, bestScore = Infinity;
-                for (let i = 0; i < remaining.length; i++) {
-                  const r = remaining[i];
-                  if (r.highAcuity && state.haCount >= 2)              continue;
-                  if (state.acuityPts + roomAcuityPts(r) > 6)         continue;
-                  if (r.glucose   && state.glucoseCount   >= 2)        continue;
-                  if (r.totalCare && state.totalCareCount >= 2)        continue;
-                  const projRooms = [...state.rooms, r.id];
-                  const diam = clusterDiameter(projRooms);
-                  if (diam >= DIAM_HARD)                               continue;
-                  let s = 0;
-                  s += (diam < DIAM_PEN.length ? DIAM_PEN[diam] : 450+(diam-13)*80) * fbW.diam;
-                  if (state.rooms.length > 0) {
-                    const minDist = Math.min(...state.rooms.map(id => circDist(r.id, id)));
-                    s += minDist * 20;
-                  }
-                  s -= roomAcuityPts(r) * 14 * fbW.acuity;
-                  if (r.isolation && state.isolationCount >= 1)                              s += 90;
-                  if (state.isolationCount >= 1 && r.totalCare && state.totalCareCount >= 1) s += 70;
-                  if (r.isolation && state.totalCareCount >= 2)                              s += 70;
-                  s += (Math.random() - 0.5) * 6;
-                  if (s < bestScore) { bestScore = s; bestIdx = i; }
-                }
-                if (bestIdx === -1) break; // acuity / diameter blocked — give up on this nurse
-                const room = remaining[bestIdx];
-                remaining.splice(bestIdx, 1);
-                assigned[room.id] = n.id;
-                commitToState(state, room);
               }
             }
           }
