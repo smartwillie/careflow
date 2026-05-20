@@ -2341,6 +2341,7 @@ function App() {
             isolationCount: existing.filter(id => resetRooms[id]?.isolation).length,
             totalCareCount: existing.filter(id => resetRooms[id]?.totalCare).length,
             glucoseCount:   existing.filter(id => resetRooms[id]?.glucose).length,
+            dripCount:      existing.filter(id => resetRooms[id]?.drip).length,
           };
         });
 
@@ -2483,15 +2484,18 @@ function App() {
           if (room.isolation)  state.isolationCount++;
           if (room.totalCare)  state.totalCareCount++;
           if (room.glucose)    state.glucoseCount++;
+          if (room.drip)       state.dripCount++;
         }
 
         // ── ECO shared helpers ───────────────────────────────────────────────
         // Hard acuity / stacking limits — same rules used everywhere.
         function _ecoPasses(state, r) {
-          if (r.highAcuity && state.haCount >= 2)       return false;
-          if (state.acuityPts + roomAcuityPts(r) > 6)   return false;
-          if (r.glucose   && state.glucoseCount   >= 2)  return false;
-          if (r.totalCare && state.totalCareCount >= 2)  return false;
+          if (r.highAcuity && state.haCount >= 2)        return false;
+          if (state.acuityPts + roomAcuityPts(r) > 6)    return false;
+          if (r.glucose    && state.glucoseCount    >= 2) return false;
+          if (r.totalCare  && state.totalCareCount  >= 2) return false;
+          if (r.drip       && state.dripCount       >= 2) return false;
+          if (r.isolation  && state.isolationCount  >= 2) return false;
           return true;
         }
         // Proximity + acuity score for one candidate room (lower = better).
