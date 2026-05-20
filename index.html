@@ -2456,26 +2456,81 @@ function App() {
           if (room.glucose)    state.glucoseCount++;
         }
 
-        // ── ECO: proximity-first cluster builder for one room type ───────────
-        // Guarantees type purity: each nurse in nurseList only receives rooms
-        // from pool (all same type). Within that constraint, picks the room
-        // closest to the nurse's existing cluster that fits acuity limits.
+        // ── ECO: two-phase cluster builder for one room type ────────────────
+        // Guarantees type purity (pool is already type-filtered).
+        //
+        // Phase A — Spatial seeding:
+        //   Divide the corridor into N equal sections (one per nurse).
+        //   Each nurse gets the heaviest-acuity valid room from their section
+        //   as an anchor. This spreads nurses across the corridor so they
+        //   don't all start fighting over the same end.
+        //
+        // Phase B — Round-robin growth:
+        //   Every nurse gets one room per round (not: fill nurse 1, then nurse 2).
+        //   Each pick = closest valid room to the nurse's existing cluster that
+        //   also passes hard acuity/diameter limits. Round-robin naturally
+        //   distributes acuity evenly (each nurse grabs their heaviest nearby
+        //   room before anyone gets a second, third…).
+        //
         // Returns { assigned: {roomId→nurseId}, overflow: [rooms not placed] }
         function buildEcoClusters(pool, nurseList, isTele) {
+          if (nurseList.length === 0) return { assigned: {}, overflow: [...pool] };
+
           const cap       = isTele ? 4 : 5;
-          const remaining = [...pool];
+          const remaining = [...pool]; // mutated throughout
           const assigned  = {};
 
-          for (const n of nurseList) {
+          // ── Phase A: spatial seeding ─────────────────────────────────────
+          // Sort a separate view by corridor index to identify spatial sections.
+          const byCorr = [...remaining].sort((a, b) => _RIDX[a.id] - _RIDX[b.id]);
+          const stride  = Math.ceil(byCorr.length / nurseList.length);
+
+          for (let ni = 0; ni < nurseList.length; ni++) {
+            const n     = nurseList[ni];
             const state = ns[n.id];
 
-            while (state.rooms.length < cap && remaining.length > 0) {
+            // Section of the corridor belonging to this nurse
+            const section = byCorr.slice(ni * stride, ni * stride + stride);
+
+            // Pick heaviest valid room from section as the seed anchor
+            const candidates = section
+              .filter(r => {
+                if (r.highAcuity && state.haCount >= 2)        return false;
+                if (state.acuityPts + roomAcuityPts(r) > 6)   return false;
+                if (r.glucose   && state.glucoseCount   >= 2)  return false;
+                if (r.totalCare && state.totalCareCount >= 2)  return false;
+                return remaining.some(rem => rem.id === r.id); // still available
+              })
+              .sort((a, b) => roomAcuityPts(b) - roomAcuityPts(a)); // heaviest first
+
+            if (candidates.length === 0) continue;
+
+            // Add a small noise to seed selection for variety across runs
+            const seed = candidates[Math.floor(Math.random() * Math.min(2, candidates.length))];
+            const idx  = remaining.findIndex(r => r.id === seed.id);
+            if (idx === -1) continue;
+
+            remaining.splice(idx, 1);
+            assigned[seed.id] = n.id;
+            commitToState(state, seed);
+          }
+
+          // ── Phase B: round-robin growth ──────────────────────────────────
+          // Each pass gives every nurse one room. Continue until no progress.
+          let progress = true;
+          while (progress && remaining.length > 0) {
+            progress = false;
+
+            for (const n of nurseList) {
+              const state = ns[n.id];
+              if (state.rooms.length >= cap || remaining.length === 0) continue;
+
               let bestIdx = -1, bestScore = Infinity;
 
               for (let i = 0; i < remaining.length; i++) {
                 const r = remaining[i];
 
-                // ── Hard acuity / capacity limits ────────────────────────────
+                // ── Hard limits ────────────────────────────────────────────
                 if (r.highAcuity && state.haCount >= 2)                continue;
                 if (state.acuityPts + roomAcuityPts(r) > 6)           continue;
                 if (r.glucose   && state.glucoseCount   >= 2)          continue;
@@ -2484,44 +2539,43 @@ function App() {
                 const diam = clusterDiameter(projRooms);
                 if (diam >= DIAM_HARD)                                 continue;
 
-                // ── Score: proximity + diameter tightness + acuity ───────────
+                // ── Score ──────────────────────────────────────────────────
                 let s = 0;
 
-                // Diameter: keep the cluster geographically tight
+                // Diameter tightness (primary geographic constraint)
                 s += (diam < DIAM_PEN.length ? DIAM_PEN[diam] : 450+(diam-13)*80) * fbW.diam;
 
-                // Cohesion: prefer rooms nearest to the current cluster
+                // Cohesion: pull toward the nurse's existing cluster
                 if (state.rooms.length > 0) {
                   const minDist = Math.min(...state.rooms.map(id => circDist(r.id, id)));
-                  s += minDist * 15;
-                } else {
-                  // No anchor yet — seed by corridor index so neighbours land together
-                  s += _RIDX[r.id] * 0.4;
+                  s += minDist * 20; // stronger pull than base algorithm
                 }
 
-                // Acuity balance: heavier rooms placed first (negative = bonus)
-                s -= roomAcuityPts(r) * 12 * fbW.acuity;
+                // Acuity: prefer heavier rooms (ensures heavy rooms spread
+                // across nurses rather than piling onto one)
+                s -= roomAcuityPts(r) * 14 * fbW.acuity;
 
-                // Isolation stacking discouraged
-                if (r.isolation && state.isolationCount >= 1) s += 90;
+                // Isolation / totalCare stacking discouraged
+                if (r.isolation && state.isolationCount >= 1)                        s += 90;
                 if (state.isolationCount >= 1 && r.totalCare && state.totalCareCount >= 1) s += 70;
-                if (r.isolation && state.totalCareCount >= 2) s += 70;
+                if (r.isolation && state.totalCareCount >= 2)                        s += 70;
 
-                // Load balance
-                s += state.rooms.length * 5 * fbW.load;
+                // Light load balance
+                s += state.rooms.length * 4 * fbW.load;
 
-                // Small noise for variety
-                s += (Math.random() - 0.5) * 8;
+                // Noise for run-to-run variety
+                s += (Math.random() - 0.5) * 6;
 
                 if (s < bestScore) { bestScore = s; bestIdx = i; }
               }
 
-              if (bestIdx === -1) break; // no valid room found for this nurse
-
-              const room = remaining[bestIdx];
-              remaining.splice(bestIdx, 1);
-              assigned[room.id] = n.id;
-              commitToState(state, room);
+              if (bestIdx !== -1) {
+                const room = remaining[bestIdx];
+                remaining.splice(bestIdx, 1);
+                assigned[room.id] = n.id;
+                commitToState(state, room);
+                progress = true;
+              }
             }
           }
 
