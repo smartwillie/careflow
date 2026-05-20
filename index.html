@@ -907,7 +907,7 @@ function RoomCard({ room, pos, cw, ch, selected, nurses, nurseRooms, onSelect, o
               <span>{base}</span>
               {suf && <span style={{ fontSize: Math.max(7, Math.round(fsz*0.78)), fontWeight:800, opacity:0.75 }}>{suf}</span>}
               {room.occupied && room.type==='TELE' &&
-                <span style={{ color:'#f87171', marginLeft:2, fontSize: Math.max(8, Math.round(cw*0.14)) }}>♥</span>}
+                <span style={{ color:'#f87171', marginLeft:2, fontSize: Math.max(11, Math.round(cw*0.22)) }}>♥</span>}
             </div>
           );
         })()}
@@ -2465,9 +2465,13 @@ function App() {
   function saveRoom(updated) {
     const wasOccupied = rooms[updated.id]?.occupied;
     const becomingVacant = wasOccupied && !updated.occupied;
-    // When toggling a room to vacant: clear its nurse assignment and deselect it
+    // When toggling a room to vacant: clear ALL patient properties, not just nurseId
     const finalRoom = becomingVacant
-      ? { ...updated, nurseId: null }
+      ? { ...updated,
+          nurseId: null,
+          foley: false, drip: false, prisoner: false, totalCare: false,
+          glucose: false, highAcuity: false, sitter: false,
+          discharge: false, isolation: false, restraint: false, centralLine: false }
       : updated;
     setRooms(prev => ({ ...prev, [updated.id]: finalRoom }));
     if (becomingVacant) {
@@ -2522,6 +2526,7 @@ function App() {
               Object.keys(prev).forEach(id=>{
                 next[id]={...prev[id], occupied:true, gender:'female', type:'TELE',
                   foley:false, drip:false, prisoner:false, totalCare:false, glucose:false, highAcuity:false,
+                  sitter:false, discharge:false, isolation:false,
                   restraint:false, centralLine:false, nurseId:null};
               });
               return next;
