@@ -1237,10 +1237,11 @@ function NurseBadge({ room, onDragStart }) {
 
 // ── NURSE FEEDBACK STRIP (inline, per-nurse) ──────────────────────────────────
 const NURSE_FB_REASONS = [
-  { key:'spread', label:'Too spread',   icon:'📍' },
-  { key:'load',   label:'Too many rooms', icon:'⚖️' },
-  { key:'heavy',  label:'Too heavy',    icon:'🔴' },
-  { key:'mix',    label:'TELE/Med mix', icon:'💔' },
+  { key:'spread',  label:'Too spread',      icon:'📍' },
+  { key:'load',    label:'Too many rooms',  icon:'⚖️' },
+  { key:'heavy',   label:'Too heavy',       icon:'🔴' },
+  { key:'mix',     label:'TELE/Med mix',    icon:'💔' },
+  { key:'cluster', label:'Lack of cluster', icon:'🗺️' },
 ];
 function NurseFeedbackStrip({ onGood, onBad, nurseColor }) {
   const [phase, setPhase] = React.useState('ask'); // ask | reason | done
@@ -1590,10 +1591,11 @@ function StatRoomPopup({ title, icon, color, rooms, allRooms, nurseRooms, nurses
 
 // ── FEEDBACK BAR ──────────────────────────────────────────────────────────────
 const FB_REASONS = [
-  { key:'spread',     label:'Rooms too spread out', icon:'📍' },
-  { key:'load',       label:'Uneven workload',       icon:'⚖️' },
-  { key:'heavy',      label:'Too many heavy rooms',  icon:'🔴' },
-  { key:'mix',        label:'TELE/Med mixed',        icon:'💔' },
+  { key:'spread',     label:'Rooms too spread out',  icon:'📍' },
+  { key:'load',       label:'Uneven workload',        icon:'⚖️' },
+  { key:'heavy',      label:'Too many heavy rooms',   icon:'🔴' },
+  { key:'mix',        label:'TELE/Med mixed',         icon:'💔' },
+  { key:'cluster',    label:'Lack of cluster',        icon:'🗺️' },
 ];
 
 function FeedbackBar({ onGood, onBad }) {
@@ -2134,6 +2136,7 @@ function App() {
       if (reason === 'load')     weights.load        = +Math.min(weights.load        * BOOST, CAP).toFixed(3);
       if (reason === 'heavy')    weights.acuity      = +Math.min(weights.acuity      * BOOST, CAP).toFixed(3);
       if (reason === 'mix')      weights.teleCluster = +Math.min(weights.teleCluster * BOOST, CAP).toFixed(3);
+      if (reason === 'cluster')  weights.diam        = +Math.min(weights.diam        * BOOST * BOOST, CAP).toFixed(3);
       const entry = { ts: Date.now(), rating:'bad', nurseId, reason };
       const next = { entries:[...prev.entries.slice(-99), entry], weights };
       saveFB(next); return next;
