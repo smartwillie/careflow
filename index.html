@@ -1705,8 +1705,8 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
         </button>
       </div>
 
-      {/* ── Row 1: Census stats ── */}
-      <div style={{ display:'flex', gap:6, alignItems:'stretch', marginBottom:6 }}>
+      {/* ── Single row: all stats ── */}
+      <div style={{ display:'flex', gap:6, alignItems:'stretch' }}>
         <DashTile icon="□" value={vacant}     label="Empty"      color="rgba(255,255,255,0.55)" />
         <DashTile icon="●" value={occupied}   label="Occupied"   color="#fff" />
         <DashTile icon="✓" value={assigned}   label="Assigned"   color={assigned===occupied&&occupied>0 ? '#86efac' : '#fff'}
@@ -1715,9 +1715,6 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
           color={unassigned>0 ? '#fbbf24' : '#fff'}
           accentColor={unassigned>0 ? '#fbbf24' : undefined}
           onClick={onUnassignedClick} active={unassignedOpen} btnRef={unassignedBtnRef} />
-      </div>
-      {/* ── Row 2: Clinical flags ── */}
-      <div style={{ display:'flex', gap:6, alignItems:'stretch' }}>
         <DashTile icon="♥" value={tele}        label="TELE"      color={tele>0 ? '#f87171' : '#fff'} accentColor={tele>0 ? '#f87171' : undefined} />
         <DashTile icon="👁" value={sitter}      label="Sitter"    color={sitter>0 ? '#c4b5fd' : '#fff'} accentColor={sitter>0 ? '#c4b5fd' : undefined}
           onClick={()=>toggleStatPopup('sitter',sitterRef)} active={statPopup?.key==='sitter'} btnRef={sitterRef} />
