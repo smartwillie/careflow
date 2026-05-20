@@ -2312,32 +2312,8 @@ function App() {
             isolationCount: existing.filter(id => resetRooms[id]?.isolation).length,
             totalCareCount: existing.filter(id => resetRooms[id]?.totalCare).length,
             glucoseCount:   existing.filter(id => resetRooms[id]?.glucose).length,
-            ecoType:        null, // assigned below in ECO mode
           };
         });
-
-        // ── ECO mode: pre-assign each nurse a room type ──────────────────────
-        // Unlocked nurses are designated TELE or MED proportionally to the
-        // room mix. This creates dedicated nurses per type so the greedy
-        // algorithm can enforce purity with a strong score barrier.
-        if (fuelMode) {
-          const unassignedTele = unassigned.filter(r => r.type === 'TELE').length;
-          const unassignedMed  = unassigned.filter(r => r.type !== 'TELE').length;
-          const total = unassignedTele + unassignedMed;
-          const unlockedNurses = shuffledNurses.filter(n => !lockedNurses.has(n.id));
-          const teleNurseCount = total > 0
-            ? Math.round(unlockedNurses.length * unassignedTele / total)
-            : 0;
-          unlockedNurses.forEach((n, i) => {
-            ns[n.id].ecoType = i < teleNurseCount ? 'TELE' : 'MED';
-          });
-          // Locked nurses inherit their dominant existing type (or null = flexible)
-          shuffledNurses.filter(n => lockedNurses.has(n.id)).forEach(n => {
-            const state = ns[n.id];
-            if (state.teleCount > 0 && state.medCount === 0) ns[n.id].ecoType = 'TELE';
-            else if (state.medCount > 0 && state.teleCount === 0) ns[n.id].ecoType = 'MED';
-          });
-        }
 
         // Snapshot learned weights from feedback store
         const fbW = feedbackStore.weights;
@@ -2345,17 +2321,11 @@ function App() {
         // All occupied rooms that are NOT locked get re-assigned
         const unassigned = Object.values(resetRooms).filter(r => r.occupied && !lockedRoomIds.has(r.id));
 
-        // Sort rooms: heaviest acuity first (hardest to place → assign early)
-        // ECO mode: within same acuity tier, group by type then by corridor index
-        // so adjacent rooms of the same type flow to the same nurse naturally.
+        // Sort rooms: heaviest acuity first — ECO mode manages its own ordering internally
         const toAssign = [...unassigned].sort((a, b) => {
           const wa = (a.isolation?4:0)+(a.highAcuity?3:0)+(a.totalCare?2:0)+(a.type==='TELE'?1:0);
           const wb = (b.isolation?4:0)+(b.highAcuity?3:0)+(b.totalCare?2:0)+(b.type==='TELE'?1:0);
           if (wa !== wb) return wb - wa;
-          if (fuelMode) {
-            if (a.type !== b.type) return a.type === 'TELE' ? 1 : -1; // MED first, then TELE
-            return _RIDX[a.id] - _RIDX[b.id]; // same type → corridor order (builds tight clusters)
-          }
           return Math.random() - 0.5;
         });
 
@@ -2452,29 +2422,12 @@ function App() {
           if (isolationCount >= 1 && room.totalCare && totalCareCount >= 1) penalty += 70;
           if (room.isolation && totalCareCount >= 2) penalty += 70;
 
-          // ── ECO mode: type purity + same-type proximity reward ───────────
+          // ── ECO overflow: soft type-mix discouragement ───────────────────
+          // (main ECO assignment is handled by buildEcoClusters; score() is
+          //  only called for rooms that overflow the dedicated-type nurses)
           if (fuelMode) {
-            const { ecoType } = state;
-
-            // Tier-1 barrier: pre-assigned type mismatch — near-hard wall
-            // Allows bleed only if acuity/capacity leaves no other option.
-            if (ecoType === 'TELE' && room.type !== 'TELE') penalty += 220 * fbW.teleCluster;
-            if (ecoType === 'MED'  && room.type === 'TELE') penalty += 220 * fbW.teleCluster;
-
-            // Tier-2 barrier: observed type mismatch (catches locked nurses,
-            // or when a nurse has already received rooms of the opposite type)
-            if (teleCount > 0 && room.type !== 'TELE') penalty += 150 * fbW.teleCluster;
-            if (medCount  > 0 && room.type === 'TELE') penalty += 150 * fbW.teleCluster;
-
-            // Proximity reward within same type: rooms that are physically
-            // close to existing same-type rooms get a score bonus so tight
-            // MED/TELE clusters form naturally alongside the diameter penalty.
-            const sameTypeRooms = nRooms.filter(id => resetRooms[id]?.type === room.type);
-            if (sameTypeRooms.length > 0) {
-              const minSameDist = Math.min(...sameTypeRooms.map(id => circDist(room.id, id)));
-              // Adjacent (dist≤1)→-30, dist 2→-25 … dist 6→-5, beyond→0
-              if (minSameDist <= 6) penalty -= (7 - minSameDist) * 5;
-            }
+            if (teleCount > 0 && room.type !== 'TELE') penalty += 80 * fbW.teleCluster;
+            if (medCount  > 0 && room.type === 'TELE') penalty += 80 * fbW.teleCluster;
           }
 
           // ── Load balance — scaled by learned weight ───────────────────────
@@ -2492,23 +2445,150 @@ function App() {
           return load + haSpread + telePenalty + penalty + noise;
         }
 
-        const newAssignments = {};
-        for (const room of toAssign) {
-          let best = null, bestScore = Infinity;
-          for (const state of Object.values(ns)) {
-            const s = score(state, room);
-            if (s < bestScore) { bestScore = s; best = state; }
+        // ── Helper: apply a room assignment to a nurse state ────────────────
+        function commitToState(state, room) {
+          state.rooms.push(room.id);
+          if (room.type === 'TELE') state.teleCount++; else state.medCount++;
+          if (room.highAcuity)     state.haCount++;
+          state.acuityPts      += roomAcuityPts(room);
+          if (room.isolation)  state.isolationCount++;
+          if (room.totalCare)  state.totalCareCount++;
+          if (room.glucose)    state.glucoseCount++;
+        }
+
+        // ── ECO: proximity-first cluster builder for one room type ───────────
+        // Guarantees type purity: each nurse in nurseList only receives rooms
+        // from pool (all same type). Within that constraint, picks the room
+        // closest to the nurse's existing cluster that fits acuity limits.
+        // Returns { assigned: {roomId→nurseId}, overflow: [rooms not placed] }
+        function buildEcoClusters(pool, nurseList, isTele) {
+          const cap       = isTele ? 4 : 5;
+          const remaining = [...pool];
+          const assigned  = {};
+
+          for (const n of nurseList) {
+            const state = ns[n.id];
+
+            while (state.rooms.length < cap && remaining.length > 0) {
+              let bestIdx = -1, bestScore = Infinity;
+
+              for (let i = 0; i < remaining.length; i++) {
+                const r = remaining[i];
+
+                // ── Hard acuity / capacity limits ────────────────────────────
+                if (r.highAcuity && state.haCount >= 2)                continue;
+                if (state.acuityPts + roomAcuityPts(r) > 6)           continue;
+                if (r.glucose   && state.glucoseCount   >= 2)          continue;
+                if (r.totalCare && state.totalCareCount >= 2)          continue;
+                const projRooms = [...state.rooms, r.id];
+                const diam = clusterDiameter(projRooms);
+                if (diam >= DIAM_HARD)                                 continue;
+
+                // ── Score: proximity + diameter tightness + acuity ───────────
+                let s = 0;
+
+                // Diameter: keep the cluster geographically tight
+                s += (diam < DIAM_PEN.length ? DIAM_PEN[diam] : 450+(diam-13)*80) * fbW.diam;
+
+                // Cohesion: prefer rooms nearest to the current cluster
+                if (state.rooms.length > 0) {
+                  const minDist = Math.min(...state.rooms.map(id => circDist(r.id, id)));
+                  s += minDist * 15;
+                } else {
+                  // No anchor yet — seed by corridor index so neighbours land together
+                  s += _RIDX[r.id] * 0.4;
+                }
+
+                // Acuity balance: heavier rooms placed first (negative = bonus)
+                s -= roomAcuityPts(r) * 12 * fbW.acuity;
+
+                // Isolation stacking discouraged
+                if (r.isolation && state.isolationCount >= 1) s += 90;
+                if (state.isolationCount >= 1 && r.totalCare && state.totalCareCount >= 1) s += 70;
+                if (r.isolation && state.totalCareCount >= 2) s += 70;
+
+                // Load balance
+                s += state.rooms.length * 5 * fbW.load;
+
+                // Small noise for variety
+                s += (Math.random() - 0.5) * 8;
+
+                if (s < bestScore) { bestScore = s; bestIdx = i; }
+              }
+
+              if (bestIdx === -1) break; // no valid room found for this nurse
+
+              const room = remaining[bestIdx];
+              remaining.splice(bestIdx, 1);
+              assigned[room.id] = n.id;
+              commitToState(state, room);
+            }
           }
-          if (best && bestScore < Infinity) {
-            newAssignments[room.id] = best.nurse.id;
-            best.rooms.push(room.id);
-            if (room.type === 'TELE') best.teleCount++;
-            else                      best.medCount++;
-            if (room.highAcuity)     best.haCount++;
-            best.acuityPts      += roomAcuityPts(room);
-            if (room.isolation)  best.isolationCount++;
-            if (room.totalCare)  best.totalCareCount++;
-            if (room.glucose)    best.glucoseCount++;
+
+          return { assigned, overflow: remaining };
+        }
+
+        // ── Main assignment ──────────────────────────────────────────────────
+        const newAssignments = {};
+
+        if (fuelMode) {
+          // ECO MODE: two-phase type-first cluster assignment
+          // ─────────────────────────────────────────────────────────────────
+          // Phase 1: split rooms by type, dedicate nurses proportionally,
+          //          build tight same-type clusters with proximity-first greedy.
+          // Phase 2: overflow rooms (acuity conflicts / capacity exhausted)
+          //          fall back to normal score() greedy.
+
+          const acuityKey = r => (r.isolation?4:0)+(r.highAcuity?3:0)+(r.totalCare?2:0);
+
+          // Sort each pool: heavy acuity first, then by corridor index within acuity tier
+          const telePool = unassigned
+            .filter(r => r.type === 'TELE')
+            .sort((a,b) => acuityKey(b)-acuityKey(a) || _RIDX[a.id]-_RIDX[b.id]);
+          const medPool = unassigned
+            .filter(r => r.type !== 'TELE')
+            .sort((a,b) => acuityKey(b)-acuityKey(a) || _RIDX[a.id]-_RIDX[b.id]);
+
+          // Proportional nurse split (unlocked nurses only)
+          const unlockedNurses = shuffledNurses.filter(n => !lockedNurses.has(n.id));
+          const total = telePool.length + medPool.length;
+          const teleNurseCount = total > 0
+            ? Math.min(Math.round(unlockedNurses.length * telePool.length / total), unlockedNurses.length)
+            : 0;
+          const teleNurses = unlockedNurses.slice(0, teleNurseCount);
+          const medNurses  = unlockedNurses.slice(teleNurseCount);
+
+          // Build clusters — MED first (larger pool, 5-room cap)
+          const medResult  = buildEcoClusters(medPool,  medNurses,  false);
+          const teleResult = buildEcoClusters(telePool, teleNurses, true);
+          Object.assign(newAssignments, medResult.assigned, teleResult.assigned);
+
+          // Phase 2: overflow through normal score() greedy (no type restriction)
+          const overflow = [...medResult.overflow, ...teleResult.overflow];
+          for (const room of overflow) {
+            let best = null, bestScore = Infinity;
+            for (const state of Object.values(ns)) {
+              const s = score(state, room);
+              if (s < bestScore) { bestScore = s; best = state; }
+            }
+            if (best && bestScore < Infinity) {
+              newAssignments[room.id] = best.nurse.id;
+              commitToState(best, room);
+            }
+          }
+
+        } else {
+          // NORMAL MODE: single proximity + acuity greedy pass
+          for (const room of toAssign) {
+            let best = null, bestScore = Infinity;
+            for (const state of Object.values(ns)) {
+              const s = score(state, room);
+              if (s < bestScore) { bestScore = s; best = state; }
+            }
+            if (best && bestScore < Infinity) {
+              newAssignments[room.id] = best.nurse.id;
+              commitToState(best, room);
+            }
           }
         }
 
