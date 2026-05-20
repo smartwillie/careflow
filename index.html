@@ -2312,8 +2312,32 @@ function App() {
             isolationCount: existing.filter(id => resetRooms[id]?.isolation).length,
             totalCareCount: existing.filter(id => resetRooms[id]?.totalCare).length,
             glucoseCount:   existing.filter(id => resetRooms[id]?.glucose).length,
+            ecoType:        null, // assigned below in ECO mode
           };
         });
+
+        // ── ECO mode: pre-assign each nurse a room type ──────────────────────
+        // Unlocked nurses are designated TELE or MED proportionally to the
+        // room mix. This creates dedicated nurses per type so the greedy
+        // algorithm can enforce purity with a strong score barrier.
+        if (fuelMode) {
+          const unassignedTele = unassigned.filter(r => r.type === 'TELE').length;
+          const unassignedMed  = unassigned.filter(r => r.type !== 'TELE').length;
+          const total = unassignedTele + unassignedMed;
+          const unlockedNurses = shuffledNurses.filter(n => !lockedNurses.has(n.id));
+          const teleNurseCount = total > 0
+            ? Math.round(unlockedNurses.length * unassignedTele / total)
+            : 0;
+          unlockedNurses.forEach((n, i) => {
+            ns[n.id].ecoType = i < teleNurseCount ? 'TELE' : 'MED';
+          });
+          // Locked nurses inherit their dominant existing type (or null = flexible)
+          shuffledNurses.filter(n => lockedNurses.has(n.id)).forEach(n => {
+            const state = ns[n.id];
+            if (state.teleCount > 0 && state.medCount === 0) ns[n.id].ecoType = 'TELE';
+            else if (state.medCount > 0 && state.teleCount === 0) ns[n.id].ecoType = 'MED';
+          });
+        }
 
         // Snapshot learned weights from feedback store
         const fbW = feedbackStore.weights;
@@ -2322,11 +2346,16 @@ function App() {
         const unassigned = Object.values(resetRooms).filter(r => r.occupied && !lockedRoomIds.has(r.id));
 
         // Sort rooms: heaviest acuity first (hardest to place → assign early)
+        // ECO mode: within same acuity tier, group by type then by corridor index
+        // so adjacent rooms of the same type flow to the same nurse naturally.
         const toAssign = [...unassigned].sort((a, b) => {
           const wa = (a.isolation?4:0)+(a.highAcuity?3:0)+(a.totalCare?2:0)+(a.type==='TELE'?1:0);
           const wb = (b.isolation?4:0)+(b.highAcuity?3:0)+(b.totalCare?2:0)+(b.type==='TELE'?1:0);
           if (wa !== wb) return wb - wa;
-          if (fuelMode && a.type !== b.type) return a.type === 'TELE' ? 1 : -1; // MedSurg first
+          if (fuelMode) {
+            if (a.type !== b.type) return a.type === 'TELE' ? 1 : -1; // MED first, then TELE
+            return _RIDX[a.id] - _RIDX[b.id]; // same type → corridor order (builds tight clusters)
+          }
           return Math.random() - 0.5;
         });
 
@@ -2423,11 +2452,29 @@ function App() {
           if (isolationCount >= 1 && room.totalCare && totalCareCount >= 1) penalty += 70;
           if (room.isolation && totalCareCount >= 2) penalty += 70;
 
-          // ── Fuel efficiency mode — teleCluster weight applied ─────────────
+          // ── ECO mode: type purity + same-type proximity reward ───────────
           if (fuelMode) {
-            if (teleCount > 0 && room.type !== 'TELE') penalty += 55 * fbW.teleCluster;
-            if (medCount > 0  && room.type === 'TELE') penalty += 55 * fbW.teleCluster;
-            if (room.type !== 'TELE') penalty -= medCount * 4;
+            const { ecoType } = state;
+
+            // Tier-1 barrier: pre-assigned type mismatch — near-hard wall
+            // Allows bleed only if acuity/capacity leaves no other option.
+            if (ecoType === 'TELE' && room.type !== 'TELE') penalty += 220 * fbW.teleCluster;
+            if (ecoType === 'MED'  && room.type === 'TELE') penalty += 220 * fbW.teleCluster;
+
+            // Tier-2 barrier: observed type mismatch (catches locked nurses,
+            // or when a nurse has already received rooms of the opposite type)
+            if (teleCount > 0 && room.type !== 'TELE') penalty += 150 * fbW.teleCluster;
+            if (medCount  > 0 && room.type === 'TELE') penalty += 150 * fbW.teleCluster;
+
+            // Proximity reward within same type: rooms that are physically
+            // close to existing same-type rooms get a score bonus so tight
+            // MED/TELE clusters form naturally alongside the diameter penalty.
+            const sameTypeRooms = nRooms.filter(id => resetRooms[id]?.type === room.type);
+            if (sameTypeRooms.length > 0) {
+              const minSameDist = Math.min(...sameTypeRooms.map(id => circDist(room.id, id)));
+              // Adjacent (dist≤1)→-30, dist 2→-25 … dist 6→-5, beyond→0
+              if (minSameDist <= 6) penalty -= (7 - minSameDist) * 5;
+            }
           }
 
           // ── Load balance — scaled by learned weight ───────────────────────
