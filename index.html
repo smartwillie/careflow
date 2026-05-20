@@ -2485,327 +2485,144 @@ function App() {
           if (room.glucose)    state.glucoseCount++;
         }
 
-        // ── ECO: two-phase cluster builder for one room type ────────────────
-        // Guarantees type purity (pool is already type-filtered).
-        //
-        // Phase A — Spatial seeding:
-        //   Divide the corridor into N equal sections (one per nurse).
-        //   Each nurse gets the heaviest-acuity valid room from their section
-        //   as an anchor. This spreads nurses across the corridor so they
-        //   don't all start fighting over the same end.
-        //
-        // Phase B — Round-robin growth:
-        //   Every nurse gets one room per round (not: fill nurse 1, then nurse 2).
-        //   Each pick = closest valid room to the nurse's existing cluster that
-        //   also passes hard acuity/diameter limits. Round-robin naturally
-        //   distributes acuity evenly (each nurse grabs their heaviest nearby
-        //   room before anyone gets a second, third…).
-        //
-        // Returns { assigned: {roomId→nurseId}, overflow: [rooms not placed] }
-        function buildEcoClusters(pool, nurseList, isTele) {
-          if (nurseList.length === 0) return { assigned: {}, overflow: [...pool] };
+        // ── ECO shared helpers ───────────────────────────────────────────────
+        // Hard acuity / stacking limits — same rules used everywhere.
+        function _ecoPasses(state, r) {
+          if (r.highAcuity && state.haCount >= 2)       return false;
+          if (state.acuityPts + roomAcuityPts(r) > 6)   return false;
+          if (r.glucose   && state.glucoseCount   >= 2)  return false;
+          if (r.totalCare && state.totalCareCount >= 2)  return false;
+          return true;
+        }
+        // Proximity + acuity score for one candidate room (lower = better).
+        // Returns Infinity if the projected cluster exceeds DIAM_HARD.
+        function _ecoScore(state, r, projRooms) {
+          const diam = clusterDiameter(projRooms);
+          if (diam >= DIAM_HARD) return Infinity;
+          let s = (diam < DIAM_PEN.length ? DIAM_PEN[diam] : 450+(diam-13)*80) * fbW.diam;
+          if (state.rooms.length > 0)
+            s += Math.min(...state.rooms.map(id => circDist(r.id, id))) * 20;
+          s -= roomAcuityPts(r) * 14 * fbW.acuity;
+          if (r.isolation && state.isolationCount >= 1)                              s += 90;
+          if (state.isolationCount >= 1 && r.totalCare && state.totalCareCount >= 1) s += 70;
+          if (r.isolation && state.totalCareCount >= 2)                              s += 70;
+          s += (Math.random() - 0.5) * 6;
+          return s;
+        }
 
-          const cap       = isTele ? 4 : 5;
-          const remaining = [...pool]; // mutated throughout
+        // ── Step 2: MedSurg cluster builder (cap = 5) ───────────────────────
+        // For each nurse:
+        //   a) Seed with the heaviest-acuity valid room from their corridor section
+        //   b) Greedily fill to 5 (proximity + acuity — no round-robin)
+        // Returns { assigned:{roomId→nurseId}, overflow:[rooms not placed] }
+        function buildMedClusters(medPool, medNurses) {
+          if (medNurses.length === 0) return { assigned: {}, overflow: [...medPool] };
+          const CAP       = 5;
+          const remaining = [...medPool];
           const assigned  = {};
 
-          // ── Phase 0 (MedSurg only): guaranteed full-load assignment ───────
-          // When the pool has enough rooms to give every nurse a full load
-          // (remaining ≥ nurses × cap), skip the seeding dance and assign
-          // each nurse exactly cap rooms in one greedy sweep, processing
-          // nurses in fewest-rooms-first order. Uses spatial sections so
-          // nurses don't compete for the same corridor segment.
-          if (!isTele && remaining.length >= nurseList.length * cap) {
-            const bySection = [...remaining].sort((a, b) => _RIDX[a.id] - _RIDX[b.id]);
-            const sec       = Math.ceil(bySection.length / nurseList.length);
-
-            for (let ni = 0; ni < nurseList.length; ni++) {
-              const n     = nurseList[ni];
-              const state = ns[n.id];
-
-              // This nurse's corridor section (with wraparound fallback from any section)
-              const sectionIds = new Set(bySection.slice(ni * sec, ni * sec + sec).map(r => r.id));
-
-              // Two-pass fill: first prefer rooms in this nurse's section, then any
-              for (const preferSection of [true, false]) {
-                while (state.rooms.length < cap && remaining.length > 0) {
-                  let bestIdx = -1, bestScore = Infinity;
-                  for (let i = 0; i < remaining.length; i++) {
-                    const r = remaining[i];
-                    if (preferSection && !sectionIds.has(r.id))            continue;
-                    if (r.highAcuity && state.haCount >= 2)                continue;
-                    if (state.acuityPts + roomAcuityPts(r) > 6)           continue;
-                    if (r.glucose   && state.glucoseCount   >= 2)          continue;
-                    if (r.totalCare && state.totalCareCount >= 2)          continue;
-                    const projRooms = [...state.rooms, r.id];
-                    const diam = clusterDiameter(projRooms);
-                    if (diam >= DIAM_HARD)                                 continue;
-                    let s = 0;
-                    s += (diam < DIAM_PEN.length ? DIAM_PEN[diam] : 450+(diam-13)*80) * fbW.diam;
-                    if (state.rooms.length > 0) {
-                      const minDist = Math.min(...state.rooms.map(id => circDist(r.id, id)));
-                      s += minDist * 20;
-                    }
-                    s -= roomAcuityPts(r) * 14 * fbW.acuity;
-                    if (r.isolation && state.isolationCount >= 1)                              s += 90;
-                    if (state.isolationCount >= 1 && r.totalCare && state.totalCareCount >= 1) s += 70;
-                    if (r.isolation && state.totalCareCount >= 2)                              s += 70;
-                    s += (Math.random() - 0.5) * 6;
-                    if (s < bestScore) { bestScore = s; bestIdx = i; }
-                  }
-                  if (bestIdx === -1) break;
-                  const room = remaining[bestIdx];
-                  remaining.splice(bestIdx, 1);
-                  assigned[room.id] = n.id;
-                  commitToState(state, room);
-                }
-              }
-            }
-
-            // If every nurse reached cap, nothing left to do — return now.
-            if (nurseList.every(n => ns[n.id].rooms.length >= cap)) {
-              return { assigned, overflow: remaining };
-            }
-            // Otherwise fall through: remaining phases mop up nurses/rooms
-            // that Phase 0 couldn't fully resolve (acuity / diameter blocked).
-          }
-
-          // ── Phase A: spatial seeding ─────────────────────────────────────
-          // Sort a separate view by corridor index to identify spatial sections.
           const byCorr = [...remaining].sort((a, b) => _RIDX[a.id] - _RIDX[b.id]);
-          const stride  = Math.ceil(byCorr.length / nurseList.length);
+          const stride  = Math.ceil(byCorr.length / medNurses.length);
 
-          for (let ni = 0; ni < nurseList.length; ni++) {
-            const n     = nurseList[ni];
-            const state = ns[n.id];
+          for (let ni = 0; ni < medNurses.length; ni++) {
+            const n = medNurses[ni], state = ns[n.id];
 
-            // Section of the corridor belonging to this nurse
-            const section = byCorr.slice(ni * stride, ni * stride + stride);
+            // (a) Seed: heaviest valid room in this nurse's spatial section
+            const section      = byCorr.slice(ni * stride, ni * stride + stride);
+            const sectionAvail = section
+              .filter(r => remaining.some(rem => rem.id === r.id) && _ecoPasses(state, r))
+              .sort((a, b) => roomAcuityPts(b) - roomAcuityPts(a));
 
-            // Pick heaviest valid room from section as the seed anchor
-            const candidates = section
-              .filter(r => {
-                if (r.highAcuity && state.haCount >= 2)        return false;
-                if (state.acuityPts + roomAcuityPts(r) > 6)   return false;
-                if (r.glucose   && state.glucoseCount   >= 2)  return false;
-                if (r.totalCare && state.totalCareCount >= 2)  return false;
-                return remaining.some(rem => rem.id === r.id); // still available
-              })
-              .sort((a, b) => roomAcuityPts(b) - roomAcuityPts(a)); // heaviest first
-
-            if (candidates.length === 0) continue;
-
-            // Add a small noise to seed selection for variety across runs
-            const seed = candidates[Math.floor(Math.random() * Math.min(2, candidates.length))];
-            const idx  = remaining.findIndex(r => r.id === seed.id);
-            if (idx === -1) continue;
-
-            remaining.splice(idx, 1);
-            assigned[seed.id] = n.id;
-            commitToState(state, seed);
-          }
-
-          // ── Phase B.5 (MedSurg only): greedy fill-up to cap ─────────────
-          // Runs immediately after Phase A seeding, before round-robin.
-          // Each nurse (fewest-rooms-first) greedily fills to cap 5 using
-          // proximity + acuity scoring — aggressive cluster completion right
-          // after the spatial seed is placed.
-          if (!isTele && remaining.length > 0) {
-            const sortedNurses = [...nurseList]
-              .sort((a, b) => ns[a.id].rooms.length - ns[b.id].rooms.length);
-
-            for (const n of sortedNurses) {
-              const state = ns[n.id];
-              while (state.rooms.length < cap && remaining.length > 0) {
-                let bestIdx = -1, bestScore = Infinity;
-                for (let i = 0; i < remaining.length; i++) {
-                  const r = remaining[i];
-                  if (r.highAcuity && state.haCount >= 2)              continue;
-                  if (state.acuityPts + roomAcuityPts(r) > 6)         continue;
-                  if (r.glucose   && state.glucoseCount   >= 2)        continue;
-                  if (r.totalCare && state.totalCareCount >= 2)        continue;
-                  const projRooms = [...state.rooms, r.id];
-                  const diam = clusterDiameter(projRooms);
-                  if (diam >= DIAM_HARD)                               continue;
-                  let s = 0;
-                  s += (diam < DIAM_PEN.length ? DIAM_PEN[diam] : 450+(diam-13)*80) * fbW.diam;
-                  if (state.rooms.length > 0) {
-                    const minDist = Math.min(...state.rooms.map(id => circDist(r.id, id)));
-                    s += minDist * 20;
-                  }
-                  s -= roomAcuityPts(r) * 14 * fbW.acuity;
-                  if (r.isolation && state.isolationCount >= 1)                              s += 90;
-                  if (state.isolationCount >= 1 && r.totalCare && state.totalCareCount >= 1) s += 70;
-                  if (r.isolation && state.totalCareCount >= 2)                              s += 70;
-                  s += (Math.random() - 0.5) * 6;
-                  if (s < bestScore) { bestScore = s; bestIdx = i; }
-                }
-                if (bestIdx === -1) break; // acuity / diameter blocked — give up on this nurse
-                const room = remaining[bestIdx];
-                remaining.splice(bestIdx, 1);
-                assigned[room.id] = n.id;
-                commitToState(state, room);
+            if (sectionAvail.length > 0) {
+              const seed = sectionAvail[Math.floor(Math.random() * Math.min(2, sectionAvail.length))];
+              const idx  = remaining.findIndex(r => r.id === seed.id);
+              if (idx !== -1) {
+                remaining.splice(idx, 1);
+                assigned[seed.id] = n.id;
+                commitToState(state, seed);
               }
             }
-          }
 
-          // ── Phase A.5 (TELE only): guarantee every nurse ≥1 room ────────
-          // If Phase A left any TELE nurse with no seed (empty spatial section
-          // or all acuity-blocked), force-assign the best available room.
-          // Diameter irrelevant for a single room — skip that check.
-          if (isTele) {
-            for (const n of nurseList) {
-              const state = ns[n.id];
-              if (state.rooms.length > 0 || remaining.length === 0) continue;
-
+            // (b) Greedy fill to cap
+            while (state.rooms.length < CAP && remaining.length > 0) {
               let bestIdx = -1, bestScore = Infinity;
               for (let i = 0; i < remaining.length; i++) {
                 const r = remaining[i];
-                if (r.highAcuity && state.haCount >= 2)       continue;
-                if (state.acuityPts + roomAcuityPts(r) > 6)   continue;
-                if (r.glucose   && state.glucoseCount   >= 2)  continue;
-                if (r.totalCare && state.totalCareCount >= 2)  continue;
-                // Prefer lighter acuity (preserve heavy rooms for balanced nurses)
-                // and spread seeds across the corridor
-                const s = -roomAcuityPts(r) * 8 + _RIDX[r.id] * 0.5;
+                if (!_ecoPasses(state, r)) continue;
+                const s = _ecoScore(state, r, [...state.rooms, r.id]);
                 if (s < bestScore) { bestScore = s; bestIdx = i; }
               }
-
-              if (bestIdx !== -1) {
-                const room = remaining[bestIdx];
-                remaining.splice(bestIdx, 1);
-                assigned[room.id] = n.id;
-                commitToState(state, room);
-              }
+              if (bestIdx === -1) break;
+              const room = remaining[bestIdx];
+              remaining.splice(bestIdx, 1);
+              assigned[room.id] = n.id;
+              commitToState(state, room);
             }
           }
 
-          // ── Phase B: round-robin growth ──────────────────────────────────
-          // Each pass gives every nurse one room. Continue until no progress.
-          // Round-robin naturally distributes load — no extra load penalty needed.
-          let progress = true;
-          while (progress && remaining.length > 0) {
-            progress = false;
+          return { assigned, overflow: remaining };
+        }
 
-            for (const n of nurseList) {
-              const state = ns[n.id];
-              if (state.rooms.length >= cap || remaining.length === 0) continue;
+        // ── Step 3: TELE cluster builder (cap = 4, MedSurg mixing allowed) ──
+        // medOverflow = leftover MedSurg rooms injected after Step 2.
+        // For each nurse:
+        //   a) Seed with a TELE room from their TELE corridor section
+        //      (fallback to any available TELE if section empty)
+        //   b) Greedily fill to 4 — MedSurg rooms allowed but soft-penalised
+        // Dynamic cap: TELE involved → 4, pure MedSurg nurse → 5
+        // Returns { assigned:{roomId→nurseId}, overflow:[rooms not placed] }
+        function buildTeleClusters(telePool, medOverflow, teleNurses) {
+          if (teleNurses.length === 0) return { assigned: {}, overflow: [...telePool, ...medOverflow] };
+          const TELE_CAP  = 4;
+          const remaining = [...telePool, ...medOverflow]; // TELE first, then MedSurg
+          const assigned  = {};
 
+          // Section seeding draws only from TELE rooms
+          const teleByCorr = [...telePool].sort((a, b) => _RIDX[a.id] - _RIDX[b.id]);
+          const stride     = Math.max(1, Math.ceil(teleByCorr.length / teleNurses.length));
+
+          for (let ni = 0; ni < teleNurses.length; ni++) {
+            const n = teleNurses[ni], state = ns[n.id];
+
+            // (a) Seed: heaviest valid TELE room in section; fallback to any TELE
+            const section      = teleByCorr.slice(ni * stride, ni * stride + stride);
+            const sectionAvail = section
+              .filter(r => remaining.some(rem => rem.id === r.id) && _ecoPasses(state, r))
+              .sort((a, b) => roomAcuityPts(b) - roomAcuityPts(a));
+            const seedPool = sectionAvail.length > 0 ? sectionAvail :
+              remaining.filter(r => r.type === 'TELE' && _ecoPasses(state, r))
+                       .sort((a, b) => roomAcuityPts(b) - roomAcuityPts(a));
+
+            if (seedPool.length > 0) {
+              const seed = seedPool[Math.floor(Math.random() * Math.min(2, seedPool.length))];
+              const idx  = remaining.findIndex(r => r.id === seed.id);
+              if (idx !== -1) {
+                remaining.splice(idx, 1);
+                assigned[seed.id] = n.id;
+                commitToState(state, seed);
+              }
+            }
+
+            // (b) Greedy fill to TELE cap
+            while (state.rooms.length < TELE_CAP && remaining.length > 0) {
               let bestIdx = -1, bestScore = Infinity;
-
               for (let i = 0; i < remaining.length; i++) {
                 const r = remaining[i];
-
-                // ── Hard limits ────────────────────────────────────────────
-                if (r.highAcuity && state.haCount >= 2)                continue;
-                if (state.acuityPts + roomAcuityPts(r) > 6)           continue;
-                if (r.glucose   && state.glucoseCount   >= 2)          continue;
-                if (r.totalCare && state.totalCareCount >= 2)          continue;
-                const projRooms = [...state.rooms, r.id];
-                const diam = clusterDiameter(projRooms);
-                if (diam >= DIAM_HARD)                                 continue;
-
-                // ── Score ──────────────────────────────────────────────────
-                let s = 0;
-
-                // Diameter tightness (primary geographic constraint)
-                s += (diam < DIAM_PEN.length ? DIAM_PEN[diam] : 450+(diam-13)*80) * fbW.diam;
-
-                // Cohesion: pull toward the nurse's existing cluster
-                if (state.rooms.length > 0) {
-                  const minDist = Math.min(...state.rooms.map(id => circDist(r.id, id)));
-                  s += minDist * 20;
-                }
-
-                // Acuity: prefer heavier rooms (spreads load across nurses)
-                s -= roomAcuityPts(r) * 14 * fbW.acuity;
-
-                // Isolation / totalCare stacking discouraged
-                if (r.isolation && state.isolationCount >= 1)                        s += 90;
-                if (state.isolationCount >= 1 && r.totalCare && state.totalCareCount >= 1) s += 70;
-                if (r.isolation && state.totalCareCount >= 2)                        s += 70;
-
-                // Noise for run-to-run variety
-                s += (Math.random() - 0.5) * 6;
-
+                if (!_ecoPasses(state, r)) continue;
+                // Dynamic cap enforced per candidate
+                const effectiveCap = (state.teleCount > 0 || r.type === 'TELE') ? TELE_CAP : 5;
+                if (state.rooms.length >= effectiveCap) continue;
+                let s = _ecoScore(state, r, [...state.rooms, r.id]);
+                if (s === Infinity) continue;
+                // Soft penalty for MedSurg rooms mixed into a TELE nurse's cluster
+                if (r.type !== 'TELE') s += 60 * fbW.teleCluster;
                 if (s < bestScore) { bestScore = s; bestIdx = i; }
               }
-
-              if (bestIdx !== -1) {
-                const room = remaining[bestIdx];
-                remaining.splice(bestIdx, 1);
-                assigned[room.id] = n.id;
-                commitToState(state, room);
-                progress = true;
-              }
-            }
-          }
-
-          // ── Phase C: mixed-type fallback ─────────────────────────────────
-          // If rooms still remain after Phases A+B (dedicated nurses full or
-          // acuity-blocked), allow type mixing — but caps are still enforced
-          // per-room: a nurse with any TELE room (or taking a TELE room) is
-          // capped at 4; a pure MedSurg nurse is capped at 5.
-          if (remaining.length > 0) {
-            let mixProgress = true;
-            while (mixProgress && remaining.length > 0) {
-              mixProgress = false;
-
-              for (const n of nurseList) {
-                const state = ns[n.id];
-                if (remaining.length === 0) continue;
-
-                // Skip nurse only if they're at the absolute maximum (5).
-                // Per-room cap enforcement happens inside the candidate loop.
-                if (state.rooms.length >= 5) continue;
-
-                let bestIdx = -1, bestScore = Infinity;
-
-                for (let i = 0; i < remaining.length; i++) {
-                  const r = remaining[i];
-
-                  // ── Dynamic cap: TELE involved → max 4 rooms, else max 5 ───
-                  const mixCap = (state.teleCount > 0 || r.type === 'TELE') ? 4 : 5;
-                  if (state.rooms.length >= mixCap)                      continue;
-
-                  // ── Hard acuity / capacity limits ─────────────────────────
-                  if (r.highAcuity && state.haCount >= 2)                continue;
-                  if (state.acuityPts + roomAcuityPts(r) > 6)           continue;
-                  if (r.glucose   && state.glucoseCount   >= 2)          continue;
-                  if (r.totalCare && state.totalCareCount >= 2)          continue;
-                  const projRooms = [...state.rooms, r.id];
-                  const diam = clusterDiameter(projRooms);
-                  if (diam >= DIAM_HARD)                                 continue;
-
-                  // ── Score: same as Phase B + soft type-mix penalty ─────────
-                  let s = 0;
-                  s += (diam < DIAM_PEN.length ? DIAM_PEN[diam] : 450+(diam-13)*80) * fbW.diam;
-                  if (state.rooms.length > 0) {
-                    const minDist = Math.min(...state.rooms.map(id => circDist(r.id, id)));
-                    s += minDist * 20;
-                  }
-                  s -= roomAcuityPts(r) * 14 * fbW.acuity;
-                  if (r.isolation && state.isolationCount >= 1)                              s += 90;
-                  if (state.isolationCount >= 1 && r.totalCare && state.totalCareCount >= 1) s += 70;
-                  if (r.isolation && state.totalCareCount >= 2)                              s += 70;
-                  s += state.rooms.length * 4 * fbW.load;
-                  // Prefer same-type rooms; penalise cross-type only softly
-                  const nurseIsTele = state.teleCount >= state.medCount && state.teleCount > 0;
-                  if (nurseIsTele  && r.type !== 'TELE') s += 60 * fbW.teleCluster;
-                  if (!nurseIsTele && r.type === 'TELE') s += 60 * fbW.teleCluster;
-                  s += (Math.random() - 0.5) * 6;
-
-                  if (s < bestScore) { bestScore = s; bestIdx = i; }
-                }
-
-                if (bestIdx !== -1) {
-                  const room = remaining[bestIdx];
-                  remaining.splice(bestIdx, 1);
-                  assigned[room.id] = n.id;
-                  commitToState(state, room);
-                  mixProgress = true;
-                }
-              }
+              if (bestIdx === -1) break;
+              const room = remaining[bestIdx];
+              remaining.splice(bestIdx, 1);
+              assigned[room.id] = n.id;
+              commitToState(state, room);
             }
           }
 
@@ -2816,16 +2633,13 @@ function App() {
         const newAssignments = {};
 
         if (fuelMode) {
-          // ECO MODE: two-phase type-first cluster assignment
-          // ─────────────────────────────────────────────────────────────────
-          // Phase 1: split rooms by type, dedicate nurses proportionally,
-          //          build tight same-type clusters with proximity-first greedy.
-          // Phase 2: overflow rooms (acuity conflicts / capacity exhausted)
-          //          fall back to normal score() greedy.
+          // ECO MODE — 3-step cluster assignment:
+          //   Step 1: pool all MedSurg rooms → dedicate to MedSurg nurses (cap 5)
+          //   Step 2: any leftover MedSurg rooms fold into TELE pool → TELE nurses (cap 4)
+          //   Step 3: anything still unassigned → normal score() greedy across all nurses
 
           const acuityKey = r => (r.isolation?4:0)+(r.highAcuity?3:0)+(r.totalCare?2:0);
 
-          // Sort each pool: heavy acuity first, then by corridor index within acuity tier
           const telePool = unassigned
             .filter(r => r.type === 'TELE')
             .sort((a,b) => acuityKey(b)-acuityKey(a) || _RIDX[a.id]-_RIDX[b.id]);
@@ -2833,7 +2647,6 @@ function App() {
             .filter(r => r.type !== 'TELE')
             .sort((a,b) => acuityKey(b)-acuityKey(a) || _RIDX[a.id]-_RIDX[b.id]);
 
-          // Proportional nurse split (unlocked nurses only)
           const unlockedNurses = shuffledNurses.filter(n => !lockedNurses.has(n.id));
           const total = telePool.length + medPool.length;
           const teleNurseCount = total > 0
@@ -2842,15 +2655,16 @@ function App() {
           const teleNurses = unlockedNurses.slice(0, teleNurseCount);
           const medNurses  = unlockedNurses.slice(teleNurseCount);
 
-          // Build clusters — MED first (larger pool, 5-room cap)
-          const medResult  = buildEcoClusters(medPool,  medNurses,  false);
-          const teleResult = buildEcoClusters(telePool, teleNurses, true);
-          Object.assign(newAssignments, medResult.assigned, teleResult.assigned);
+          // Step 1→2: fill MedSurg nurses (cap 5); leftover MedSurg → TELE pool
+          const medResult  = buildMedClusters(medPool, medNurses);
+          Object.assign(newAssignments, medResult.assigned);
 
-          // Final overflow: any rooms Phase C still couldn't place (extreme acuity
-          // conflicts) go through the normal score() greedy across ALL nurses
-          const overflow = [...medResult.overflow, ...teleResult.overflow];
-          for (const room of overflow) {
+          // Step 3: fill TELE nurses (cap 4) with TELE pool + leftover MedSurg
+          const teleResult = buildTeleClusters(telePool, medResult.overflow, teleNurses);
+          Object.assign(newAssignments, teleResult.assigned);
+
+          // Final safety net: anything buildTeleClusters couldn't place → score() greedy
+          for (const room of teleResult.overflow) {
             let best = null, bestScore = Infinity;
             for (const state of Object.values(ns)) {
               const s = score(state, room);
