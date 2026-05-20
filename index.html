@@ -2587,28 +2587,33 @@ function App() {
           }
 
           // ── Phase C: mixed-type fallback ─────────────────────────────────
-          // If rooms still remain after Phases A+B (e.g. all dedicated nurses
-          // are at cap, or acuity conflicts blocked placement), allow any nurse
-          // to take any remaining room regardless of type. Proximity and acuity
-          // still fully enforced — we just drop the type-purity requirement.
+          // If rooms still remain after Phases A+B (dedicated nurses full or
+          // acuity-blocked), allow type mixing — but caps are still enforced
+          // per-room: a nurse with any TELE room (or taking a TELE room) is
+          // capped at 4; a pure MedSurg nurse is capped at 5.
           if (remaining.length > 0) {
             let mixProgress = true;
             while (mixProgress && remaining.length > 0) {
               mixProgress = false;
 
-              // All nurses in this type's list, round-robin
               for (const n of nurseList) {
                 const state = ns[n.id];
-                // Use overall cap (5) when mixing types
-                const mixCap = 5;
-                if (state.rooms.length >= mixCap || remaining.length === 0) continue;
+                if (remaining.length === 0) continue;
+
+                // Skip nurse only if they're at the absolute maximum (5).
+                // Per-room cap enforcement happens inside the candidate loop.
+                if (state.rooms.length >= 5) continue;
 
                 let bestIdx = -1, bestScore = Infinity;
 
                 for (let i = 0; i < remaining.length; i++) {
                   const r = remaining[i];
 
-                  // Hard limits
+                  // ── Dynamic cap: TELE involved → max 4 rooms, else max 5 ───
+                  const mixCap = (state.teleCount > 0 || r.type === 'TELE') ? 4 : 5;
+                  if (state.rooms.length >= mixCap)                      continue;
+
+                  // ── Hard acuity / capacity limits ─────────────────────────
                   if (r.highAcuity && state.haCount >= 2)                continue;
                   if (state.acuityPts + roomAcuityPts(r) > 6)           continue;
                   if (r.glucose   && state.glucoseCount   >= 2)          continue;
@@ -2617,7 +2622,7 @@ function App() {
                   const diam = clusterDiameter(projRooms);
                   if (diam >= DIAM_HARD)                                 continue;
 
-                  // Same scoring as Phase B but with a soft type-mix penalty
+                  // ── Score: same as Phase B + soft type-mix penalty ─────────
                   let s = 0;
                   s += (diam < DIAM_PEN.length ? DIAM_PEN[diam] : 450+(diam-13)*80) * fbW.diam;
                   if (state.rooms.length > 0) {
@@ -2625,14 +2630,14 @@ function App() {
                     s += minDist * 20;
                   }
                   s -= roomAcuityPts(r) * 14 * fbW.acuity;
-                  if (r.isolation && state.isolationCount >= 1)                             s += 90;
+                  if (r.isolation && state.isolationCount >= 1)                              s += 90;
                   if (state.isolationCount >= 1 && r.totalCare && state.totalCareCount >= 1) s += 70;
-                  if (r.isolation && state.totalCareCount >= 2)                             s += 70;
+                  if (r.isolation && state.totalCareCount >= 2)                              s += 70;
                   s += state.rooms.length * 4 * fbW.load;
-                  // Soft type-mix discouragement — prefer same-type rooms first
-                  const isTeleNurse = state.teleCount > state.medCount;
-                  if (isTeleNurse && r.type !== 'TELE') s += 60 * fbW.teleCluster;
-                  if (!isTeleNurse && r.type === 'TELE') s += 60 * fbW.teleCluster;
+                  // Prefer same-type rooms; penalise cross-type only softly
+                  const nurseIsTele = state.teleCount >= state.medCount && state.teleCount > 0;
+                  if (nurseIsTele  && r.type !== 'TELE') s += 60 * fbW.teleCluster;
+                  if (!nurseIsTele && r.type === 'TELE') s += 60 * fbW.teleCluster;
                   s += (Math.random() - 0.5) * 6;
 
                   if (s < bestScore) { bestScore = s; bestIdx = i; }
