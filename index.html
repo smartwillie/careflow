@@ -299,7 +299,7 @@
   .dash-tile {
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    gap: 4px; padding: 10px 6px 8px; border-radius: 9px;
+    gap: 5px; padding: 12px 10px 10px; border-radius: 9px;
     flex: 1 1 0; min-width: 0;
     background: rgba(255,255,255,0.10);
     border: 1px solid rgba(255,255,255,0.16);
@@ -1763,7 +1763,7 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
       </div>
 
       {/* ── Single row: all stats ── */}
-      <div style={{ display:'flex', gap:6, alignItems:'stretch' }}>
+      <div style={{ display:'flex', gap:10, alignItems:'stretch' }}>
         <DashTile icon="□" value={vacant}     label="Empty"      color="rgba(255,255,255,0.55)" />
         <DashTile icon="●" value={occupied}   label="Occupied"   color="#fff" />
         <DashTile icon="✓" value={assigned}   label="Assigned"   color={assigned===occupied&&occupied>0 ? '#86efac' : '#fff'}
