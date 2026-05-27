@@ -1313,6 +1313,8 @@ function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, on
   const inputRef = useRef();
 
   useEffect(() => { if (editing && inputRef.current) inputRef.current.focus(); }, [editing]);
+  // Keep local nameVal in sync when nurse.name changes externally (e.g. undo, sync)
+  useEffect(() => { if (!editing) setNameVal(nurse.name); }, [nurse.name]);
 
   const nurseRms = rooms.map(id=>allRooms[id]).filter(Boolean);
   const occ = nurseRms.filter(r=>r.occupied);
@@ -1340,10 +1342,24 @@ function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, on
         <div className="nurse-color-dot" style={{ background:nurse.color }}/>
         {editing ? (
           <input ref={inputRef} type="text" value={nameVal}
+            placeholder="Enter name…"
             onChange={e=>setNameVal(e.target.value)}
-            onBlur={()=>{ onRename(nameVal); setEditing(false); }}
-            onKeyDown={e=>{ if(e.key==='Enter'){onRename(nameVal);setEditing(false);} }}
-            style={{ flex:1, padding:'2px 6px', fontSize:13 }}
+            onBlur={()=>{
+              const v = nameVal.trim();
+              if (v) onRename(v);
+              setNameVal(v || nurse.name);
+              setEditing(false);
+            }}
+            onKeyDown={e=>{
+              if(e.key==='Enter'){
+                const v = nameVal.trim();
+                if (v) onRename(v);
+                setNameVal(v || nurse.name);
+                setEditing(false);
+              }
+              if(e.key==='Escape'){ setNameVal(nurse.name); setEditing(false); }
+            }}
+            style={{ flex:1, minWidth:90, padding:'2px 6px', fontSize:13 }}
           />
         ) : (
           <span style={{ flex:1, fontWeight:700, fontSize:15, cursor:'text', color:'var(--text-1)' }}
@@ -2829,7 +2845,30 @@ function App() {
           <div style={{ padding:'12px 12px 8px', borderBottom:'1px solid var(--border)' }}>
             <div style={{ fontSize:11, fontWeight:700, color:'var(--text-4)', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:8, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
               <span>Nursing Staff</span>
-              <span style={{ background:'var(--btn-ghost-bg)', color:'var(--btn-ghost-tx)', borderRadius:10, padding:'1px 8px', fontSize:11, fontWeight:700, letterSpacing:0 }}>{nurses.length}</span>
+              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                <span style={{ background:'var(--btn-ghost-bg)', color:'var(--btn-ghost-tx)', borderRadius:10, padding:'1px 8px', fontSize:11, fontWeight:700, letterSpacing:0 }}>{nurses.length}</span>
+                {nurses.length > 0 && (
+                  <button
+                    onClick={()=>{
+                      if(!confirm('Delete all nurses and unassign all rooms?')) return;
+                      setNurses([]);
+                      setRooms(prev=>{ const n={}; Object.keys(prev).forEach(id=>{ n[id]={...prev[id],nurseId:null}; }); return n; });
+                      setLockedNurses(new Set());
+                    }}
+                    title="Delete all nurses and unassign all rooms"
+                    style={{
+                      background:'rgba(239,68,68,0.15)', border:'1px solid rgba(239,68,68,0.45)',
+                      color:'#fca5a5', borderRadius:7, padding:'3px 10px', fontSize:11, fontWeight:700,
+                      cursor:'pointer', display:'flex', alignItems:'center', gap:4,
+                      transition:'background 0.15s, border-color 0.15s, box-shadow 0.15s',
+                      boxShadow:'0 1px 3px rgba(0,0,0,0.25)',
+                      letterSpacing:'0.02em',
+                    }}
+                    onMouseEnter={e=>{ e.currentTarget.style.background='rgba(239,68,68,0.30)'; e.currentTarget.style.borderColor='rgba(239,68,68,0.7)'; e.currentTarget.style.boxShadow='0 0 0 2px rgba(239,68,68,0.20)'; }}
+                    onMouseLeave={e=>{ e.currentTarget.style.background='rgba(239,68,68,0.15)'; e.currentTarget.style.borderColor='rgba(239,68,68,0.45)'; e.currentTarget.style.boxShadow='0 1px 3px rgba(0,0,0,0.25)'; }}
+                  >🗑 Clear All</button>
+                )}
+              </div>
             </div>
             <div style={{ display:'flex', gap:6 }}>
               <input type="text" placeholder="Add nurse name…" value={newNurseName}
