@@ -722,7 +722,8 @@ function initRooms() {
                 foley: false, drip: false, prisoner: false, totalCare: false,
                 glucose: false, highAcuity: false, sitter: false,
                 discharge: false, isolation: false,
-                restraint: false, centralLine: false, nurseId: null };
+                restraint: false, centralLine: false,
+                chestTube: false, drain: false, nurseId: null };
     return acc;
   }, {});
 }
@@ -743,6 +744,8 @@ const FLAG_DEFS = [
   { key:'isolation',   label:'☣',   bg:'#c2410c', tc:'#fff' },
   { key:'restraint',   label:'RST', bg:'#7f1d1d', tc:'#fca5a5' },
   { key:'centralLine', label:'CVL', bg:'#1e3a5f', tc:'#93c5fd' },
+  { key:'chestTube',   label:'CT',  bg:'#134e4a', tc:'#99f6e4', glow:'#2dd4bf' },
+  { key:'drain',       label:'DR',  bg:'#3b0764', tc:'#e9d5ff' },
 ];
 
 const STORAGE_KEY = 'careflow_assignment';
@@ -778,6 +781,8 @@ function checkAssignment(nurseId, roomIds, allRooms) {
   if (cnt('prisoner')   > 2) return 'Exceeds 2 prisoner patients';
   if (cnt('highAcuity') > 2) return 'Exceeds 2 high-acuity patients';
   if (cnt('drip')       > 2) return 'Exceeds 2 infusion-drip patients';
+  if (cnt('chestTube')  > 1) return 'Exceeds 1 chest-tube patient';
+  if (cnt('drain')      > 2) return 'Exceeds 2 drain patients';
   return null;
 }
 
@@ -1068,6 +1073,8 @@ function PatientModal({ room, onClose, onSave }) {
           <Toggle on={s.isolation}   onChange={v=>set('isolation',v)}   label="Isolation"       color="#f97316"/>
           <Toggle on={s.restraint}   onChange={v=>set('restraint',v)}   label="Restraint"       color="#dc2626"/>
           <Toggle on={s.centralLine} onChange={v=>set('centralLine',v)} label="Central Line"    color="#3b82f6"/>
+          <Toggle on={s.chestTube}  onChange={v=>set('chestTube',v)}  label="Chest Tube"      color="#0d9488"/>
+          <Toggle on={s.drain}      onChange={v=>set('drain',v)}      label="Drain"            color="#9333ea"/>
         </>)}
 
         <div style={{ display:'flex', gap:8, marginTop:16, justifyContent:'flex-end' }}>
@@ -2335,7 +2342,8 @@ function App() {
 
         // ── Acuity point value per room ──────────────────────────────────
         function roomAcuityPts(r) {
-          return (r.highAcuity ? 2 : 0) + (r.isolation ? 2 : 0) + (r.totalCare ? 2 : 0);
+          return (r.highAcuity ? 2 : 0) + (r.isolation ? 2 : 0) + (r.totalCare ? 2 : 0)
+               + (r.chestTube ? 2 : 0) + (r.drain ? 1 : 0);
         }
 
         // Nurse state: locked nurses seed with their preserved rooms;
@@ -2358,6 +2366,8 @@ function App() {
             totalCareCount: existing.filter(id => resetRooms[id]?.totalCare).length,
             glucoseCount:   existing.filter(id => resetRooms[id]?.glucose).length,
             dripCount:      existing.filter(id => resetRooms[id]?.drip).length,
+            chestTubeCount: existing.filter(id => resetRooms[id]?.chestTube).length,
+            drainCount:     existing.filter(id => resetRooms[id]?.drain).length,
           };
         });
 
@@ -2501,6 +2511,8 @@ function App() {
           if (room.totalCare)  state.totalCareCount++;
           if (room.glucose)    state.glucoseCount++;
           if (room.drip)       state.dripCount++;
+          if (room.chestTube)  state.chestTubeCount++;
+          if (room.drain)      state.drainCount++;
         }
 
         // ── ECO shared helpers ───────────────────────────────────────────────
@@ -2512,6 +2524,8 @@ function App() {
           if (r.totalCare  && state.totalCareCount  >= 2) return false;
           if (r.drip       && state.dripCount       >= 2) return false;
           if (r.isolation  && state.isolationCount  >= 2) return false;
+          if (r.chestTube  && state.chestTubeCount  >= 1) return false;
+          if (r.drain      && state.drainCount      >= 2) return false;
           return true;
         }
         // Proximity + acuity score for one candidate room (lower = better).
@@ -2658,7 +2672,7 @@ function App() {
           //   Step 2: any leftover MedSurg rooms fold into TELE pool → TELE nurses (cap 4)
           //   Step 3: anything still unassigned → normal score() greedy across all nurses
 
-          const acuityKey = r => (r.isolation?4:0)+(r.highAcuity?3:0)+(r.totalCare?2:0);
+          const acuityKey = r => (r.isolation?4:0)+(r.highAcuity?3:0)+(r.chestTube?3:0)+(r.totalCare?2:0)+(r.drain?1:0);
 
           const telePool = unassigned
             .filter(r => r.type === 'TELE')
@@ -2770,7 +2784,8 @@ function App() {
           nurseId: null,
           foley: false, drip: false, prisoner: false, totalCare: false,
           glucose: false, highAcuity: false, sitter: false,
-          discharge: false, isolation: false, restraint: false, centralLine: false }
+          discharge: false, isolation: false, restraint: false, centralLine: false,
+          chestTube: false, drain: false }
       : updated;
     setRooms(prev => ({ ...prev, [updated.id]: finalRoom }));
     if (becomingVacant) {
@@ -2826,7 +2841,7 @@ function App() {
                 next[id]={...prev[id], occupied:true, gender:'female', type:'TELE',
                   foley:false, drip:false, prisoner:false, totalCare:false, glucose:false, highAcuity:false,
                   sitter:false, discharge:false, isolation:false,
-                  restraint:false, centralLine:false, nurseId:null};
+                  restraint:false, centralLine:false, chestTube:false, drain:false, nurseId:null};
               });
               return next;
             });
