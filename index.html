@@ -1815,7 +1815,7 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
           color={unassigned>0 ? '#fbbf24' : '#fff'}
           accentColor={unassigned>0 ? '#fbbf24' : undefined}
           onClick={onUnassignedClick} active={unassignedOpen} btnRef={unassignedBtnRef} />
-        <DashTile icon="♥" value={tele}        label="TELE"      color={tele>0 ? '#f87171' : '#fff'} accentColor={tele>0 ? '#f87171' : undefined} />
+        <DashTile icon="♥" value={tele}        label="TELE"      color="#fff" />
         <DashTile icon="👁" value={sitter}      label="Sitter"    color={sitter>0 ? '#c4b5fd' : '#fff'} accentColor={sitter>0 ? '#c4b5fd' : undefined}
           onClick={()=>toggleStatPopup('sitter',sitterRef)} active={statPopup?.key==='sitter'} btnRef={sitterRef} />
         <DashTile icon="🚪" value={discharge}   label="Discharge" color={discharge>0 ? '#7dd3fc' : '#fff'} accentColor={discharge>0 ? '#7dd3fc' : undefined}
