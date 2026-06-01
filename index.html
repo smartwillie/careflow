@@ -2178,17 +2178,33 @@ function PolicySearchModal({ onClose }) {
   const inputRef = useRef();
   useEffect(() => { setTimeout(() => inputRef.current?.focus(), 80); }, []);
 
+  // Shared drawer shell — right-side panel taking half the room display
+  // room-panel = 100vw - 400px (nurse panel), so half = calc(50vw - 200px)
+  const DRAWER_W = 'calc(50vw - 200px)';
+  const DRAWER_MIN = 360;
+  function Drawer({ children }) {
+    return (
+      <>
+        <div style={{position:'fixed',inset:0,zIndex:299,background:'rgba(0,0,0,0.25)'}} onClick={onClose}/>
+        <div style={{position:'fixed',right:0,top:0,bottom:0,zIndex:300,
+          width:DRAWER_W,minWidth:DRAWER_MIN,
+          background:'var(--bg-panel)',borderLeft:'1px solid var(--border)',
+          display:'flex',flexDirection:'column',padding:'20px 20px 16px',
+          boxShadow:'-10px 0 40px rgba(0,0,0,0.45)'}}>
+          {children}
+        </div>
+      </>
+    );
+  }
+
   function doSearch(q) { setResults(q.trim() ? searchPolicies(q, policies) : []); }
-
   function persistPolicies(next) { setPolicies(next); savePoliciesLS(next); }
-
   function openPolicy(p) { setViewing(p); setView('read'); }
   function startEdit(p)  { setEditing({...p}); setView('edit'); }
   function startAdd()    {
     setEditing({ id:'', title:'', category:'Other', keywords:[], content:'', source:'manual', lastUpdated: policyToday(), _isNew: true });
     setView('edit');
   }
-
   function saveEdit() {
     const p = { ...editing, lastUpdated: policyToday() };
     if (!p.id) p.id = p.title.toLowerCase().replace(/[^a-z0-9]/g,'_').slice(0,40);
@@ -2199,7 +2215,6 @@ function PolicySearchModal({ onClose }) {
     setViewing(p); setView('read');
     if (query) setResults(searchPolicies(query, next));
   }
-
   function deletePolicy(p) {
     if (!confirm(`Delete "${p.title}"?`)) return;
     const next = policies.filter(x => !(x.id === p.id && x.title === p.title));
@@ -2207,183 +2222,177 @@ function PolicySearchModal({ onClose }) {
     setView('search'); setEditing(null);
     if (query) setResults(searchPolicies(query, next));
   }
-
   function resetToDefault() {
     if (!confirm('Reset all policies to the built-in defaults? Your edits will be lost.')) return;
     persistPolicies(POLICY_DB_DEFAULT);
     setView('search'); setResults([]); setQuery('');
   }
 
+  // ── Read view ──
   if (view === 'read' && viewing) return (
-    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal" style={{maxWidth:620,maxHeight:'85vh',display:'flex',flexDirection:'column'}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
-          <div style={{display:'flex',alignItems:'center',gap:10}}>
-            <button className="btn btn-ghost" style={{fontSize:12,padding:'4px 10px'}} onClick={()=>setView('search')}>← Back</button>
-            <span style={{fontSize:10,background:'rgba(59,130,246,0.2)',color:'#93c5fd',borderRadius:4,padding:'2px 8px',fontWeight:600}}>{viewing.category}</span>
-          </div>
-          <div style={{display:'flex',gap:6}}>
-            <button className="btn btn-ghost" style={{fontSize:12}} onClick={()=>startEdit(viewing)}>✏ Edit</button>
-            <button className="btn btn-ghost" onClick={onClose}>✕</button>
-          </div>
+    <Drawer>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:12}}>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <button className="btn btn-ghost" style={{fontSize:12,padding:'4px 10px'}} onClick={()=>setView('search')}>← Back</button>
+          <span style={{fontSize:10,background:'rgba(59,130,246,0.2)',color:'#93c5fd',borderRadius:4,padding:'2px 8px',fontWeight:600,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:160}}>{viewing.category}</span>
         </div>
-        <h2 style={{margin:'0 0 4px',fontSize:17,fontWeight:800,color:'var(--text-1)'}}>{viewing.title}</h2>
-        <div style={{fontSize:10,color:'var(--text-4)',marginBottom:14}}>Updated {viewing.lastUpdated} · {viewing.source}</div>
-        <div style={{overflowY:'auto',flex:1,fontSize:13,color:'var(--text-2)',lineHeight:1.75,whiteSpace:'pre-wrap',wordBreak:'break-word',
-          background:'rgba(0,0,0,0.2)',borderRadius:10,padding:'14px 16px',border:'1px solid rgba(255,255,255,0.07)'}}>
-          {viewing.content || <span style={{color:'var(--text-4)',fontStyle:'italic'}}>No content — click Edit to add.</span>}
-        </div>
-      </div>
-    </div>
-  );
-
-  if (view === 'edit' && editing) return (
-    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal" style={{maxWidth:580,maxHeight:'90vh',display:'flex',flexDirection:'column'}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
-          <h2 style={{margin:0,fontSize:16,fontWeight:700,color:'var(--text-1)'}}>{editing._isNew?'+ New Policy':'✏ Edit Policy'}</h2>
+        <div style={{display:'flex',gap:6,flexShrink:0}}>
+          <button className="btn btn-ghost" style={{fontSize:12}} onClick={()=>startEdit(viewing)}>✏ Edit</button>
           <button className="btn btn-ghost" onClick={onClose}>✕</button>
         </div>
-        <div style={{display:'flex',flexDirection:'column',gap:10,overflowY:'auto',flex:1}}>
-          {[['Title','title'],['Source / reference','source']].map(([lbl,key])=>(
-            <label key={key} style={{display:'flex',flexDirection:'column',gap:4}}>
-              <span style={{fontSize:11,color:'var(--text-3)',fontWeight:600}}>{lbl}</span>
-              <input value={editing[key]||''} onChange={e=>setEditing(p=>({...p,[key]:e.target.value}))}
-                style={{padding:'8px 12px',borderRadius:8,border:'1px solid rgba(255,255,255,0.15)',background:'rgba(255,255,255,0.06)',color:'var(--text-1)',fontSize:13}}/>
-            </label>
-          ))}
-          <label style={{display:'flex',flexDirection:'column',gap:4}}>
-            <span style={{fontSize:11,color:'var(--text-3)',fontWeight:600}}>Category</span>
-            <select value={editing.category||'Other'} onChange={e=>setEditing(p=>({...p,category:e.target.value}))}
-              style={{padding:'8px 12px',borderRadius:8,border:'1px solid rgba(255,255,255,0.15)',background:'rgba(30,30,42,1)',color:'var(--text-1)',fontSize:13}}>
-              {POLICY_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
-            </select>
-          </label>
-          <label style={{display:'flex',flexDirection:'column',gap:4}}>
-            <span style={{fontSize:11,color:'var(--text-3)',fontWeight:600}}>Keywords <span style={{fontWeight:400,opacity:.6}}>(comma-separated)</span></span>
-            <input value={Array.isArray(editing.keywords)?editing.keywords.join(', '):editing.keywords||''}
-              onChange={e=>setEditing(p=>({...p,keywords:e.target.value}))}
+      </div>
+      <h2 style={{margin:'0 0 4px',fontSize:16,fontWeight:800,color:'var(--text-1)',lineHeight:1.3}}>{viewing.title}</h2>
+      <div style={{fontSize:10,color:'var(--text-4)',marginBottom:12}}>Updated {viewing.lastUpdated} · {viewing.source}</div>
+      <div style={{overflowY:'auto',flex:1,fontSize:13,color:'var(--text-2)',lineHeight:1.75,whiteSpace:'pre-wrap',wordBreak:'break-word',
+        background:'rgba(0,0,0,0.2)',borderRadius:10,padding:'14px 16px',border:'1px solid rgba(255,255,255,0.07)'}}>
+        {viewing.content || <span style={{color:'var(--text-4)',fontStyle:'italic'}}>No content — click Edit to add.</span>}
+      </div>
+    </Drawer>
+  );
+
+  // ── Edit view ──
+  if (view === 'edit' && editing) return (
+    <Drawer>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+        <h2 style={{margin:0,fontSize:16,fontWeight:700,color:'var(--text-1)'}}>{editing._isNew?'+ New Policy':'✏ Edit Policy'}</h2>
+        <button className="btn btn-ghost" onClick={onClose}>✕</button>
+      </div>
+      <div style={{display:'flex',flexDirection:'column',gap:10,overflowY:'auto',flex:1}}>
+        {[['Title','title'],['Source / reference','source']].map(([lbl,key])=>(
+          <label key={key} style={{display:'flex',flexDirection:'column',gap:4}}>
+            <span style={{fontSize:11,color:'var(--text-3)',fontWeight:600}}>{lbl}</span>
+            <input value={editing[key]||''} onChange={e=>setEditing(p=>({...p,[key]:e.target.value}))}
               style={{padding:'8px 12px',borderRadius:8,border:'1px solid rgba(255,255,255,0.15)',background:'rgba(255,255,255,0.06)',color:'var(--text-1)',fontSize:13}}/>
           </label>
-          <label style={{display:'flex',flexDirection:'column',gap:4,flex:1}}>
-            <span style={{fontSize:11,color:'var(--text-3)',fontWeight:600}}>Content</span>
-            <textarea value={editing.content||''} onChange={e=>setEditing(p=>({...p,content:e.target.value}))}
-              rows={10} style={{padding:'10px 12px',borderRadius:8,border:'1px solid rgba(255,255,255,0.15)',
-              background:'rgba(255,255,255,0.06)',color:'var(--text-1)',fontSize:12,lineHeight:1.6,resize:'vertical',fontFamily:'inherit'}}/>
-          </label>
-        </div>
-        <div style={{display:'flex',justifyContent:'space-between',marginTop:14,paddingTop:12,borderTop:'1px solid rgba(255,255,255,0.08)'}}>
-          {!editing._isNew
-            ? <button className="btn btn-ghost" style={{color:'#f87171',borderColor:'rgba(248,113,113,0.3)'}} onClick={()=>deletePolicy(editing)}>🗑 Delete</button>
-            : <div/>}
-          <div style={{display:'flex',gap:8}}>
-            <button className="btn btn-ghost" onClick={()=>setView(editing._isNew?'search':'read')}>Cancel</button>
-            <button className="btn btn-primary" onClick={saveEdit}>Save</button>
-          </div>
+        ))}
+        <label style={{display:'flex',flexDirection:'column',gap:4}}>
+          <span style={{fontSize:11,color:'var(--text-3)',fontWeight:600}}>Category</span>
+          <select value={editing.category||'Other'} onChange={e=>setEditing(p=>({...p,category:e.target.value}))}
+            style={{padding:'8px 12px',borderRadius:8,border:'1px solid rgba(255,255,255,0.15)',background:'rgba(30,30,42,1)',color:'var(--text-1)',fontSize:13}}>
+            {POLICY_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
+          </select>
+        </label>
+        <label style={{display:'flex',flexDirection:'column',gap:4}}>
+          <span style={{fontSize:11,color:'var(--text-3)',fontWeight:600}}>Keywords <span style={{fontWeight:400,opacity:.6}}>(comma-separated)</span></span>
+          <input value={Array.isArray(editing.keywords)?editing.keywords.join(', '):editing.keywords||''}
+            onChange={e=>setEditing(p=>({...p,keywords:e.target.value}))}
+            style={{padding:'8px 12px',borderRadius:8,border:'1px solid rgba(255,255,255,0.15)',background:'rgba(255,255,255,0.06)',color:'var(--text-1)',fontSize:13}}/>
+        </label>
+        <label style={{display:'flex',flexDirection:'column',gap:4,flex:1}}>
+          <span style={{fontSize:11,color:'var(--text-3)',fontWeight:600}}>Content</span>
+          <textarea value={editing.content||''} onChange={e=>setEditing(p=>({...p,content:e.target.value}))}
+            rows={10} style={{padding:'10px 12px',borderRadius:8,border:'1px solid rgba(255,255,255,0.15)',
+            background:'rgba(255,255,255,0.06)',color:'var(--text-1)',fontSize:12,lineHeight:1.6,resize:'vertical',fontFamily:'inherit'}}/>
+        </label>
+      </div>
+      <div style={{display:'flex',justifyContent:'space-between',marginTop:14,paddingTop:12,borderTop:'1px solid rgba(255,255,255,0.08)'}}>
+        {!editing._isNew
+          ? <button className="btn btn-ghost" style={{color:'#f87171',borderColor:'rgba(248,113,113,0.3)'}} onClick={()=>deletePolicy(editing)}>🗑 Delete</button>
+          : <div/>}
+        <div style={{display:'flex',gap:8}}>
+          <button className="btn btn-ghost" onClick={()=>setView(editing._isNew?'search':'read')}>Cancel</button>
+          <button className="btn btn-primary" onClick={saveEdit}>Save</button>
         </div>
       </div>
-    </div>
+    </Drawer>
   );
 
+  // ── Manage view ──
   if (view === 'manage') return (
-    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal" style={{maxWidth:560,maxHeight:'85vh',display:'flex',flexDirection:'column'}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
-          <div style={{display:'flex',alignItems:'center',gap:10}}>
-            <button className="btn btn-ghost" style={{fontSize:12,padding:'4px 10px'}} onClick={()=>setView('search')}>← Back</button>
-            <h2 style={{margin:0,fontSize:16,fontWeight:700,color:'var(--text-1)'}}>Manage Policies</h2>
+    <Drawer>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <button className="btn btn-ghost" style={{fontSize:12,padding:'4px 10px'}} onClick={()=>setView('search')}>← Back</button>
+          <h2 style={{margin:0,fontSize:16,fontWeight:700,color:'var(--text-1)'}}>Manage Policies</h2>
+        </div>
+        <button className="btn btn-ghost" onClick={onClose}>✕</button>
+      </div>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
+        <span style={{fontSize:12,color:'var(--text-4)'}}>{policies.length} policies</span>
+        <div style={{display:'flex',gap:8}}>
+          <button className="btn btn-ghost" style={{fontSize:11,color:'#fbbf24'}} onClick={resetToDefault}>↺ Reset</button>
+          <button className="btn btn-primary" style={{fontSize:12}} onClick={startAdd}>+ Add</button>
+        </div>
+      </div>
+      <div style={{overflowY:'auto',flex:1,display:'flex',flexDirection:'column',gap:5}}>
+        {[...policies].sort((a,b)=>a.category.localeCompare(b.category)||a.title.localeCompare(b.title)).map((p,i)=>(
+          <div key={i} style={{display:'flex',alignItems:'center',gap:8,padding:'7px 12px',
+            borderRadius:8,background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.07)'}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontSize:12,fontWeight:700,color:'var(--text-1)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.title}</div>
+              <div style={{fontSize:10,color:'var(--text-4)'}}>{p.category}</div>
+            </div>
+            <button className="btn btn-ghost" style={{fontSize:11,padding:'3px 10px',flexShrink:0}} onClick={()=>startEdit(p)}>Edit</button>
           </div>
+        ))}
+      </div>
+    </Drawer>
+  );
+
+  // ── Search view (default) ──
+  return (
+    <Drawer>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+        <h2 style={{margin:0,fontSize:16,fontWeight:800,color:'var(--text-1)'}}>🐒 Policy Search</h2>
+        <div style={{display:'flex',gap:8}}>
+          <button className="btn btn-ghost" style={{fontSize:11}} onClick={()=>setView('manage')}>⚙ Manage</button>
           <button className="btn btn-ghost" onClick={onClose}>✕</button>
         </div>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:10}}>
-          <span style={{fontSize:12,color:'var(--text-4)'}}>{policies.length} policies</span>
-          <div style={{display:'flex',gap:8}}>
-            <button className="btn btn-ghost" style={{fontSize:11,color:'#fbbf24'}} onClick={resetToDefault}>↺ Reset</button>
-            <button className="btn btn-primary" style={{fontSize:12}} onClick={startAdd}>+ Add Policy</button>
+      </div>
+      <div style={{position:'relative',marginBottom:12}}>
+        <span style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',fontSize:14,pointerEvents:'none',opacity:.5}}>🔍</span>
+        <input ref={inputRef} type="text"
+          placeholder={`Search ${policies.length} policies…`}
+          value={query}
+          onChange={e=>{ setQuery(e.target.value); doSearch(e.target.value); }}
+          onKeyDown={e=>{ if(e.key==='Escape') onClose(); }}
+          style={{width:'100%',boxSizing:'border-box',padding:'10px 14px 10px 34px',borderRadius:10,
+            border:'1px solid rgba(255,255,255,0.18)',background:'rgba(255,255,255,0.07)',
+            color:'var(--text-1)',fontSize:13,outline:'none'}}
+        />
+      </div>
+      {!query && (
+        <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',color:'var(--text-4)',gap:10,paddingBottom:20}}>
+          <div style={{fontSize:36}}>🐒</div>
+          <div style={{fontSize:13,fontWeight:700,color:'var(--text-2)'}}>Policy Monkey is ready!</div>
+          <div style={{fontSize:11,textAlign:'center',lineHeight:1.8,maxWidth:300,opacity:.8}}>
+            Type to search <strong style={{color:'var(--text-2)'}}>{policies.length}</strong> unit policies.<br/>
+            fall · transfusion · c.diff · central line · MEWS
           </div>
         </div>
+      )}
+      {query && results.length === 0 && (
+        <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',color:'var(--text-4)',gap:8}}>
+          <div style={{fontSize:28}}>🙈</div>
+          <div style={{fontSize:12}}>No match for <strong style={{color:'var(--text-2)'}}>{query}</strong></div>
+          <button className="btn btn-ghost" style={{fontSize:11,marginTop:6}} onClick={startAdd}>+ Add policy</button>
+        </div>
+      )}
+      {results.length > 0 && (
         <div style={{overflowY:'auto',flex:1,display:'flex',flexDirection:'column',gap:5}}>
-          {[...policies].sort((a,b)=>a.category.localeCompare(b.category)||a.title.localeCompare(b.title)).map((p,i)=>(
-            <div key={i} style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',
-              borderRadius:8,background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.07)'}}>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:12,fontWeight:700,color:'var(--text-1)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.title}</div>
-                <div style={{fontSize:10,color:'var(--text-4)'}}>{p.category}</div>
+          <div style={{fontSize:10,color:'var(--text-4)',marginBottom:2}}>{results.length} result{results.length!==1?'s':''} for "{query}"</div>
+          {results.map((p,i)=>(
+            <button key={i} onClick={()=>openPolicy(p)}
+              style={{textAlign:'left',padding:'9px 12px',borderRadius:9,cursor:'pointer',
+                background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.09)',
+                color:'inherit',transition:'all 0.12s',display:'block',width:'100%'}}
+              onMouseEnter={e=>{e.currentTarget.style.background='rgba(255,255,255,0.09)';e.currentTarget.style.borderColor='rgba(255,255,255,0.22)';}}
+              onMouseLeave={e=>{e.currentTarget.style.background='rgba(255,255,255,0.04)';e.currentTarget.style.borderColor='rgba(255,255,255,0.09)';}}
+            >
+              <div style={{display:'flex',alignItems:'center',gap:7,marginBottom:3}}>
+                <span style={{fontSize:12,fontWeight:700,color:'var(--text-1)',flex:1,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.title}</span>
+                <span style={{fontSize:9,background:'rgba(59,130,246,0.18)',color:'#93c5fd',borderRadius:4,padding:'2px 6px',fontWeight:600,flexShrink:0,whiteSpace:'nowrap'}}>{p.category}</span>
               </div>
-              <button className="btn btn-ghost" style={{fontSize:11,padding:'3px 10px',flexShrink:0}} onClick={()=>startEdit(p)}>Edit</button>
-            </div>
+              {p.content && (
+                <div style={{fontSize:11,color:'var(--text-3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                  {p.content.slice(0,120)}
+                </div>
+              )}
+            </button>
           ))}
         </div>
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
-      <div className="modal" style={{maxWidth:560,maxHeight:'85vh',display:'flex',flexDirection:'column'}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
-          <h2 style={{margin:0,fontSize:17,fontWeight:800,color:'var(--text-1)'}}>🐒 Policy Search</h2>
-          <div style={{display:'flex',gap:8}}>
-            <button className="btn btn-ghost" style={{fontSize:11}} onClick={()=>setView('manage')}>⚙ Manage</button>
-            <button className="btn btn-ghost" onClick={onClose}>✕</button>
-          </div>
-        </div>
-        <div style={{position:'relative',marginBottom:14}}>
-          <span style={{position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',fontSize:15,pointerEvents:'none',opacity:.6}}>🔍</span>
-          <input ref={inputRef} type="text"
-            placeholder={`Search ${policies.length} policies… fall, c.diff, transfusion, MEWS…`}
-            value={query}
-            onChange={e=>{ setQuery(e.target.value); doSearch(e.target.value); }}
-            onKeyDown={e=>{ if(e.key==='Escape') onClose(); }}
-            style={{width:'100%',boxSizing:'border-box',padding:'11px 14px 11px 36px',borderRadius:10,
-              border:'1px solid rgba(255,255,255,0.18)',background:'rgba(255,255,255,0.07)',
-              color:'var(--text-1)',fontSize:14,outline:'none'}}
-          />
-        </div>
-        {!query && (
-          <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
-            color:'var(--text-4)',gap:10,paddingBottom:24}}>
-            <div style={{fontSize:40}}>🐒</div>
-            <div style={{fontSize:14,fontWeight:700,color:'var(--text-2)'}}>Your Policy Monkey is ready!</div>
-            <div style={{fontSize:12,textAlign:'center',lineHeight:1.8,maxWidth:360}}>
-              Type any keyword to search <strong style={{color:'var(--text-2)'}}>{policies.length}</strong> unit policies.<br/>
-              <span style={{opacity:.7}}>Try: fall · blood transfusion · c.diff · central line · MEWS · bladder</span>
-            </div>
-          </div>
-        )}
-        {query && results.length === 0 && (
-          <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',color:'var(--text-4)',gap:8}}>
-            <div style={{fontSize:30}}>🙈</div>
-            <div style={{fontSize:13}}>No match for <strong style={{color:'var(--text-2)'}}>{query}</strong></div>
-            <button className="btn btn-ghost" style={{fontSize:11,marginTop:6}} onClick={startAdd}>+ Add a new policy</button>
-          </div>
-        )}
-        {results.length > 0 && (
-          <div style={{overflowY:'auto',flex:1,display:'flex',flexDirection:'column',gap:6}}>
-            <div style={{fontSize:11,color:'var(--text-4)',marginBottom:2}}>{results.length} result{results.length!==1?'s':''} for "{query}"</div>
-            {results.map((p,i)=>(
-              <button key={i} onClick={()=>openPolicy(p)}
-                style={{textAlign:'left',padding:'10px 14px',borderRadius:10,cursor:'pointer',
-                  background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.09)',
-                  color:'inherit',transition:'all 0.12s',display:'block',width:'100%'}}
-                onMouseEnter={e=>{e.currentTarget.style.background='rgba(255,255,255,0.09)';e.currentTarget.style.borderColor='rgba(255,255,255,0.22)';}}
-                onMouseLeave={e=>{e.currentTarget.style.background='rgba(255,255,255,0.04)';e.currentTarget.style.borderColor='rgba(255,255,255,0.09)';}}
-              >
-                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:3}}>
-                  <span style={{fontSize:13,fontWeight:700,color:'var(--text-1)',flex:1,minWidth:0,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.title}</span>
-                  <span style={{fontSize:10,background:'rgba(59,130,246,0.18)',color:'#93c5fd',borderRadius:4,padding:'2px 7px',fontWeight:600,flexShrink:0,whiteSpace:'nowrap'}}>{p.category}</span>
-                </div>
-                {p.content && (
-                  <div style={{fontSize:11,color:'var(--text-3)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                    {p.content.slice(0,130)}
-                  </div>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+      )}
+    </Drawer>
   );
 }
 
