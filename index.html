@@ -101,7 +101,7 @@
     color: var(--text-1);
     transition: background 0.25s, color 0.25s;
   }
-  .nurse-panel { width: 400px; min-width: 320px; flex-shrink: 0; }
+  .nurse-panel { width: 25vw; min-width: 320px; flex-shrink: 0; }
   .room-panel  { flex: 1; position: relative; overflow: visible; }
   .corridor-container { position: relative; width: 100%; height: 100%; }
 
@@ -2180,7 +2180,7 @@ function PolicySearchModal({ onClose }) {
 
   // Shared drawer shell — right-side panel taking half the room display
   // room-panel = 100vw - 400px (nurse panel), so half = calc(50vw - 200px)
-  const DRAWER_W = 'calc(50vw - 200px)';
+  const DRAWER_W = 'calc(37.5vw)'; // half of room panel (75vw)
   const DRAWER_MIN = 360;
   function Drawer({ children }) {
     return (
