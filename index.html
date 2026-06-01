@@ -338,24 +338,73 @@
     background: linear-gradient(to top, rgba(255,255,255,0.07) 0%, transparent 100%);
     pointer-events: none;
   }
-  /* Layer 1: walks left → right, then right → left */
+  /*
+   * 18s cycle (linear, no alternate):
+   *   0s  –  3s  (0%–16.67%)  : walk left → midpoint
+   *   3s  –  6s  (16.67%–33.33%) : pause at midpoint   ← speech bubble
+   *   6s  –  9s  (33.33%–50%)  : walk midpoint → right
+   *   9s  – 12s  (50%–66.67%) : walk right → midpoint
+   *  12s  – 15s  (66.67%–83.33%) : pause at midpoint   ← speech bubble
+   *  15s  – 18s  (83.33%–100%) : walk midpoint → left
+   */
+
+  /* Layer 1: the whole group slides horizontally */
   .rabbit-runner {
     position: absolute;
     bottom: 6px;
     left: -70px;
+    cursor: pointer;
+    pointer-events: auto;
+    animation: monkey-walk 18s linear infinite;
+  }
+
+  /* Inner wrapper for position relative (bubble anchor) */
+  .monkey-group {
+    position: relative;
     display: flex;
     align-items: flex-end;
     gap: 2px;
-    animation: monkey-walk 6s linear infinite alternate;
   }
-  /* Layer 2: flips at turnaround. Cycle = 12s */
+
+  /* Speech bubble */
+  .monkey-bubble {
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%) scale(0.6);
+    background: #fff;
+    color: #1e293b;
+    border-radius: 14px;
+    padding: 5px 11px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.35);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 20;
+    animation: bubble-show 18s linear infinite;
+    transform-origin: bottom center;
+  }
+  .monkey-bubble::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 7px solid transparent;
+    border-top-color: #fff;
+  }
+
+  /* Layer 2: flips direction — 18s, instant snap at 50% */
   .rabbit-flip {
-    animation: monkey-flip 12s step-end infinite;
+    animation: monkey-flip 18s step-end infinite;
     display: flex;
     align-items: flex-end;
     gap: 3px;
   }
-  /* Monkey body — walks with a body-bob */
+
+  /* Monkey body — walk bob */
   .rabbit-emoji {
     display: inline-block;
     font-size: 32px;
@@ -364,7 +413,8 @@
     animation: monkey-body 0.45s ease-in-out infinite;
     filter: drop-shadow(0 0 3px rgba(0,0,0,0.5));
   }
-  /* Banana — swings like a held arm */
+
+  /* Banana — swings as held arm */
   .monkey-banana {
     display: inline-block;
     font-size: 20px;
@@ -373,28 +423,53 @@
     animation: banana-swing 0.45s ease-in-out infinite;
     margin-bottom: 4px;
   }
-  /* Ground shadow under monkey */
+
+  /* Ground shadow */
   .monkey-shadow {
     position: absolute;
     bottom: -2px;
     left: 50%;
-    transform: translateX(-50%);
     width: 36px;
     height: 6px;
     background: rgba(0,0,0,0.25);
     border-radius: 50%;
     animation: shadow-pulse 0.45s ease-in-out infinite;
   }
+
+  /* ── Keyframes ── */
+
+  /* Position: walk → pause → walk → walk → pause → walk */
   @keyframes monkey-walk {
-    from { left: -70px; }
-    to   { left: calc(100% + 50px); }
+    0%       { left: -70px; }
+    16.67%   { left: calc(50% - 25px); }   /* arrive mid going right */
+    33.33%   { left: calc(50% - 25px); }   /* still mid (3s pause) */
+    50%      { left: calc(100% + 60px); }  /* arrive far right */
+    66.67%   { left: calc(50% - 25px); }   /* arrive mid going left */
+    83.33%   { left: calc(50% - 25px); }   /* still mid (3s pause) */
+    100%     { left: -70px; }              /* arrive far left */
   }
+
+  /* Flip at exactly the turnaround (50%) — step-end snaps instantly */
   @keyframes monkey-flip {
-    0%   { transform: scaleX(1);  }  /* facing right */
-    50%  { transform: scaleX(-1); }  /* facing left  */
+    0%   { transform: scaleX(1);  }   /* going right */
+    50%  { transform: scaleX(-1); }   /* going left  */
     100% { transform: scaleX(1);  }
   }
-  /* Walk cycle: bob up on each step */
+
+  /* Speech bubble: fade in during each 3s pause, fade out after */
+  @keyframes bubble-show {
+    0%,  14%  { opacity: 0; transform: translateX(-50%) scale(0.6); }
+    19%       { opacity: 1; transform: translateX(-50%) scale(1);   }
+    31%       { opacity: 1; transform: translateX(-50%) scale(1);   }
+    35%       { opacity: 0; transform: translateX(-50%) scale(0.6); }
+    64%       { opacity: 0; transform: translateX(-50%) scale(0.6); }
+    69%       { opacity: 1; transform: translateX(-50%) scale(1);   }
+    81%       { opacity: 1; transform: translateX(-50%) scale(1);   }
+    85%       { opacity: 0; transform: translateX(-50%) scale(0.6); }
+    100%      { opacity: 0; transform: translateX(-50%) scale(0.6); }
+  }
+
+  /* Walk cycle bob */
   @keyframes monkey-body {
     0%   { transform: translateY(0px)  rotate(-3deg); }
     25%  { transform: translateY(-6px) rotate(0deg);  }
@@ -402,16 +477,18 @@
     75%  { transform: translateY(-5px) rotate(0deg);  }
     100% { transform: translateY(0px)  rotate(-3deg); }
   }
-  /* Banana swings as an arm extension */
+
+  /* Banana arm swing */
   @keyframes banana-swing {
     0%   { transform: rotate(-20deg); }
     50%  { transform: rotate(20deg);  }
     100% { transform: rotate(-20deg); }
   }
+
   @keyframes shadow-pulse {
-    0%, 100% { transform: translateX(-50%) scaleX(1);    opacity: 0.5; }
-    25%, 75%  { transform: translateX(-50%) scaleX(0.7); opacity: 0.25; }
-    50%       { transform: translateX(-50%) scaleX(1);   opacity: 0.5; }
+    0%, 100% { transform: translateX(-50%) scaleX(1);    opacity: 0.5;  }
+    25%, 75% { transform: translateX(-50%) scaleX(0.7);  opacity: 0.25; }
+    50%      { transform: translateX(-50%) scaleX(1);    opacity: 0.5;  }
   }
 
   /* ── ECO Toggle button ── */
@@ -1793,11 +1870,14 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
       {/* ── Monkey walking across the top with banana ── */}
       <div className="rabbit-track">
         <div className="rabbit-runner">
-          <div className="rabbit-flip">
-            <span className="rabbit-emoji"><span style={{display:'inline-block',transform:'scaleX(-1)'}}>🐒</span></span>
-            <span className="monkey-banana">🍌</span>
+          <div className="monkey-group">
+            <div className="monkey-bubble">I am your policy monkey, click me</div>
+            <div className="rabbit-flip">
+              <span className="rabbit-emoji"><span style={{display:'inline-block',transform:'scaleX(-1)'}}>🐒</span></span>
+              <span className="monkey-banana">🍌</span>
+            </div>
+            <div className="monkey-shadow"/>
           </div>
-          <div className="monkey-shadow"/>
         </div>
       </div>
 
