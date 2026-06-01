@@ -322,63 +322,96 @@
   .rabbit-track {
     position: absolute;
     top: 0; left: 0; right: 0;
-    height: 58px;
+    height: 64px;
     overflow: hidden;
     pointer-events: none;
     z-index: 10;
     border-radius: 20px 20px 0 0;
-    /* Ground: solid bottom border + inner shadow to give depth */
     border-bottom: 1.5px solid rgba(255,255,255,0.28);
     box-shadow: 0 2px 8px rgba(0,0,0,0.22);
   }
-  /* Soft ground glow just above the border */
   .rabbit-track::after {
     content: '';
     position: absolute;
     bottom: 0; left: 0; right: 0;
     height: 10px;
-    background: linear-gradient(
-      to top,
-      rgba(255,255,255,0.07) 0%,
-      transparent 100%
-    );
+    background: linear-gradient(to top, rgba(255,255,255,0.07) 0%, transparent 100%);
     pointer-events: none;
   }
-  /* Layer 1: moves left ↔ right, alternates direction */
+  /* Layer 1: walks left → right, then right → left */
   .rabbit-runner {
     position: absolute;
-    bottom: 0;
-    left: -50px;
-    animation: rabbit-run 4.5s ease-in-out infinite alternate;
+    bottom: 6px;
+    left: -70px;
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    animation: monkey-walk 6s linear infinite alternate;
   }
-  /* Layer 2: flips scaleX at the exact moment direction reverses.
-     Cycle = 2 × 4.5s = 9s so it stays in sync. step-end = instant snap. */
+  /* Layer 2: flips at turnaround. Cycle = 12s */
   .rabbit-flip {
-    animation: rabbit-flip 9s step-end infinite;
-    display: inline-block;
+    animation: monkey-flip 12s step-end infinite;
+    display: flex;
+    align-items: flex-end;
+    gap: 3px;
   }
-  /* Layer 3: vertical hop, independent of direction */
+  /* Monkey body — walks with a body-bob */
   .rabbit-emoji {
     display: inline-block;
     font-size: 32px;
     line-height: 1;
     transform-origin: center bottom;
-    animation: rabbit-bob 0.36s ease-in-out infinite;
+    animation: monkey-body 0.45s ease-in-out infinite;
     filter: brightness(0) invert(1);
   }
-  @keyframes rabbit-run {
-    from { left: -50px; }
-    to   { left: calc(100% + 30px); }
+  /* Banana — swings like a held arm */
+  .monkey-banana {
+    display: inline-block;
+    font-size: 20px;
+    line-height: 1;
+    transform-origin: top center;
+    animation: banana-swing 0.45s ease-in-out infinite;
+    margin-bottom: 4px;
   }
-  @keyframes rabbit-flip {
-    0%   { transform: scaleX(-1); }   /* face right — going left→right */
-    50%  { transform: scaleX(1);  }   /* face left  — going right→left */
-    100% { transform: scaleX(-1); }
+  /* Ground shadow under monkey */
+  .monkey-shadow {
+    position: absolute;
+    bottom: -2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 36px;
+    height: 6px;
+    background: rgba(0,0,0,0.25);
+    border-radius: 50%;
+    animation: shadow-pulse 0.45s ease-in-out infinite;
   }
-  @keyframes rabbit-bob {
-    0%, 100% { transform: translateY(0px)  scaleY(1);    }
-    30%      { transform: translateY(-8px) scaleY(1.08); }
-    60%      { transform: translateY(0px)  scaleY(0.92); }
+  @keyframes monkey-walk {
+    from { left: -70px; }
+    to   { left: calc(100% + 50px); }
+  }
+  @keyframes monkey-flip {
+    0%   { transform: scaleX(1);  }  /* facing right */
+    50%  { transform: scaleX(-1); }  /* facing left  */
+    100% { transform: scaleX(1);  }
+  }
+  /* Walk cycle: bob up on each step */
+  @keyframes monkey-body {
+    0%   { transform: translateY(0px)  rotate(-3deg); }
+    25%  { transform: translateY(-6px) rotate(0deg);  }
+    50%  { transform: translateY(0px)  rotate(3deg);  }
+    75%  { transform: translateY(-5px) rotate(0deg);  }
+    100% { transform: translateY(0px)  rotate(-3deg); }
+  }
+  /* Banana swings as an arm extension */
+  @keyframes banana-swing {
+    0%   { transform: rotate(-20deg); }
+    50%  { transform: rotate(20deg);  }
+    100% { transform: rotate(-20deg); }
+  }
+  @keyframes shadow-pulse {
+    0%, 100% { transform: translateX(-50%) scaleX(1);    opacity: 0.5; }
+    25%, 75%  { transform: translateX(-50%) scaleX(0.7); opacity: 0.25; }
+    50%       { transform: translateX(-50%) scaleX(1);   opacity: 0.5; }
   }
 
   /* ── ECO Toggle button ── */
@@ -1757,12 +1790,14 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
         0 32px 64px rgba(0,0,0,0.35)`,
     }}>
 
-      {/* ── Rabbit running across the top ── */}
+      {/* ── Monkey walking across the top with banana ── */}
       <div className="rabbit-track">
         <div className="rabbit-runner">
           <div className="rabbit-flip">
             <span className="rabbit-emoji">🐒</span>
+            <span className="monkey-banana">🍌</span>
           </div>
+          <div className="monkey-shadow"/>
         </div>
       </div>
 
