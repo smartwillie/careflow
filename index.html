@@ -339,23 +339,23 @@
     pointer-events: none;
   }
   /*
-   * 18s cycle (linear, no alternate):
-   *   0s  –  3s  (0%–16.67%)  : walk left → midpoint
-   *   3s  –  6s  (16.67%–33.33%) : pause at midpoint   ← speech bubble
-   *   6s  –  9s  (33.33%–50%)  : walk midpoint → right
-   *   9s  – 12s  (50%–66.67%) : walk right → midpoint
-   *  12s  – 15s  (66.67%–83.33%) : pause at midpoint   ← speech bubble
-   *  15s  – 18s  (83.33%–100%) : walk midpoint → left
+   * 22s cycle — monkey stays within left/right borders the whole time:
+   *   0s –  3s  (0%–13.64%)    : walk left border → mid
+   *   3s –  8s  (13.64%–36.36%): pause 5s at mid   ← speech bubble
+   *   8s – 11s  (36.36%–50%)   : walk mid → right border
+   *  11s – 14s  (50%–63.64%)   : walk right border → mid
+   *  14s – 19s  (63.64%–86.36%): pause 5s at mid   ← speech bubble
+   *  19s – 22s  (86.36%–100%)  : walk mid → left border
    */
 
   /* Layer 1: the whole group slides horizontally */
   .rabbit-runner {
     position: absolute;
     bottom: 6px;
-    left: -70px;
+    left: 6px;
     cursor: pointer;
     pointer-events: auto;
-    animation: monkey-walk 18s linear infinite;
+    animation: monkey-walk 22s linear infinite;
   }
 
   /* Inner wrapper for position relative (bubble anchor) */
@@ -383,7 +383,7 @@
     opacity: 0;
     pointer-events: none;
     z-index: 20;
-    animation: bubble-show 18s linear infinite;
+    animation: bubble-show 22s linear infinite;
     transform-origin: bottom center;
   }
   .monkey-bubble::after {
@@ -396,9 +396,9 @@
     border-top-color: #fff;
   }
 
-  /* Layer 2: flips direction — 18s, instant snap at 50% */
+  /* Layer 2: flips direction — 22s, instant snap at 50% */
   .rabbit-flip {
-    animation: monkey-flip 18s step-end infinite;
+    animation: monkey-flip 22s step-end infinite;
     display: flex;
     align-items: flex-end;
     gap: 3px;
@@ -438,15 +438,15 @@
 
   /* ── Keyframes ── */
 
-  /* Position: walk → pause → walk → walk → pause → walk */
+  /* Position: stays within left/right borders at all times */
   @keyframes monkey-walk {
-    0%       { left: -70px; }
-    16.67%   { left: calc(50% - 25px); }   /* arrive mid going right */
-    33.33%   { left: calc(50% - 25px); }   /* still mid (3s pause) */
-    50%      { left: calc(100% + 60px); }  /* arrive far right */
-    66.67%   { left: calc(50% - 25px); }   /* arrive mid going left */
-    83.33%   { left: calc(50% - 25px); }   /* still mid (3s pause) */
-    100%     { left: -70px; }              /* arrive far left */
+    0%      { left: 6px; }                  /* left border */
+    13.64%  { left: calc(50% - 30px); }     /* arrive mid going right */
+    36.36%  { left: calc(50% - 30px); }     /* still mid (5s pause) */
+    50%     { left: calc(100% - 62px); }    /* right border */
+    63.64%  { left: calc(50% - 30px); }     /* arrive mid going left */
+    86.36%  { left: calc(50% - 30px); }     /* still mid (5s pause) */
+    100%    { left: 6px; }                  /* back to left border */
   }
 
   /* Flip at exactly the turnaround (50%) — step-end snaps instantly */
@@ -456,17 +456,17 @@
     100% { transform: scaleX(1);  }
   }
 
-  /* Speech bubble: fade in during each 3s pause, fade out after */
+  /* Speech bubble: fade in during each 5s pause */
   @keyframes bubble-show {
-    0%,  14%  { opacity: 0; transform: translateX(-50%) scale(0.6); }
-    19%       { opacity: 1; transform: translateX(-50%) scale(1);   }
-    31%       { opacity: 1; transform: translateX(-50%) scale(1);   }
-    35%       { opacity: 0; transform: translateX(-50%) scale(0.6); }
-    64%       { opacity: 0; transform: translateX(-50%) scale(0.6); }
-    69%       { opacity: 1; transform: translateX(-50%) scale(1);   }
-    81%       { opacity: 1; transform: translateX(-50%) scale(1);   }
-    85%       { opacity: 0; transform: translateX(-50%) scale(0.6); }
-    100%      { opacity: 0; transform: translateX(-50%) scale(0.6); }
+    0%,   12%  { opacity: 0; transform: translateX(-50%) scale(0.6); }
+    17%        { opacity: 1; transform: translateX(-50%) scale(1);   }
+    33%        { opacity: 1; transform: translateX(-50%) scale(1);   }
+    38%        { opacity: 0; transform: translateX(-50%) scale(0.6); }
+    62%        { opacity: 0; transform: translateX(-50%) scale(0.6); }
+    67%        { opacity: 1; transform: translateX(-50%) scale(1);   }
+    83%        { opacity: 1; transform: translateX(-50%) scale(1);   }
+    88%        { opacity: 0; transform: translateX(-50%) scale(0.6); }
+    100%       { opacity: 0; transform: translateX(-50%) scale(0.6); }
   }
 
   /* Walk cycle bob */
