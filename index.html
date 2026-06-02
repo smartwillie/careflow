@@ -1747,45 +1747,38 @@ function DashTile({ icon, value, label, color, accentColor, onClick, active, btn
   );
 }
 
-// ── AssignIQ icon — 4-pointed sparkle stars (AI magic style) ─────────────────
-// A large sparkle + two smaller ones, matching the industry-standard AI icon look
-function Sparkle4({ cx, cy, r, opacity=1, fill="url(#iq-grad)" }) {
-  // 4-pointed star: thin diamond shape via cubic bezier
-  const t = r * 0.22; // waist thinness
-  return (
-    <path
-      d={`M${cx},${cy-r} C${cx+t},${cy-t} ${cx+r},${cy-t} ${cx+r},${cy}
-          C${cx+r},${cy+t} ${cx+t},${cy+r} ${cx},${cy+r}
-          C${cx-t},${cy+r} ${cx-r},${cy+t} ${cx-r},${cy}
-          C${cx-r},${cy-t} ${cx-t},${cy-r} ${cx},${cy-r}Z`}
-      fill={fill}
-      opacity={opacity}
-    />
-  );
-}
-
+// ── AssignIQ icon — friendly bot face ────────────────────────────────────────
 function ZapAIIcon({ spinning }) {
   return (
-    <span style={{ display:'inline-flex', alignItems:'center', position:'relative',
-      animation: spinning ? 'zap-spin 0.7s linear infinite' : 'none',
+    <span style={{ display:'inline-flex', alignItems:'center',
+      animation: spinning ? 'zap-spin 0.8s linear infinite' : 'none',
       transformOrigin:'center' }}>
-      <svg width="24" height="22" viewBox="0 0 28 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {/* Antenna */}
+        <line x1="12" y1="1" x2="12" y2="4.5" stroke="white" strokeWidth="1.6" strokeLinecap="round"/>
+        <circle cx="12" cy="1.2" r="1.4" fill="white"/>
+        {/* Head — rounded rect */}
+        <rect x="3" y="5" width="18" height="13" rx="3.5" fill="white" fillOpacity="0.92"/>
+        {/* Left eye */}
+        <rect x="6.5" y="8.5" width="4" height="3.5" rx="1.2" fill="url(#bot-eye-grad)"/>
+        {/* Right eye */}
+        <rect x="13.5" y="8.5" width="4" height="3.5" rx="1.2" fill="url(#bot-eye-grad)"/>
+        {/* Eye shines */}
+        <circle cx="7.8"  cy="9.4" r="0.7" fill="white" opacity="0.75"/>
+        <circle cx="14.8" cy="9.4" r="0.7" fill="white" opacity="0.75"/>
+        {/* Mouth — happy line with rounded caps */}
+        <path d="M8.5 14.5 Q12 16.5 15.5 14.5" stroke="url(#bot-eye-grad)" strokeWidth="1.5" strokeLinecap="round" fill="none"/>
+        {/* Neck */}
+        <rect x="10" y="18" width="4" height="2" rx="1" fill="white" fillOpacity="0.65"/>
+        {/* Ear bolts */}
+        <rect x="1.5" y="9" width="1.5" height="3" rx="0.75" fill="white" fillOpacity="0.70"/>
+        <rect x="21"  y="9" width="1.5" height="3" rx="0.75" fill="white" fillOpacity="0.70"/>
         <defs>
-          <linearGradient id="iq-grad" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%"   stopColor="#ffffff"/>
-            <stop offset="100%" stopColor="rgba(186,230,255,0.85)"/>
-          </linearGradient>
-          <linearGradient id="iq-grad-sm" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%"   stopColor="#ffffff"/>
-            <stop offset="100%" stopColor="rgba(186,230,255,0.7)"/>
+          <linearGradient id="bot-eye-grad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stopColor="#60a5fa"/>
+            <stop offset="100%" stopColor="#818cf8"/>
           </linearGradient>
         </defs>
-        {/* Large primary sparkle */}
-        <Sparkle4 cx={10} cy={13} r={9.5} fill="url(#iq-grad)"/>
-        {/* Small top-right sparkle */}
-        <Sparkle4 cx={21} cy={5}  r={4.5} fill="url(#iq-grad-sm)" opacity={0.90}/>
-        {/* Tiny bottom-right sparkle */}
-        <Sparkle4 cx={24} cy={17} r={2.8} fill="url(#iq-grad-sm)" opacity={0.70}/>
       </svg>
     </span>
   );
