@@ -870,7 +870,8 @@ function initRooms() {
                 glucose: false, highAcuity: false, sitter: false,
                 discharge: false, isolation: false,
                 restraint: false, centralLine: false,
-                chestTube: false, drain: false, nurseId: null };
+                chestTube: false, drain: false,
+                neuroCheck: false, dailyWeight: false, nurseId: null };
     return acc;
   }, {});
 }
@@ -893,6 +894,8 @@ const FLAG_DEFS = [
   { key:'centralLine', label:'CVL', bg:'#1e3a5f', tc:'#93c5fd' },
   { key:'chestTube',   label:'CT',  bg:'#134e4a', tc:'#99f6e4', glow:'#2dd4bf' },
   { key:'drain',       label:'DR',  bg:'#3b0764', tc:'#e9d5ff' },
+  { key:'neuroCheck',  label:'NC',  bg:'#1e40af', tc:'#bfdbfe' },
+  { key:'dailyWeight', label:'DW',  bg:'#065f46', tc:'#6ee7b7' },
 ];
 
 const STORAGE_KEY = 'careflow_assignment';
@@ -1864,7 +1867,9 @@ function FeedbackBar({ onGood, onBad }) {
 
 function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
                            discharge, isolation, restraint, centralLine, foley,
+                           neuroCheck, dailyWeight,
                            sitterRooms, dischargeRooms, isolationRooms, centralLineRooms, foleyRooms,
+                           neuroCheckRooms, dailyWeightRooms,
                            nurses, nurseRooms,
                            unassignedOpen, onUnassignedClick, unassignedBtnRef,
                            onZapAssign, zapLoading, fuelMode, onToggleFuel,
@@ -1877,6 +1882,8 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
   const isolationRef   = React.useRef();
   const centralLineRef = React.useRef();
   const foleyRef       = React.useRef();
+  const neuroCheckRef  = React.useRef();
+  const dailyWeightRef = React.useRef();
 
   function toggleStatPopup(key, ref) {
     setStatPopup(prev => prev?.key === key ? null : { key, anchor: ref.current?.getBoundingClientRect() });
@@ -1977,6 +1984,10 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
           onClick={()=>toggleStatPopup('foley',foleyRef)} active={statPopup?.key==='foley'} btnRef={foleyRef} />
         <DashTile icon="⊕" value={centralLine} label="CVL"       color={centralLine>0 ? '#93c5fd' : '#fff'} accentColor={centralLine>0 ? '#93c5fd' : undefined}
           onClick={()=>toggleStatPopup('centralLine',centralLineRef)} active={statPopup?.key==='centralLine'} btnRef={centralLineRef} />
+        <DashTile icon="🧠" value={neuroCheck}  label="Neuro"     color={neuroCheck>0 ? '#bfdbfe' : '#fff'} accentColor={neuroCheck>0 ? '#bfdbfe' : undefined}
+          onClick={()=>toggleStatPopup('neuroCheck',neuroCheckRef)} active={statPopup?.key==='neuroCheck'} btnRef={neuroCheckRef} />
+        <DashTile icon="⚖" value={dailyWeight} label="Wt"        color={dailyWeight>0 ? '#6ee7b7' : '#fff'} accentColor={dailyWeight>0 ? '#6ee7b7' : undefined}
+          onClick={()=>toggleStatPopup('dailyWeight',dailyWeightRef)} active={statPopup?.key==='dailyWeight'} btnRef={dailyWeightRef} />
       </div>
 
       {/* Stat room popups */}
@@ -2003,6 +2014,16 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
       {statPopup?.key==='centralLine' && (
         <StatRoomPopup title="Central Line Rooms" icon="🩺" color="#1e3a5f"
           rooms={centralLineRooms} allRooms={{}} nurseRooms={nurseRooms} nurses={nurses}
+          anchor={statPopup.anchor} onClose={()=>setStatPopup(null)} />
+      )}
+      {statPopup?.key==='neuroCheck' && (
+        <StatRoomPopup title="Neuro Check Rooms" icon="🧠" color="#1e40af"
+          rooms={neuroCheckRooms} allRooms={{}} nurseRooms={nurseRooms} nurses={nurses}
+          anchor={statPopup.anchor} onClose={()=>setStatPopup(null)} />
+      )}
+      {statPopup?.key==='dailyWeight' && (
+        <StatRoomPopup title="Daily Weight Rooms" icon="⚖" color="#065f46"
+          rooms={dailyWeightRooms} allRooms={{}} nurseRooms={nurseRooms} nurses={nurses}
           anchor={statPopup.anchor} onClose={()=>setStatPopup(null)} />
       )}
 
@@ -2110,6 +2131,10 @@ function CorridorGrid({ allRooms, selected, nurses, nurseRooms, dragPreviewIds, 
             isolationRooms={dashStats.isolationRooms}
             centralLineRooms={dashStats.centralLineRooms}
             foleyRooms={dashStats.foleyRooms}
+            neuroCheck={dashStats.neuroCheck}
+            dailyWeight={dashStats.dailyWeight}
+            neuroCheckRooms={dashStats.neuroCheckRooms}
+            dailyWeightRooms={dashStats.dailyWeightRooms}
             nurses={nurses}
             nurseRooms={nurseRooms}
             unassignedOpen={unassignedOpen}
@@ -3219,6 +3244,8 @@ function App() {
   const totalRestraint  = allOccRooms.filter(r=>r.restraint).length;
   const totalCentralLine = allOccRooms.filter(r=>r.centralLine).length;
   const totalFoley       = allOccRooms.filter(r=>r.foley).length;
+  const totalNeuroCheck  = allOccRooms.filter(r=>r.neuroCheck).length;
+  const totalDailyWeight = allOccRooms.filter(r=>r.dailyWeight).length;
 
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100vh', overflow:'hidden' }}>
@@ -3253,7 +3280,8 @@ function App() {
                 next[id]={...prev[id], occupied:true, gender:'female', type:'TELE',
                   foley:false, drip:false, prisoner:false, totalCare:false, glucose:false, highAcuity:false,
                   sitter:false, discharge:false, isolation:false,
-                  restraint:false, centralLine:false, chestTube:false, drain:false, nurseId:null};
+                  restraint:false, centralLine:false, chestTube:false, drain:false,
+                  neuroCheck:false, dailyWeight:false, nurseId:null};
               });
               return next;
             });
@@ -3376,6 +3404,10 @@ function App() {
               dischargeRooms:   allOccRooms.filter(r=>r.discharge),
               isolationRooms:   allOccRooms.filter(r=>r.isolation),
               centralLineRooms: allOccRooms.filter(r=>r.centralLine),
+              neuroCheck:       totalNeuroCheck,
+              dailyWeight:      totalDailyWeight,
+              neuroCheckRooms:  allOccRooms.filter(r=>r.neuroCheck),
+              dailyWeightRooms: allOccRooms.filter(r=>r.dailyWeight),
             }}
             unassignedOpen={!!unassignedAnchor}
             unassignedBtnRef={unassignedBtnRef}
