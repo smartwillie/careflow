@@ -192,15 +192,37 @@
     backdrop-filter: blur(2px);
   }
   .modal {
-    background: var(--modal-bg); border-radius: 16px; padding: 24px; width: 360px;
+    background: var(--modal-bg); border-radius: 16px; width: 420px;
     border: 1px solid var(--border-sub);
     box-shadow: 0 24px 80px rgba(0,0,0,0.45);
     transition: background 0.25s;
+    display: flex; flex-direction: column;
+    max-height: 88vh; overflow: hidden;
+  }
+  .modal-header {
+    padding: 20px 20px 14px; flex-shrink: 0;
+  }
+  .modal-body {
+    padding: 0 20px; overflow-y: auto; flex: 1; min-height: 0;
+  }
+  .modal-footer {
+    padding: 12px 20px 18px; flex-shrink: 0;
+    border-top: 1px solid var(--border-sub);
   }
   .toggle-row {
     display: flex; align-items: center; justify-content: space-between;
     padding: 8px 0; border-bottom: 1px solid var(--border-sub);
   }
+  .toggle-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+  }
+  .toggle-grid-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 7px 8px 7px 4px; border-bottom: 1px solid var(--border-sub);
+    gap: 6px;
+  }
+  .toggle-grid-item:nth-child(odd) { border-right: 1px solid var(--border-sub); padding-right: 12px; }
+  .toggle-grid-item:nth-child(even) { padding-left: 12px; }
   .toggle { width: 40px; height: 22px; border-radius: 11px; background: var(--border-sub); position: relative; cursor: pointer; transition: background 0.2s; border: none; flex-shrink: 0; }
   .toggle.on { background: #22c55e; }
   .toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: white; transition: transform 0.2s; }
@@ -1185,85 +1207,111 @@ function PatientModal({ room, nurses, onClose, onSave }) {
   const [s, setS] = useState({...room});
   const set = (k,v) => setS(p=>({...p,[k]:v}));
   const assignedNurse = room.nurseId ? (nurses||[]).find(n => n.id === room.nurseId) : null;
+  const GridToggle = ({ on, onChange, label, color }) => (
+    <div className="toggle-grid-item">
+      <span style={{ fontSize:12, color: on ? color : 'var(--text-3)', fontWeight: on ? 700 : 400,
+        transition:'color 0.15s', lineHeight:1.2, flexShrink:1, minWidth:0 }}>{label}</span>
+      <button className={`toggle${on?' on':''}`}
+        style={on ? { background: color } : {}}
+        onClick={()=>onChange(!on)}/>
+    </div>
+  );
+
   return (
     <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div className="modal">
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-            <h2 style={{ margin:0, fontSize:18, fontWeight:700, color:'var(--text-1)' }}>Room {room.id}</h2>
-            {assignedNurse ? (
-              <span style={{
-                display:'flex', alignItems:'center', gap:5,
-                background:'rgba(34,197,94,0.12)', border:'1px solid rgba(34,197,94,0.35)',
-                borderRadius:20, padding:'2px 10px 2px 6px',
-                fontSize:12, fontWeight:600, color:'#86efac',
-              }}>
-                <span style={{ width:8, height:8, borderRadius:'50%', background:assignedNurse.color, display:'inline-block', flexShrink:0 }}/>
-                {assignedNurse.name}
-              </span>
-            ) : room.occupied ? (
-              <span style={{
-                fontSize:11, fontWeight:600, color:'rgba(255,255,255,0.35)',
-                border:'1px solid rgba(255,255,255,0.12)', borderRadius:20, padding:'2px 9px',
-              }}>Unassigned</span>
-            ) : null}
-          </div>
-          <button className="btn btn-ghost" onClick={onClose}>✕</button>
-        </div>
 
-        <div className="toggle-row">
-          <span style={{ fontSize:13, color:'var(--text-2)' }}>Occupied</span>
-          <button className={`toggle${s.occupied?' on':''}`} onClick={()=>set('occupied',!s.occupied)}/>
-        </div>
-
-        {s.occupied && (<>
-          <div className="toggle-row">
-            <span style={{ fontSize:13, color:'var(--text-2)' }}>Gender</span>
-            <div style={{ display:'flex', gap:6 }}>
-              {['male','female'].map(g=>(
-                <button key={g} className="btn" onClick={()=>set('gender',g)}
-                  style={{ background:s.gender===g?(g==='male'?'#1d4ed8':'#be185d'):'var(--btn-ghost-bg)', color:s.gender===g?'white':'var(--btn-ghost-tx)', padding:'4px 10px' }}>
-                  {g==='male'?'♂ Male':'♀ Female'}
-                </button>
-              ))}
+        {/* ── Fixed header ── */}
+        <div className="modal-header">
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+              <h2 style={{ margin:0, fontSize:18, fontWeight:700, color:'var(--text-1)' }}>Room {room.id}</h2>
+              {assignedNurse ? (
+                <span style={{
+                  display:'flex', alignItems:'center', gap:5,
+                  background:'rgba(34,197,94,0.12)', border:'1px solid rgba(34,197,94,0.35)',
+                  borderRadius:20, padding:'2px 10px 2px 6px',
+                  fontSize:12, fontWeight:600, color:'#86efac',
+                }}>
+                  <span style={{ width:8, height:8, borderRadius:'50%', background:assignedNurse.color, display:'inline-block', flexShrink:0 }}/>
+                  {assignedNurse.name}
+                </span>
+              ) : room.occupied ? (
+                <span style={{
+                  fontSize:11, fontWeight:600, color:'rgba(255,255,255,0.35)',
+                  border:'1px solid rgba(255,255,255,0.12)', borderRadius:20, padding:'2px 9px',
+                }}>Unassigned</span>
+              ) : null}
             </div>
+            <button className="btn btn-ghost" onClick={onClose}>✕</button>
           </div>
-
-          <div className="toggle-row">
-            <span style={{ fontSize:13, color:'var(--text-2)' }}>Type</span>
-            <div style={{ display:'flex', gap:6 }}>
-              {['MEDSURG','TELE'].map(t=>(
-                <button key={t} className="btn" onClick={()=>set('type',t)}
-                  style={{ background:s.type===t?(t==='TELE'?'#dc2626':'#0369a1'):'var(--btn-ghost-bg)', color:s.type===t?'white':'var(--btn-ghost-tx)', padding:'4px 10px' }}>
-                  {t==='TELE'?'♥ TELE':'MED/SURG'}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <Toggle on={s.foley}      onChange={v=>set('foley',v)}      label="Foley Catheter"  color="#8b5cf6"/>
-          <Toggle on={s.drip}       onChange={v=>set('drip',v)}       label="Infusion Drip"   color="#0891b2"/>
-          <Toggle on={s.prisoner}   onChange={v=>set('prisoner',v)}   label="Prisoner"        color="#b45309"/>
-          <Toggle on={s.totalCare}  onChange={v=>set('totalCare',v)}  label="Total Care"      color="#be123c"/>
-          <Toggle on={s.glucose}    onChange={v=>set('glucose',v)}    label="Glucose Check"   color="#16a34a"/>
-          <Toggle on={s.highAcuity} onChange={v=>set('highAcuity',v)} label="High Acuity"     color="#ea580c"/>
-          <Toggle on={s.sitter}     onChange={v=>set('sitter',v)}     label="Sitter"          color="#7c3aed"/>
-          <Toggle on={s.discharge}   onChange={v=>set('discharge',v)}   label="Discharge"       color="#0ea5e9"/>
-          <Toggle on={s.isolation}   onChange={v=>set('isolation',v)}   label="Isolation"       color="#f97316"/>
-          <Toggle on={s.restraint}   onChange={v=>set('restraint',v)}   label="Restraint"       color="#dc2626"/>
-          <Toggle on={s.centralLine} onChange={v=>set('centralLine',v)} label="Central Line"    color="#3b82f6"/>
-          <Toggle on={s.chestTube}  onChange={v=>set('chestTube',v)}  label="Chest Tube"      color="#0d9488"/>
-          <Toggle on={s.drain}      onChange={v=>set('drain',v)}      label="Drain"            color="#9333ea"/>
-          <Toggle on={s.neuroCheck} onChange={v=>set('neuroCheck',v)} label="Neuro Check"      color="#1e40af"/>
-          <Toggle on={s.dailyWeight}onChange={v=>set('dailyWeight',v)}label="Daily Weight"     color="#065f46"/>
-          <Toggle on={s.tubeFeed}   onChange={v=>set('tubeFeed',v)}   label="Tube Feed"        color="#92400e"/>
-          <Toggle on={s.tpn}        onChange={v=>set('tpn',v)}        label="TPN"              color="#4c1d95"/>
-        </>)}
-
-        <div style={{ display:'flex', gap:8, marginTop:16, justifyContent:'flex-end' }}>
-          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={()=>onSave(s)}>Save</button>
         </div>
+
+        {/* ── Scrollable body ── */}
+        <div className="modal-body">
+          <div className="toggle-row">
+            <span style={{ fontSize:13, color:'var(--text-2)' }}>Occupied</span>
+            <button className={`toggle${s.occupied?' on':''}`} onClick={()=>set('occupied',!s.occupied)}/>
+          </div>
+
+          {s.occupied && (<>
+            <div className="toggle-row">
+              <span style={{ fontSize:13, color:'var(--text-2)' }}>Gender</span>
+              <div style={{ display:'flex', gap:6 }}>
+                {['male','female'].map(g=>(
+                  <button key={g} className="btn" onClick={()=>set('gender',g)}
+                    style={{ background:s.gender===g?(g==='male'?'#1d4ed8':'#be185d'):'var(--btn-ghost-bg)', color:s.gender===g?'white':'var(--btn-ghost-tx)', padding:'4px 10px' }}>
+                    {g==='male'?'♂ Male':'♀ Female'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="toggle-row" style={{ marginBottom:6 }}>
+              <span style={{ fontSize:13, color:'var(--text-2)' }}>Type</span>
+              <div style={{ display:'flex', gap:6 }}>
+                {['MEDSURG','TELE'].map(t=>(
+                  <button key={t} className="btn" onClick={()=>set('type',t)}
+                    style={{ background:s.type===t?(t==='TELE'?'#dc2626':'#0369a1'):'var(--btn-ghost-bg)', color:s.type===t?'white':'var(--btn-ghost-tx)', padding:'4px 10px' }}>
+                    {t==='TELE'?'♥ TELE':'MED/SURG'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 2-column acuity toggle grid */}
+            <div style={{ fontSize:10, fontWeight:700, color:'var(--text-4)', letterSpacing:'0.08em',
+              textTransform:'uppercase', padding:'8px 4px 4px' }}>Acuity &amp; Flags</div>
+            <div className="toggle-grid">
+              <GridToggle on={s.foley}       onChange={v=>set('foley',v)}       label="Foley Catheter"  color="#8b5cf6"/>
+              <GridToggle on={s.drip}        onChange={v=>set('drip',v)}        label="Infusion Drip"   color="#0891b2"/>
+              <GridToggle on={s.totalCare}   onChange={v=>set('totalCare',v)}   label="Total Care"      color="#be123c"/>
+              <GridToggle on={s.highAcuity}  onChange={v=>set('highAcuity',v)}  label="High Acuity"     color="#ea580c"/>
+              <GridToggle on={s.isolation}   onChange={v=>set('isolation',v)}   label="Isolation"       color="#f97316"/>
+              <GridToggle on={s.centralLine} onChange={v=>set('centralLine',v)} label="Central Line"    color="#3b82f6"/>
+              <GridToggle on={s.chestTube}   onChange={v=>set('chestTube',v)}   label="Chest Tube"      color="#0d9488"/>
+              <GridToggle on={s.tpn}         onChange={v=>set('tpn',v)}         label="TPN"             color="#4c1d95"/>
+              <GridToggle on={s.tubeFeed}    onChange={v=>set('tubeFeed',v)}    label="Tube Feed"       color="#92400e"/>
+              <GridToggle on={s.drain}       onChange={v=>set('drain',v)}       label="Drain"           color="#9333ea"/>
+              <GridToggle on={s.neuroCheck}  onChange={v=>set('neuroCheck',v)}  label="Neuro Check"     color="#1e40af"/>
+              <GridToggle on={s.dailyWeight} onChange={v=>set('dailyWeight',v)} label="Daily Weight"    color="#065f46"/>
+              <GridToggle on={s.glucose}     onChange={v=>set('glucose',v)}     label="Glucose Check"   color="#16a34a"/>
+              <GridToggle on={s.restraint}   onChange={v=>set('restraint',v)}   label="Restraint"       color="#dc2626"/>
+              <GridToggle on={s.sitter}      onChange={v=>set('sitter',v)}      label="Sitter"          color="#7c3aed"/>
+              <GridToggle on={s.prisoner}    onChange={v=>set('prisoner',v)}    label="Prisoner"        color="#b45309"/>
+              <GridToggle on={s.discharge}   onChange={v=>set('discharge',v)}   label="Discharge"       color="#0ea5e9"/>
+            </div>
+          </>)}
+        </div>
+
+        {/* ── Fixed footer ── */}
+        <div className="modal-footer">
+          <div style={{ display:'flex', gap:8, justifyContent:'flex-end' }}>
+            <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+            <button className="btn btn-primary" onClick={()=>onSave(s)}>Save</button>
+          </div>
+        </div>
+
       </div>
     </div>
   );
