@@ -367,29 +367,35 @@
   }
 
   /* Speech bubble */
+  @import url('https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap');
+
   .monkey-bubble {
     position: absolute;
-    bottom: calc(100% + 16px);
+    bottom: calc(100% + 18px);
     left: 50%;
     transform: translateX(-50%) scale(0.6);
-    background: #fff;
-    color: #1e293b;
-    border-radius: 14px;
-    padding: 5px 11px;
-    font-size: 11px;
-    font-weight: 700;
+    background: linear-gradient(135deg, #fef08a 0%, #fde047 60%, #fbbf24 100%);
+    color: #7c2d12;
+    border-radius: 20px;
+    padding: 10px 18px;
+    font-family: 'Fredoka One', 'Pacifico', 'Comic Sans MS', cursive;
+    font-size: 15px;
+    font-weight: 400;
+    letter-spacing: 0.03em;
     white-space: nowrap;
-    box-shadow: 0 3px 10px rgba(0,0,0,0.35);
+    box-shadow: 0 4px 18px rgba(0,0,0,0.4), 0 0 0 2px #f59e0b, 0 0 14px rgba(251,191,36,0.6);
     opacity: 0;
     pointer-events: auto;
     cursor: pointer;
     z-index: 20;
     animation: bubble-show 22s linear infinite;
     transform-origin: bottom center;
+    text-shadow: 0 1px 0 rgba(255,255,255,0.4);
   }
   .monkey-bubble:hover {
-    background: #f0f9ff;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+    background: linear-gradient(135deg, #fef9c3 0%, #fef08a 60%, #fde047 100%);
+    box-shadow: 0 6px 22px rgba(0,0,0,0.5), 0 0 0 2px #f59e0b, 0 0 22px rgba(251,191,36,0.8);
+    transform: translateX(-50%) scale(1.06) !important;
   }
   .monkey-bubble::after {
     content: '';
@@ -397,8 +403,8 @@
     top: 100%;
     left: 50%;
     transform: translateX(-50%);
-    border: 7px solid transparent;
-    border-top-color: #fff;
+    border: 10px solid transparent;
+    border-top-color: #fbbf24;
   }
 
   /* Layer 2: flips direction — 22s, instant snap at 50% */
