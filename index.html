@@ -1616,7 +1616,7 @@ function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, on
         {/* Lock toggle — protects this nurse's rooms from Zap Assign reset */}
         <button
           onClick={onToggleLock}
-          title={locked ? 'Locked — rooms kept on Zap Assign' : 'Unlocked — rooms reset on Zap Assign'}
+          title={locked ? 'Locked — rooms kept on AssignIQ' : 'Unlocked — rooms reset on AssignIQ'}
           style={{
             background: locked ? 'rgba(251,191,36,0.18)' : 'transparent',
             border: locked ? '1px solid rgba(251,191,36,0.55)' : '1px solid transparent',
@@ -1747,24 +1747,40 @@ function DashTile({ icon, value, label, color, accentColor, onClick, active, btn
   );
 }
 
-// ── AI Zap icon (lightning + circuit nodes) ───────────────────────────────────
+// ── AssignIQ icon — neural brain with pulse ring ──────────────────────────────
 function ZapAIIcon({ spinning }) {
   return (
-    <span style={{ display:'inline-flex', alignItems:'center',
-      animation: spinning ? 'zap-spin 0.3s linear infinite' : 'none',
+    <span style={{ display:'inline-flex', alignItems:'center', position:'relative',
+      animation: spinning ? 'zap-spin 0.6s linear infinite' : 'none',
       transformOrigin:'center' }}>
-      <svg width="17" height="17" viewBox="0 0 20 20" fill="none">
-        {/* Lightning bolt */}
-        <path d="M12 2L3.5 11H9L7 18l9.5-9H11L13 2z" fill="white"/>
-        {/* Circuit node top-left */}
-        <circle cx="2" cy="4" r="1.6" fill="white" opacity="0.55"/>
-        <line x1="2" y1="4" x2="5.5" y2="7.5" stroke="white" strokeWidth="0.9" opacity="0.45"/>
-        {/* Circuit node bottom-right */}
-        <circle cx="18" cy="16" r="1.6" fill="white" opacity="0.55"/>
-        <line x1="18" y1="16" x2="14.5" y2="12.5" stroke="white" strokeWidth="0.9" opacity="0.45"/>
-        {/* Circuit node mid-right */}
-        <circle cx="18.5" cy="7" r="1.2" fill="white" opacity="0.40"/>
-        <line x1="18.5" y1="7" x2="15" y2="9" stroke="white" strokeWidth="0.8" opacity="0.35"/>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {/* Outer pulse ring — only shown when idle */}
+        {!spinning && <circle cx="12" cy="12" r="11" stroke="rgba(255,255,255,0.18)" strokeWidth="1"/>}
+        {/* Brain silhouette — two lobes */}
+        {/* Left lobe */}
+        <path d="M12 7 C12 7 9.5 5.5 7.5 6.5 C5.5 7.5 4.5 9.5 5 11.5 C5.5 13.5 7 14.5 8 15
+                 C8.5 15.3 9 16 9 17 L9 17.5 L12 17.5 L12 7Z"
+              fill="white" opacity="0.90"/>
+        {/* Right lobe */}
+        <path d="M12 7 C12 7 14.5 5.5 16.5 6.5 C18.5 7.5 19.5 9.5 19 11.5 C18.5 13.5 17 14.5 16 15
+                 C15.5 15.3 15 16 15 17 L15 17.5 L12 17.5 L12 7Z"
+              fill="white" opacity="0.80"/>
+        {/* Center divider stem */}
+        <line x1="12" y1="7.5" x2="12" y2="17.5" stroke="rgba(255,255,255,0.25)" strokeWidth="0.8"/>
+        {/* Neural connection dots */}
+        <circle cx="8.5"  cy="9.5"  r="1.1" fill="white" opacity="0.95"/>
+        <circle cx="15.5" cy="9.5"  r="1.1" fill="white" opacity="0.85"/>
+        <circle cx="7.5"  cy="12.5" r="0.9" fill="white" opacity="0.80"/>
+        <circle cx="16.5" cy="12.5" r="0.9" fill="white" opacity="0.70"/>
+        {/* Synapse lines */}
+        <line x1="8.5"  y1="9.5"  x2="12" y2="11" stroke="white" strokeWidth="0.7" opacity="0.45"/>
+        <line x1="15.5" y1="9.5"  x2="12" y2="11" stroke="white" strokeWidth="0.7" opacity="0.40"/>
+        <line x1="7.5"  y1="12.5" x2="12" y2="11" stroke="white" strokeWidth="0.6" opacity="0.35"/>
+        <line x1="16.5" y1="12.5" x2="12" y2="11" stroke="white" strokeWidth="0.6" opacity="0.30"/>
+        {/* Central node */}
+        <circle cx="12" cy="11" r="1.4" fill="white" opacity="1"/>
+        {/* Base / stem */}
+        <rect x="10" y="17.5" width="4" height="1.5" rx="0.75" fill="white" opacity="0.55"/>
       </svg>
     </span>
   );
@@ -2095,14 +2111,11 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
           className={`zap-btn${pressed || zapLoading ? ' zap-pressed' : ''}`}
           onClick={handleZap}
           disabled={zapLoading}
-          title="AI auto-assign unassigned rooms to nurses"
+          title="AssignIQ — AI-powered smart room assignment"
           style={{ position:'relative' }}
         >
           <ZapAIIcon spinning={zapLoading} />
-          <span>{zapLoading ? 'Assigning…' : 'Zap Assign'}</span>
-          {!zapLoading && (
-            <span style={{ fontSize:10, fontWeight:600, opacity:0.7, marginLeft:2 }}>AI</span>
-          )}
+          <span>{zapLoading ? 'Running…' : 'AssignIQ'}</span>
           {/* Tuning indicator dot — lit when model weights have drifted from baseline */}
           {isTuned && !zapLoading && (
             <span title="Model tuned by your feedback" style={{
@@ -2946,7 +2959,7 @@ function App() {
 
   // ── AI Zap Assign ─────────────────────────────────────────────────────────
   function zapAssign() {
-    if (!nurses.length) { showToast('⚠ Add nurses before Zap Assign'); return; }
+    if (!nurses.length) { showToast('⚠ Add nurses before running AssignIQ'); return; }
 
     setZapLoading(true);
 
