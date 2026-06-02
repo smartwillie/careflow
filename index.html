@@ -2786,7 +2786,8 @@ function App() {
         // ── Acuity point value per room ──────────────────────────────────
         function roomAcuityPts(r) {
           return (r.highAcuity ? 2 : 0) + (r.isolation ? 2 : 0) + (r.totalCare ? 2 : 0)
-               + (r.chestTube ? 2 : 0) + (r.drain ? 1 : 0);
+               + (r.chestTube ? 2 : 0) + (r.drain ? 1 : 0)
+               + (r.neuroCheck ? 1 : 0) + (r.dailyWeight ? 1 : 0);
         }
 
         // Nurse state: locked nurses seed with their preserved rooms;
@@ -2809,8 +2810,10 @@ function App() {
             totalCareCount: existing.filter(id => resetRooms[id]?.totalCare).length,
             glucoseCount:   existing.filter(id => resetRooms[id]?.glucose).length,
             dripCount:      existing.filter(id => resetRooms[id]?.drip).length,
-            chestTubeCount: existing.filter(id => resetRooms[id]?.chestTube).length,
-            drainCount:     existing.filter(id => resetRooms[id]?.drain).length,
+            chestTubeCount:  existing.filter(id => resetRooms[id]?.chestTube).length,
+            drainCount:      existing.filter(id => resetRooms[id]?.drain).length,
+            neuroCheckCount: existing.filter(id => resetRooms[id]?.neuroCheck).length,
+            dailyWeightCount:existing.filter(id => resetRooms[id]?.dailyWeight).length,
           };
         });
 
@@ -2954,8 +2957,10 @@ function App() {
           if (room.totalCare)  state.totalCareCount++;
           if (room.glucose)    state.glucoseCount++;
           if (room.drip)       state.dripCount++;
-          if (room.chestTube)  state.chestTubeCount++;
-          if (room.drain)      state.drainCount++;
+          if (room.chestTube)   state.chestTubeCount++;
+          if (room.drain)       state.drainCount++;
+          if (room.neuroCheck)  state.neuroCheckCount++;
+          if (room.dailyWeight) state.dailyWeightCount++;
         }
 
         // ── ECO shared helpers ───────────────────────────────────────────────
@@ -2967,8 +2972,10 @@ function App() {
           if (r.totalCare  && state.totalCareCount  >= 2) return false;
           if (r.drip       && state.dripCount       >= 2) return false;
           if (r.isolation  && state.isolationCount  >= 2) return false;
-          if (r.chestTube  && state.chestTubeCount  >= 1) return false;
-          if (r.drain      && state.drainCount      >= 2) return false;
+          if (r.chestTube   && state.chestTubeCount   >= 1) return false;
+          if (r.drain       && state.drainCount       >= 2) return false;
+          if (r.neuroCheck  && state.neuroCheckCount  >= 3) return false;
+          if (r.dailyWeight && state.dailyWeightCount >= 3) return false;
           return true;
         }
         // Proximity + acuity score for one candidate room (lower = better).
