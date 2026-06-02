@@ -578,7 +578,7 @@
     75%       { transform: rotate(-5deg) skewX(-5deg) scale(0.97); }
   }
 
-  /* ── AssignIQ button ── */
+  /* ── OpenAssign AI button ── */
   .zap-btn {
     position: relative; overflow: hidden;
     width: 100%; border: none; border-radius: 14px;
@@ -1616,7 +1616,7 @@ function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, on
         {/* Lock toggle — protects this nurse's rooms from Zap Assign reset */}
         <button
           onClick={onToggleLock}
-          title={locked ? 'Locked — rooms kept on AssignIQ' : 'Unlocked — rooms reset on AssignIQ'}
+          title={locked ? 'Locked — rooms kept on OpenAssign AI' : 'Unlocked — rooms reset on OpenAssign AI'}
           style={{
             background: locked ? 'rgba(251,191,36,0.18)' : 'transparent',
             border: locked ? '1px solid rgba(251,191,36,0.55)' : '1px solid transparent',
@@ -1747,7 +1747,7 @@ function DashTile({ icon, value, label, color, accentColor, onClick, active, btn
   );
 }
 
-// ── AssignIQ icon — friendly bot face ────────────────────────────────────────
+// ── OpenAssign AI icon — friendly bot face ────────────────────────────────────────
 function ZapAIIcon({ spinning }) {
   return (
     <span style={{ display:'inline-flex', alignItems:'center',
@@ -2109,11 +2109,11 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
           className={`zap-btn${pressed || zapLoading ? ' zap-pressed' : ''}`}
           onClick={handleZap}
           disabled={zapLoading}
-          title="AssignIQ — AI-powered smart room assignment"
+          title="OpenAssign AI — AI-powered smart room assignment"
           style={{ position:'relative' }}
         >
           <ZapAIIcon spinning={zapLoading} />
-          <span>{zapLoading ? 'Running…' : 'AssignIQ'}</span>
+          <span>{zapLoading ? 'Running…' : 'OpenAssign AI'}</span>
           {/* Tuning indicator dot — lit when model weights have drifted from baseline */}
           {isTuned && !zapLoading && (
             <span title="Model tuned by your feedback" style={{
@@ -2957,7 +2957,7 @@ function App() {
 
   // ── AI Zap Assign ─────────────────────────────────────────────────────────
   function zapAssign() {
-    if (!nurses.length) { showToast('⚠ Add nurses before running AssignIQ'); return; }
+    if (!nurses.length) { showToast('⚠ Add nurses before running OpenAssign AI'); return; }
 
     setZapLoading(true);
 
