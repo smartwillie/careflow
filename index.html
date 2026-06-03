@@ -2327,16 +2327,38 @@ function PolicySearchModal({ onClose }) {
 
   // ── PDF generator ──
   function generatePolicyPdf(policy) {
-    // Sanitize to Latin-1: jsPDF built-in Helvetica only supports Latin-1 (cp1252).
-    // Unicode symbols outside that range (e.g. ● U+25CF) render as '%' or garbage.
+    // Sanitize to Latin-1: jsPDF's built-in Helvetica only supports Latin-1 (cp1252).
+    // All chars above U+00FF render as '%' or garbage — replace each with a
+    // meaningful ASCII/Latin-1 equivalent based on the full audit of all 41 policies.
     const sanitize = str => (str || '')
-      .replace(/[•●▪▫►‣⁃]/g, '-')   // bullets → dash
-      .replace(/['']/g, "'")    // smart single quotes
-      .replace(/[""]/g, '"')    // smart double quotes
-      .replace(/–/g, '-')            // en-dash
-      .replace(/—/g, '--')           // em-dash
-      .replace(/…/g, '...')          // ellipsis
-      .replace(/[^\x00-\xFF]/g, ''); // drop remaining non-Latin-1
+      // Zero-width / invisible
+      .replace(/​/g, '')              // zero-width space → remove
+      // Bullets & list markers
+      .replace(/[●•■]/g, '-')  // ● • ■  (filled bullets) → -
+      .replace(/[○⬜]/g, '[ ]')  // ○ ⬜ (open/empty box) → [ ]
+      // Checkboxes
+      .replace(/☐/g, '[ ]')           // ☐ → [ ]
+      .replace(/☒/g, '[x]')           // ☒ → [x]
+      // Quotes
+      .replace(/[‘’]/g, "'")     // '' → '
+      .replace(/[“”]/g, '"')     // "" → "
+      // Dashes
+      .replace(/–/g, '-')             // – en-dash → -
+      .replace(/—/g, '--')            // — em-dash → --
+      // Ellipsis
+      .replace(/…/g, '...')           // … → ...
+      // Math / comparisons
+      .replace(/≤/g, '<=')            // ≤ → <=
+      .replace(/≥/g, '>=')            // ≥ → >=
+      // Temperature / degree
+      .replace(/℃/g, '°C')      // ℃ → °C  (° is Latin-1 U+00B0)
+      .replace(/˚/g, '°')       // ˚ → °
+      // Angle / comparison
+      .replace(/˃/g, '>')             // ˃ → >
+      // Ligatures
+      .replace(/ﬁ/g, 'fi')            // ﬁ → fi
+      // Catch-all: drop any remaining non-Latin-1
+      .replace(/[^\x00-\xFF]/g, '');
 
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit: 'pt', format: 'letter' });
