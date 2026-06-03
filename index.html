@@ -2327,38 +2327,27 @@ function PolicySearchModal({ onClose }) {
 
   // ── PDF generator ──
   function generatePolicyPdf(policy) {
-    // Sanitize to Latin-1: jsPDF's built-in Helvetica only supports Latin-1 (cp1252).
-    // All chars above U+00FF render as '%' or garbage — replace each with a
-    // meaningful ASCII/Latin-1 equivalent based on the full audit of all 41 policies.
+    // Sanitize to Latin-1: jsPDF built-in Helvetica only supports Latin-1 (cp1252).
+    // Use \uXXXX escapes (never literal Unicode) so Babel standalone parses cleanly.
     const sanitize = str => (str || '')
-      // Zero-width / invisible
-      .replace(/​/g, '')              // zero-width space → remove
-      // Bullets & list markers
-      .replace(/[●•■]/g, '-')  // ● • ■  (filled bullets) → -
-      .replace(/[○⬜]/g, '[ ]')  // ○ ⬜ (open/empty box) → [ ]
-      // Checkboxes
-      .replace(/☐/g, '[ ]')           // ☐ → [ ]
-      .replace(/☒/g, '[x]')           // ☒ → [x]
-      // Quotes
-      .replace(/[‘’]/g, "'")     // '' → '
-      .replace(/[“”]/g, '"')     // "" → "
-      // Dashes
-      .replace(/–/g, '-')             // – en-dash → -
-      .replace(/—/g, '--')            // — em-dash → --
-      // Ellipsis
-      .replace(/…/g, '...')           // … → ...
-      // Math / comparisons
-      .replace(/≤/g, '<=')            // ≤ → <=
-      .replace(/≥/g, '>=')            // ≥ → >=
-      // Temperature / degree
-      .replace(/℃/g, '°C')      // ℃ → °C  (° is Latin-1 U+00B0)
-      .replace(/˚/g, '°')       // ˚ → °
-      // Angle / comparison
-      .replace(/˃/g, '>')             // ˃ → >
-      // Ligatures
-      .replace(/ﬁ/g, 'fi')            // ﬁ → fi
-      // Catch-all: drop any remaining non-Latin-1
-      .replace(/[^\x00-\xFF]/g, '');
+      .replace(/\u200B/g, '')           // zero-width space
+      .replace(/\uF0B7/g, '-')          // private-use bullet
+      .replace(/\u25CF|\u2022|\u25A0/g, '-')  // filled bullets ● • ■
+      .replace(/\u25CB|\u2B1C/g, '[ ]')        // open circle/box ○ ⬜
+      .replace(/\u2610/g, '[ ]')        // checkbox unchecked ☐
+      .replace(/\u2612/g, '[x]')        // checkbox checked ☒
+      .replace(/\u2018|\u2019/g, "'")  // smart single quotes
+      .replace(/\u201C|\u201D/g, '"')  // smart double quotes
+      .replace(/\u2013/g, '-')          // en-dash
+      .replace(/\u2014/g, '--')         // em-dash
+      .replace(/\u2026/g, '...')        // ellipsis
+      .replace(/\u2264/g, '<=')         // <=
+      .replace(/\u2265/g, '>=')         // >=
+      .replace(/\u2103/g, '\u00B0C')   // ℃ → °C
+      .replace(/\u02DA/g, '\u00B0')    // ˚ → °
+      .replace(/\u02C3/g, '>')          // ˃ → >
+      .replace(/\uFB01/g, 'fi')         // fi ligature
+      .replace(/[^\x00-\xFF]/g, '');   // drop any remaining non-Latin-1
 
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit: 'pt', format: 'letter' });
