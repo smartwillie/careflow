@@ -2327,6 +2327,17 @@ function PolicySearchModal({ onClose }) {
 
   // ── PDF generator ──
   function generatePolicyPdf(policy) {
+    // Sanitize to Latin-1: jsPDF built-in Helvetica only supports Latin-1 (cp1252).
+    // Unicode symbols outside that range (e.g. ● U+25CF) render as '%' or garbage.
+    const sanitize = str => (str || '')
+      .replace(/[•●▪▫►‣⁃]/g, '-')   // bullets → dash
+      .replace(/['']/g, "'")    // smart single quotes
+      .replace(/[""]/g, '"')    // smart double quotes
+      .replace(/–/g, '-')            // en-dash
+      .replace(/—/g, '--')           // em-dash
+      .replace(/…/g, '...')          // ellipsis
+      .replace(/[^\x00-\xFF]/g, ''); // drop remaining non-Latin-1
+
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit: 'pt', format: 'letter' });
     const pageW = doc.internal.pageSize.getWidth();
@@ -2362,7 +2373,7 @@ function PolicySearchModal({ onClose }) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(18);
     doc.setTextColor(15, 23, 42);
-    const titleLines = doc.splitTextToSize(policy.title || 'Untitled Policy', contentW);
+    const titleLines = doc.splitTextToSize(sanitize(policy.title || 'Untitled Policy'), contentW);
     doc.text(titleLines, margin, y);
     y += titleLines.length * 22 + 6;
 
@@ -2397,7 +2408,7 @@ function PolicySearchModal({ onClose }) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10.5);
     doc.setTextColor(30, 41, 59);
-    const content = policy.content || '(No content available)';
+    const content = sanitize(policy.content || ‘(No content available)’);
     const lines = doc.splitTextToSize(content, contentW);
     const lineH = 15;
     for (const line of lines) {
