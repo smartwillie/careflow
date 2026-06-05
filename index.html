@@ -360,18 +360,19 @@
     align-items: center; justify-content: center;
     gap: 3px; padding: 7px 6px 6px; border-radius: 10px;
     flex: 1 1 0; min-width: 0;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid rgba(255,255,255,0.09);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.07);
+    background: rgba(255,255,255,0.10);
+    border: 1px solid rgba(255,255,255,0.18);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 2px 6px rgba(0,0,0,0.20);
     transition: background 0.12s, transform 0.08s, border-color 0.12s;
     cursor: default;
   }
   .flag-tile-btn { cursor: pointer; }
-  .flag-tile-btn:hover { background: rgba(255,255,255,0.11); border-color: rgba(255,255,255,0.20); }
+  .flag-tile-btn:hover { background: rgba(255,255,255,0.16); border-color: rgba(255,255,255,0.30); }
   .flag-tile-btn:active { transform: scale(0.93); }
   .flag-tile-active {
-    background: rgba(255,255,255,0.12);
-    border-color: rgba(255,255,255,0.26);
+    background: rgba(255,255,255,0.18);
+    border-color: rgba(255,255,255,0.36);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 0 0 2px rgba(255,255,255,0.10);
   }
 
   /* ── Stat section label ── */
@@ -2026,15 +2027,17 @@ function FlagTile({ icon, value, label, color, onClick, active, btnRef }) {
       className={`flag-tile${isBtn ? ' flag-tile-btn' : ''}${active ? ' flag-tile-active' : ''}`}
       title={label}
     >
-      <span style={{ fontSize:13, lineHeight:1, opacity: lit ? 1 : 0.30 }}>{icon}</span>
+      <span style={{ fontSize:13, lineHeight:1, opacity: lit ? 1 : 0.38 }}>{icon}</span>
       <span style={{
         fontSize:20, fontWeight:900, lineHeight:1, letterSpacing:'-0.5px',
-        color: lit ? '#ffffff' : 'rgba(255,255,255,0.25)',
-        textShadow: lit ? `0 0 16px ${color}88` : 'none',
+        color: '#ffffff',
+        opacity: lit ? 1 : 0.35,
+        textShadow: lit ? `0 0 18px ${color}99` : 'none',
       }}>{value}</span>
       <span style={{
-        fontSize:9, fontWeight:700, letterSpacing:'0.06em', textTransform:'uppercase',
-        color: lit ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.20)',
+        fontSize:9, fontWeight:800, letterSpacing:'0.07em', textTransform:'uppercase',
+        color: '#ffffff',
+        opacity: lit ? 0.95 : 0.30,
         lineHeight:1, textAlign:'center',
       }}>{label}</span>
     </div>
