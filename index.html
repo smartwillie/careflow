@@ -2148,7 +2148,7 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
       {/* ── Acuity & flag stats ── */}
       <div className="dash-section-label">Acuity Flags</div>
       <div style={{ display:'flex', gap:6, alignItems:'stretch', marginBottom:16 }}>
-        <FlagTile icon="👁" value={sitter}      label="ST"   color="#c4b5fd"
+        <FlagTile icon="👁" value={sitter}      label="SITTER" color="#c4b5fd"
           onClick={()=>toggleStatPopup('sitter',sitterRef)} active={statPopup?.key==='sitter'} btnRef={sitterRef} />
         <FlagTile icon="🚪" value={discharge}   label="DC"   color="#7dd3fc"
           onClick={()=>toggleStatPopup('discharge',dischargeRef)} active={statPopup?.key==='discharge'} btnRef={dischargeRef} />
@@ -2156,9 +2156,9 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
           onClick={()=>toggleStatPopup('isolation',isolationRef)} active={statPopup?.key==='isolation'} btnRef={isolationRef} />
         <FlagTile icon="💧" value={foley}       label="FOLEY" color="#a78bfa"
           onClick={()=>toggleStatPopup('foley',foleyRef)} active={statPopup?.key==='foley'} btnRef={foleyRef} />
-        <FlagTile icon="⊕" value={centralLine} label="CVL"  color="#93c5fd"
+        <FlagTile icon="⊕" value={centralLine} label="LINE" color="#93c5fd"
           onClick={()=>toggleStatPopup('centralLine',centralLineRef)} active={statPopup?.key==='centralLine'} btnRef={centralLineRef} />
-        <FlagTile icon="🧠" value={neuroCheck}  label="NC"   color="#bfdbfe"
+        <FlagTile icon="🧠" value={neuroCheck}  label="NEURO" color="#bfdbfe"
           onClick={()=>toggleStatPopup('neuroCheck',neuroCheckRef)} active={statPopup?.key==='neuroCheck'} btnRef={neuroCheckRef} />
         <FlagTile icon="⚖" value={dailyWeight} label="DW"   color="#6ee7b7"
           onClick={()=>toggleStatPopup('dailyWeight',dailyWeightRef)} active={statPopup?.key==='dailyWeight'} btnRef={dailyWeightRef} />
