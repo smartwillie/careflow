@@ -1706,6 +1706,8 @@ function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, on
             transition:'background 0.15s, border-color 0.15s',
           }}
         >{locked ? '🔒' : '🔓'}</button>
+        {/* Spacer between lock/tele/stats group and trash bin */}
+        <div style={{ width:1, height:18, background:'var(--border-sub)', borderRadius:1, flexShrink:0 }}/>
         <div className={`trash-zone${trashOver?' drag-over':''}`}
           onDragOver={e=>{ e.preventDefault(); e.stopPropagation(); setTrashOver(true); setDragOver(false); }}
           onDragLeave={()=>setTrashOver(false)}
