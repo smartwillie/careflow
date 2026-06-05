@@ -312,16 +312,16 @@
   /* ── Center Dashboard ── */
   .dash-card {
     position: relative;
-    isolation: isolate;   /* own stacking context so ::before stays behind content */
-    border-radius: 20px;
+    isolation: isolate;
+    border-radius: 22px;
     transition: background 0.25s;
+    width: 340px;          /* explicit width so tiles have room to breathe */
   }
-  /* Subtle white border ring around dashboard */
   .dash-card::before {
     content: '';
-    position: absolute; inset: -2px;
-    border-radius: 22px;
-    background: rgba(255,255,255,0.20);
+    position: absolute; inset: -1.5px;
+    border-radius: 24px;
+    background: linear-gradient(135deg, rgba(99,102,241,0.35), rgba(52,211,153,0.15));
     z-index: -1;
   }
   .dash-title { display: inline-block; }
@@ -337,46 +337,47 @@
   .dash-tile {
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    gap: 4px; padding: 13px 8px 11px; border-radius: 10px;
+    gap: 5px; padding: 16px 10px 13px; border-radius: 12px;
     flex: 1 1 0; min-width: 0;
-    background: rgba(255,255,255,0.055);
-    border: 1px solid rgba(255,255,255,0.10);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.10), 0 2px 8px rgba(0,0,0,0.25);
     transition: background 0.12s, transform 0.08s, border-color 0.12s;
   }
   .dash-tile-btn { cursor: pointer; }
-  .dash-tile-btn:hover { background: rgba(255,255,255,0.10); border-color: rgba(255,255,255,0.20); }
+  .dash-tile-btn:hover { background: rgba(255,255,255,0.13); border-color: rgba(255,255,255,0.26); }
   .dash-tile-btn:active { transform: scale(0.94); }
   .dash-tile-active {
-    background: rgba(255,255,255,0.12);
-    border-color: rgba(255,255,255,0.28);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 0 0 2px rgba(255,255,255,0.06);
+    background: rgba(255,255,255,0.15);
+    border-color: rgba(255,255,255,0.32);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.14), 0 0 0 2px rgba(255,255,255,0.08);
   }
 
-  /* ── Acuity flag tiles (compact pill row) ── */
+  /* ── Acuity flag tiles (compact pill) ── */
   .flag-tile {
-    display: flex; flex-direction: row;
+    display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    gap: 4px; padding: 6px 8px; border-radius: 8px;
+    gap: 3px; padding: 9px 6px 8px; border-radius: 10px;
     flex: 1 1 0; min-width: 0;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.09);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.07);
     transition: background 0.12s, transform 0.08s, border-color 0.12s;
     cursor: default;
   }
   .flag-tile-btn { cursor: pointer; }
-  .flag-tile-btn:hover { background: rgba(255,255,255,0.09); border-color: rgba(255,255,255,0.18); }
-  .flag-tile-btn:active { transform: scale(0.94); }
+  .flag-tile-btn:hover { background: rgba(255,255,255,0.11); border-color: rgba(255,255,255,0.20); }
+  .flag-tile-btn:active { transform: scale(0.93); }
   .flag-tile-active {
-    background: rgba(255,255,255,0.10);
-    border-color: rgba(255,255,255,0.24);
+    background: rgba(255,255,255,0.12);
+    border-color: rgba(255,255,255,0.26);
   }
 
-  /* ── Stat section divider label ── */
+  /* ── Stat section label ── */
   .dash-section-label {
-    font-size: 9px; font-weight: 700; letter-spacing: 0.10em;
-    text-transform: uppercase; color: rgba(255,255,255,0.28);
-    padding: 10px 2px 5px; user-select: none;
+    font-size: 9.5px; font-weight: 700; letter-spacing: 0.12em;
+    text-transform: uppercase; color: rgba(255,255,255,0.32);
+    padding: 12px 2px 6px; user-select: none;
   }
 
   /* ── Rabbit animation ── */
@@ -1801,19 +1802,19 @@ function DashTile({ icon, value, label, color, accentColor, onClick, active, btn
     >
       {/* Value */}
       <div style={{
-        fontSize:26, fontWeight:900, color: numColor, lineHeight:1,
-        textShadow: numColor !== '#fff' && numColor !== 'rgba(255,255,255,0.55)' ? `0 0 14px ${numColor}55` : 'none',
-        letterSpacing:'-0.5px',
+        fontSize:32, fontWeight:900, color: numColor, lineHeight:1,
+        textShadow: numColor !== '#fff' && numColor !== 'rgba(255,255,255,0.55)' && numColor !== 'rgba(255,255,255,0.90)' && numColor !== 'rgba(255,255,255,0.25)' ? `0 0 18px ${numColor}66` : 'none',
+        letterSpacing:'-1px',
       }}>{value}</div>
       {/* Label */}
       <div style={{
-        fontSize:8.5, fontWeight:700, letterSpacing:'0.07em',
-        textTransform:'uppercase', color:'rgba(255,255,255,0.45)',
+        fontSize:10, fontWeight:700, letterSpacing:'0.07em',
+        textTransform:'uppercase', color:'rgba(255,255,255,0.50)',
         lineHeight:1, textAlign:'center',
       }}>{label}</div>
       {/* Chevron */}
       <div style={{
-        fontSize:7, color: numColor, lineHeight:1, marginTop:1,
+        fontSize:8, color: numColor, lineHeight:1, marginTop:1,
         opacity: isBtn ? (active ? 0.9 : 0.28) : 0,
         visibility: isBtn ? 'visible' : 'hidden',
         transform: active ? 'rotate(180deg)' : 'none',
@@ -2025,16 +2026,16 @@ function FlagTile({ icon, value, label, color, onClick, active, btnRef }) {
       className={`flag-tile${isBtn ? ' flag-tile-btn' : ''}${active ? ' flag-tile-active' : ''}`}
       title={label}
     >
-      <span style={{ fontSize:11, lineHeight:1, opacity: lit ? 1 : 0.4 }}>{icon}</span>
+      <span style={{ fontSize:13, lineHeight:1, opacity: lit ? 1 : 0.35 }}>{icon}</span>
       <span style={{
-        fontSize:14, fontWeight:800, lineHeight:1, letterSpacing:'-0.3px',
-        color: lit ? color : 'rgba(255,255,255,0.35)',
-        textShadow: lit && color !== '#fff' ? `0 0 10px ${color}55` : 'none',
+        fontSize:20, fontWeight:900, lineHeight:1, letterSpacing:'-0.5px',
+        color: lit ? color : 'rgba(255,255,255,0.30)',
+        textShadow: lit ? `0 0 14px ${color}66` : 'none',
       }}>{value}</span>
       <span style={{
-        fontSize:8, fontWeight:700, letterSpacing:'0.05em', textTransform:'uppercase',
-        color: lit ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.22)',
-        lineHeight:1,
+        fontSize:9, fontWeight:700, letterSpacing:'0.06em', textTransform:'uppercase',
+        color: lit ? 'rgba(255,255,255,0.60)' : 'rgba(255,255,255,0.22)',
+        lineHeight:1, textAlign:'center',
       }}>{label}</span>
     </div>
   );
@@ -2078,8 +2079,8 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
 
   return (
     <div className="dash-card dash-cockpit" style={{
-      padding:'56px 16px 16px',
-      boxShadow:`0 4px 24px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.05) inset`,
+      padding:'60px 20px 20px',
+      boxShadow:`0 8px 32px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.06) inset`,
     }}>
 
       {/* ── Policy monkey track ── */}
@@ -2125,7 +2126,7 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
 
       {/* ── Primary stats ── */}
       <div className="dash-section-label">Room Status</div>
-      <div style={{ display:'flex', gap:7, alignItems:'stretch', marginBottom:10 }}>
+      <div style={{ display:'flex', gap:8, alignItems:'stretch', marginBottom:10 }}>
         <DashTile value={vacant}     label="Empty"
           color={vacant > 0 ? 'rgba(255,255,255,0.50)' : 'rgba(255,255,255,0.25)'} />
         <DashTile value={occupied}   label="Occupied"  color="rgba(255,255,255,0.90)" />
@@ -2143,7 +2144,7 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
 
       {/* ── Acuity & flag stats ── */}
       <div className="dash-section-label">Acuity Flags</div>
-      <div style={{ display:'flex', gap:5, alignItems:'stretch', marginBottom:14 }}>
+      <div style={{ display:'flex', gap:6, alignItems:'stretch', marginBottom:16 }}>
         <FlagTile icon="👁" value={sitter}      label="ST"   color="#c4b5fd"
           onClick={()=>toggleStatPopup('sitter',sitterRef)} active={statPopup?.key==='sitter'} btnRef={sitterRef} />
         <FlagTile icon="🚪" value={discharge}   label="DC"   color="#7dd3fc"
