@@ -3474,16 +3474,21 @@ function App() {
 
   function saveRoom(updated) {
     const wasOccupied = rooms[updated.id]?.occupied;
-    const becomingVacant = wasOccupied && !updated.occupied;
-    // When toggling a room to vacant: clear ALL patient properties, not just nurseId
+    const becomingVacant  = wasOccupied && !updated.occupied;
+    const becomingOccupied = !wasOccupied && updated.occupied;
+    // When toggling to vacant: clear all patient properties (keep clean as-is)
+    // When toggling to occupied: clear clean flag (new patient = room no longer "clean")
+    // Otherwise (already vacant or already occupied): preserve everything as updated
     const finalRoom = becomingVacant
       ? { ...updated,
-          nurseId: null, clean: updated.clean ?? false,
+          nurseId: null,
           foley: false, drip: false, prisoner: false, totalCare: false,
           glucose: false, highAcuity: false, sitter: false,
           discharge: false, isolation: false, restraint: false, centralLine: false,
           chestTube: false, drain: false }
-      : { ...updated, clean: false }; // clear clean status when room becomes occupied
+      : becomingOccupied
+        ? { ...updated, clean: false }
+        : updated;
     setRooms(prev => ({ ...prev, [updated.id]: finalRoom }));
     if (becomingVacant) {
       setSelected(prev => { const next = new Set(prev); next.delete(updated.id); return next; });
