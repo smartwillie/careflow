@@ -315,8 +315,8 @@
     isolation: isolate;
     border-radius: 22px;
     transition: background 0.25s;
-    width: 33.33vw;        /* 1/3 of screen width */
-    min-width: 320px;
+    width: 38vw;           /* slightly wider for tile breathing room */
+    min-width: 380px;
   }
   .dash-card::before {
     content: '';
@@ -379,7 +379,7 @@
   .dash-section-label {
     font-size: 9.5px; font-weight: 700; letter-spacing: 0.12em;
     text-transform: uppercase; color: rgba(255,255,255,0.32);
-    padding: 12px 2px 6px; user-select: none;
+    padding: 14px 2px 7px; user-select: none;
   }
 
   /* ── Rabbit animation ── */
@@ -2102,7 +2102,7 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
 
       {/* ── Header row: branding + ECO toggle ── */}
       <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
-        gap:8, marginBottom:12, marginTop:6 }}>
+        gap:8, marginBottom:14, marginTop:10 }}>
         <div style={{ display:'flex', alignItems:'baseline', gap:6 }}>
           <span style={{ fontSize:15, fontWeight:800, letterSpacing:'-0.3px',
             color:'rgba(255,255,255,0.90)' }}>Unit</span>
@@ -2112,6 +2112,7 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
           onClick={onToggleFuel}
           title={fuelMode ? 'ECO ON — MedSurg priority' : 'ECO OFF'}
           className={`eco-toggle ${fuelMode ? 'eco-toggle-on' : 'eco-toggle-off'}`}
+          style={{ marginTop:4 }}
         >
           <span className="eco-icon">
             <svg width="13" height="13" viewBox="0 0 20 20" fill="none">
@@ -2129,7 +2130,7 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
 
       {/* ── Primary stats ── */}
       <div className="dash-section-label">Room Status</div>
-      <div style={{ display:'flex', gap:8, alignItems:'stretch', marginBottom:10 }}>
+      <div style={{ display:'flex', gap:10, alignItems:'stretch', marginBottom:12 }}>
         <DashTile value={vacant}     label="Empty"
           color={vacant > 0 ? 'rgba(255,255,255,0.50)' : 'rgba(255,255,255,0.25)'} />
         <DashTile value={occupied}   label="Occupied"  color="rgba(255,255,255,0.90)" />
@@ -2147,7 +2148,7 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
 
       {/* ── Acuity & flag stats ── */}
       <div className="dash-section-label">Acuity Flags</div>
-      <div style={{ display:'flex', gap:6, alignItems:'stretch', marginBottom:16 }}>
+      <div style={{ display:'flex', gap:8, alignItems:'stretch', marginBottom:18 }}>
         <FlagTile icon="👁" value={sitter}      label="SITTER" color="#c4b5fd"
           onClick={()=>toggleStatPopup('sitter',sitterRef)} active={statPopup?.key==='sitter'} btnRef={sitterRef} />
         <FlagTile icon="🚪" value={discharge}   label="DC"   color="#7dd3fc"
