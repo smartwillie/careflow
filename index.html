@@ -327,31 +327,56 @@
   .dash-title { display: inline-block; }
   .dash-sub   { opacity: 0.80; }
 
-  /* ── Dashboard background — deep burnt orange ── */
+  /* ── Dashboard background — Carbon Medical dark surface ── */
   .dash-cockpit {
-    background: #c2410c !important;
+    background: linear-gradient(170deg, #161926 0%, #111422 50%, #0e1220 100%) !important;
+    border: 1px solid #252b48 !important;
   }
 
-  /* ── Dashboard stat tiles ── */
+  /* ── Primary stat tiles (large) ── */
   .dash-tile {
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    gap: 5px; padding: 12px 10px 10px; border-radius: 9px;
+    gap: 4px; padding: 13px 8px 11px; border-radius: 10px;
     flex: 1 1 0; min-width: 0;
-    background: rgba(255,255,255,0.10);
-    border: 1px solid rgba(255,255,255,0.16);
-    box-shadow:
-      inset 0 1px 0 rgba(255,255,255,0.18),
-      inset 0 -1px 0 rgba(0,0,0,0.12);
-    transition: background 0.12s, transform 0.08s;
+    background: rgba(255,255,255,0.055);
+    border: 1px solid rgba(255,255,255,0.10);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+    transition: background 0.12s, transform 0.08s, border-color 0.12s;
   }
   .dash-tile-btn { cursor: pointer; }
-  .dash-tile-btn:hover { background: rgba(255,255,255,0.18); border-color: rgba(255,255,255,0.30); }
-  .dash-tile-btn:active { transform: scale(0.95); }
+  .dash-tile-btn:hover { background: rgba(255,255,255,0.10); border-color: rgba(255,255,255,0.20); }
+  .dash-tile-btn:active { transform: scale(0.94); }
   .dash-tile-active {
-    background: rgba(255,255,255,0.20);
-    border-color: rgba(255,255,255,0.42);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 0 0 2px rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.12);
+    border-color: rgba(255,255,255,0.28);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 0 0 2px rgba(255,255,255,0.06);
+  }
+
+  /* ── Acuity flag tiles (compact pill row) ── */
+  .flag-tile {
+    display: flex; flex-direction: row;
+    align-items: center; justify-content: center;
+    gap: 4px; padding: 6px 8px; border-radius: 8px;
+    flex: 1 1 0; min-width: 0;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    transition: background 0.12s, transform 0.08s, border-color 0.12s;
+    cursor: default;
+  }
+  .flag-tile-btn { cursor: pointer; }
+  .flag-tile-btn:hover { background: rgba(255,255,255,0.09); border-color: rgba(255,255,255,0.18); }
+  .flag-tile-btn:active { transform: scale(0.94); }
+  .flag-tile-active {
+    background: rgba(255,255,255,0.10);
+    border-color: rgba(255,255,255,0.24);
+  }
+
+  /* ── Stat section divider label ── */
+  .dash-section-label {
+    font-size: 9px; font-weight: 700; letter-spacing: 0.10em;
+    text-transform: uppercase; color: rgba(255,255,255,0.28);
+    padding: 10px 2px 5px; user-select: none;
   }
 
   /* ── Rabbit animation ── */
@@ -558,10 +583,10 @@
     color: rgba(255,255,255,0.85);
   }
   .eco-toggle-on {
-    background: rgba(255,255,255,0.92);
-    color: #9a3412;
-    border-color: rgba(255,255,255,0.7);
-    box-shadow: 0 2px 10px rgba(0,0,0,0.28), 0 0 0 1px rgba(255,255,255,0.15);
+    background: #f97316;
+    color: #fff;
+    border-color: #fb923c;
+    box-shadow: 0 2px 12px rgba(249,115,22,0.45);
   }
   .eco-icon {
     display: inline-flex; align-items: center; justify-content: center;
@@ -569,19 +594,19 @@
 
   /* ── "crazy" title word ── */
   .crazy-word {
-    font-size: 36px;
+    font-size: 22px;
     font-weight: 900;
     font-style: italic;
-    letter-spacing: -1.5px;
+    letter-spacing: -0.8px;
     display: inline-block;
-    transform: rotate(-4deg) skewX(-4deg);
-    background: linear-gradient(120deg, #ffffff 0%, #a1a1aa 30%, #3f3f46 58%, #18181b 100%);
+    transform: rotate(-2deg) skewX(-3deg);
+    background: linear-gradient(110deg, #e0e7ff 0%, #818cf8 40%, #6366f1 70%, #4f46e5 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
     background-size: 200% auto;
-    animation: crazy-shimmer 3s ease-in-out infinite, crazy-wobble 4s ease-in-out infinite;
-    filter: drop-shadow(0 0 14px rgba(255,255,255,0.30));
+    animation: crazy-shimmer 4s ease-in-out infinite;
+    filter: drop-shadow(0 0 8px rgba(99,102,241,0.40));
   }
   @keyframes crazy-shimmer {
     0%, 100% { background-position: 0% center; }
@@ -1769,26 +1794,22 @@ function DashTile({ icon, value, label, color, accentColor, onClick, active, btn
       onClick={onClick}
       className={`dash-tile${isBtn ? ' dash-tile-btn' : ''}${active ? ' dash-tile-active' : ''}`}
     >
-      {/* Icon */}
-      {icon && (
-        <div style={{ fontSize:12, lineHeight:1, opacity:0.75, marginBottom:1 }}>{icon}</div>
-      )}
       {/* Value */}
       <div style={{
-        fontSize:24, fontWeight:900, color: numColor, lineHeight:1,
-        textShadow: `0 0 12px ${numColor}66`,
+        fontSize:26, fontWeight:900, color: numColor, lineHeight:1,
+        textShadow: numColor !== '#fff' && numColor !== 'rgba(255,255,255,0.55)' ? `0 0 14px ${numColor}55` : 'none',
         letterSpacing:'-0.5px',
       }}>{value}</div>
       {/* Label */}
       <div style={{
-        fontSize:9, fontWeight:700, letterSpacing:'0.06em',
-        textTransform:'uppercase', color:'rgba(255,255,255,0.60)',
-        lineHeight:1, paddingLeft:4, paddingRight:4, textAlign:'center',
+        fontSize:8.5, fontWeight:700, letterSpacing:'0.07em',
+        textTransform:'uppercase', color:'rgba(255,255,255,0.45)',
+        lineHeight:1, textAlign:'center',
       }}>{label}</div>
       {/* Chevron */}
       <div style={{
-        fontSize:8, color: numColor, lineHeight:1, marginTop:1,
-        opacity: isBtn ? (active ? 0.9 : 0.30) : 0,
+        fontSize:7, color: numColor, lineHeight:1, marginTop:1,
+        opacity: isBtn ? (active ? 0.9 : 0.28) : 0,
         visibility: isBtn ? 'visible' : 'hidden',
         transform: active ? 'rotate(180deg)' : 'none',
         transition:'transform 0.2s, opacity 0.2s',
@@ -1991,6 +2012,29 @@ function FeedbackBar({ onGood, onBad }) {
   );
 }
 
+function FlagTile({ icon, value, label, color, onClick, active, btnRef }) {
+  const isBtn = !!onClick;
+  const lit = value > 0;
+  return (
+    <div ref={btnRef} onClick={onClick}
+      className={`flag-tile${isBtn ? ' flag-tile-btn' : ''}${active ? ' flag-tile-active' : ''}`}
+      title={label}
+    >
+      <span style={{ fontSize:11, lineHeight:1, opacity: lit ? 1 : 0.4 }}>{icon}</span>
+      <span style={{
+        fontSize:14, fontWeight:800, lineHeight:1, letterSpacing:'-0.3px',
+        color: lit ? color : 'rgba(255,255,255,0.35)',
+        textShadow: lit && color !== '#fff' ? `0 0 10px ${color}55` : 'none',
+      }}>{value}</span>
+      <span style={{
+        fontSize:8, fontWeight:700, letterSpacing:'0.05em', textTransform:'uppercase',
+        color: lit ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.22)',
+        lineHeight:1,
+      }}>{label}</span>
+    </div>
+  );
+}
+
 function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
                            discharge, isolation, restraint, centralLine, foley,
                            neuroCheck, dailyWeight,
@@ -2025,18 +2069,15 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
     onZapAssign();
   }
 
+  const allFull = assigned === occupied && occupied > 0;
+
   return (
     <div className="dash-card dash-cockpit" style={{
-      padding:'56px 22px 20px',
-      boxShadow:`
-        inset 0 1px 0 rgba(255,255,255,0.07),
-        inset 0 -1px 0 rgba(0,0,0,0.5),
-        0 4px 12px rgba(0,0,0,0.5),
-        0 16px 36px rgba(0,0,0,0.55),
-        0 32px 64px rgba(0,0,0,0.35)`,
+      padding:'56px 16px 16px',
+      boxShadow:`0 4px 24px rgba(0,0,0,0.5), 0 1px 0 rgba(255,255,255,0.05) inset`,
     }}>
 
-      {/* ── Monkey walking across the top with banana ── */}
+      {/* ── Policy monkey track ── */}
       <div className="rabbit-track">
         <div className="rabbit-runner" onClick={onMonkeyClick} title="Click to search unit policies">
           <div className="monkey-group">
@@ -2050,131 +2091,100 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
         </div>
       </div>
 
-      {/* ── Header ── */}
-      <div style={{ marginBottom:14, marginTop:10, paddingBottom:12, borderBottom:'1px solid transparent',
-        display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:10 }}>
-        <div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center',
-          gap:6, flexWrap:'nowrap', lineHeight:1 }}>
-          <span style={{ fontSize:22 }}>🧠</span>
-          <span style={{ fontSize:13, fontWeight:600, color:'rgba(255,255,255,0.55)',
-            letterSpacing:'0.04em', textTransform:'uppercase', whiteSpace:'nowrap' }}>Driven by a</span>
-          <span className="crazy-word">crazy</span>
-          <span style={{ fontSize:20, fontWeight:900, color:'rgba(255,255,255,0.92)',
-            letterSpacing:'-0.5px', whiteSpace:'nowrap' }}>mind</span>
+      {/* ── Header row: branding + ECO toggle ── */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+        gap:8, marginBottom:12, marginTop:6 }}>
+        <div style={{ display:'flex', alignItems:'baseline', gap:6 }}>
+          <span style={{ fontSize:15, fontWeight:800, letterSpacing:'-0.3px',
+            color:'rgba(255,255,255,0.90)' }}>Unit</span>
+          <span className="crazy-word" style={{ fontSize:22 }}>Overview</span>
         </div>
-        {/* ── Fuel Efficiency Toggle ── */}
         <button
           onClick={onToggleFuel}
-          title={fuelMode ? 'Fuel Efficiency ON — MedSurg priority' : 'Fuel Efficiency OFF'}
+          title={fuelMode ? 'ECO ON — MedSurg priority' : 'ECO OFF'}
           className={`eco-toggle ${fuelMode ? 'eco-toggle-on' : 'eco-toggle-off'}`}
         >
           <span className="eco-icon">
-            <svg width="15" height="15" viewBox="0 0 20 20" fill="none">
+            <svg width="13" height="13" viewBox="0 0 20 20" fill="none">
               <rect x="2" y="4" width="11" height="14" rx="2" stroke="currentColor" strokeWidth="1.8"/>
               <path d="M13 8h2a2 2 0 012 2v2a2 2 0 01-2 2h-2" stroke="currentColor" strokeWidth="1.8"/>
-              <rect x="4" y="10" width={fuelMode ? 7 : 2} height="3" rx="1" fill="currentColor"
-                style={{transition:'width 0.3s ease'}}/>
+              <rect x="4" y="10" width={fuelMode ? 7 : 2} height="3" rx="1" fill="currentColor" style={{transition:'width 0.3s'}}/>
               <line x1="4" y1="8" x2="11" y2="8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
             </svg>
           </span>
-          {/* Fixed-width label — never changes width so title stays stable */}
           <span>ECO</span>
-          {/* ON indicator dot — appears/disappears in place */}
-          <span style={{
-            width:6, height:6, borderRadius:'50%',
-            background: fuelMode ? '#c2410c' : 'transparent',
-            transition:'background 0.22s',
-            flexShrink:0,
-          }}/>
+          <span style={{ width:5, height:5, borderRadius:'50%', flexShrink:0,
+            background: fuelMode ? '#f97316' : 'transparent', transition:'background 0.22s' }}/>
         </button>
       </div>
 
-      {/* ── Single row: all stats ── */}
-      <div style={{ display:'flex', gap:10, alignItems:'stretch' }}>
-        <DashTile icon="□" value={vacant}     label="Empty"      color="rgba(255,255,255,0.55)" />
-        <DashTile icon="●" value={occupied}   label="Occupied"   color="#fff" />
-        <DashTile icon="✓" value={assigned}   label="Assigned"   color={assigned===occupied&&occupied>0 ? '#86efac' : '#fff'}
-          accentColor={assigned===occupied&&occupied>0 ? '#86efac' : undefined} />
-        <DashTile icon="!" value={unassigned} label="Unassigned"
-          color={unassigned>0 ? '#fbbf24' : '#fff'}
-          accentColor={unassigned>0 ? '#fbbf24' : undefined}
+      {/* ── Primary stats ── */}
+      <div className="dash-section-label">Room Status</div>
+      <div style={{ display:'flex', gap:7, alignItems:'stretch', marginBottom:10 }}>
+        <DashTile value={vacant}     label="Empty"
+          color={vacant > 0 ? 'rgba(255,255,255,0.50)' : 'rgba(255,255,255,0.25)'} />
+        <DashTile value={occupied}   label="Occupied"  color="rgba(255,255,255,0.90)" />
+        <DashTile value={assigned}   label="Assigned"
+          color={allFull ? '#34d399' : 'rgba(255,255,255,0.90)'}
+          accentColor={allFull ? '#34d399' : undefined} />
+        <DashTile value={unassigned} label="Pending"
+          color={unassigned > 0 ? '#fbbf24' : 'rgba(255,255,255,0.90)'}
+          accentColor={unassigned > 0 ? '#fbbf24' : undefined}
           onClick={onUnassignedClick} active={unassignedOpen} btnRef={unassignedBtnRef} />
-        <DashTile icon="♥" value={tele}        label="TELE"      color="#fff" />
-        <DashTile icon="👁" value={sitter}      label="Sitter"    color={sitter>0 ? '#c4b5fd' : '#fff'} accentColor={sitter>0 ? '#c4b5fd' : undefined}
+        <DashTile value={tele} label="TELE"
+          color={tele > 0 ? '#f87171' : 'rgba(255,255,255,0.90)'}
+          accentColor={tele > 0 ? '#f87171' : undefined} />
+      </div>
+
+      {/* ── Acuity & flag stats ── */}
+      <div className="dash-section-label">Acuity Flags</div>
+      <div style={{ display:'flex', gap:5, alignItems:'stretch', marginBottom:14 }}>
+        <FlagTile icon="👁" value={sitter}      label="ST"   color="#c4b5fd"
           onClick={()=>toggleStatPopup('sitter',sitterRef)} active={statPopup?.key==='sitter'} btnRef={sitterRef} />
-        <DashTile icon="🚪" value={discharge}   label="Discharge" color={discharge>0 ? '#7dd3fc' : '#fff'} accentColor={discharge>0 ? '#7dd3fc' : undefined}
+        <FlagTile icon="🚪" value={discharge}   label="DC"   color="#7dd3fc"
           onClick={()=>toggleStatPopup('discharge',dischargeRef)} active={statPopup?.key==='discharge'} btnRef={dischargeRef} />
-        <DashTile icon="☣" value={isolation}   label="Isolation" color={isolation>0 ? '#fb923c' : '#fff'} accentColor={isolation>0 ? '#fb923c' : undefined}
+        <FlagTile icon="☣" value={isolation}   label="ISO"  color="#fb923c"
           onClick={()=>toggleStatPopup('isolation',isolationRef)} active={statPopup?.key==='isolation'} btnRef={isolationRef} />
-        <DashTile icon="💧" value={foley}       label="Foley"     color={foley>0 ? '#a78bfa' : '#fff'} accentColor={foley>0 ? '#a78bfa' : undefined}
+        <FlagTile icon="💧" value={foley}       label="FOL"  color="#a78bfa"
           onClick={()=>toggleStatPopup('foley',foleyRef)} active={statPopup?.key==='foley'} btnRef={foleyRef} />
-        <DashTile icon="⊕" value={centralLine} label="CVL"       color={centralLine>0 ? '#93c5fd' : '#fff'} accentColor={centralLine>0 ? '#93c5fd' : undefined}
+        <FlagTile icon="⊕" value={centralLine} label="CVL"  color="#93c5fd"
           onClick={()=>toggleStatPopup('centralLine',centralLineRef)} active={statPopup?.key==='centralLine'} btnRef={centralLineRef} />
-        <DashTile icon="🧠" value={neuroCheck}  label="Neuro"     color={neuroCheck>0 ? '#bfdbfe' : '#fff'} accentColor={neuroCheck>0 ? '#bfdbfe' : undefined}
+        <FlagTile icon="🧠" value={neuroCheck}  label="NC"   color="#bfdbfe"
           onClick={()=>toggleStatPopup('neuroCheck',neuroCheckRef)} active={statPopup?.key==='neuroCheck'} btnRef={neuroCheckRef} />
-        <DashTile icon="⚖" value={dailyWeight} label="Wt"        color={dailyWeight>0 ? '#6ee7b7' : '#fff'} accentColor={dailyWeight>0 ? '#6ee7b7' : undefined}
+        <FlagTile icon="⚖" value={dailyWeight} label="DW"   color="#6ee7b7"
           onClick={()=>toggleStatPopup('dailyWeight',dailyWeightRef)} active={statPopup?.key==='dailyWeight'} btnRef={dailyWeightRef} />
       </div>
 
-      {/* Stat room popups */}
-      {statPopup?.key==='sitter' && (
-        <StatRoomPopup title="Sitter Rooms" icon="👁" color="#5b21b6"
-          rooms={sitterRooms} allRooms={{}} nurseRooms={nurseRooms} nurses={nurses}
-          anchor={statPopup.anchor} onClose={()=>setStatPopup(null)} />
-      )}
-      {statPopup?.key==='discharge' && (
-        <StatRoomPopup title="Discharge Rooms" icon="🚪" color="#0369a1"
-          rooms={dischargeRooms} allRooms={{}} nurseRooms={nurseRooms} nurses={nurses}
-          anchor={statPopup.anchor} onClose={()=>setStatPopup(null)} />
-      )}
-      {statPopup?.key==='isolation' && (
-        <StatRoomPopup title="Isolation Rooms" icon="☣" color="#c2410c"
-          rooms={isolationRooms} allRooms={{}} nurseRooms={nurseRooms} nurses={nurses}
-          anchor={statPopup.anchor} onClose={()=>setStatPopup(null)} />
-      )}
-      {statPopup?.key==='foley' && (
-        <StatRoomPopup title="Foley Catheter Rooms" icon="💧" color="#7c3aed"
-          rooms={foleyRooms} allRooms={{}} nurseRooms={nurseRooms} nurses={nurses}
-          anchor={statPopup.anchor} onClose={()=>setStatPopup(null)} />
-      )}
-      {statPopup?.key==='centralLine' && (
-        <StatRoomPopup title="Central Line Rooms" icon="🩺" color="#1e3a5f"
-          rooms={centralLineRooms} allRooms={{}} nurseRooms={nurseRooms} nurses={nurses}
-          anchor={statPopup.anchor} onClose={()=>setStatPopup(null)} />
-      )}
-      {statPopup?.key==='neuroCheck' && (
-        <StatRoomPopup title="Neuro Check Rooms" icon="🧠" color="#1e40af"
-          rooms={neuroCheckRooms} allRooms={{}} nurseRooms={nurseRooms} nurses={nurses}
-          anchor={statPopup.anchor} onClose={()=>setStatPopup(null)} />
-      )}
-      {statPopup?.key==='dailyWeight' && (
-        <StatRoomPopup title="Daily Weight Rooms" icon="⚖" color="#065f46"
-          rooms={dailyWeightRooms} allRooms={{}} nurseRooms={nurseRooms} nurses={nurses}
-          anchor={statPopup.anchor} onClose={()=>setStatPopup(null)} />
-      )}
+      {/* ── Room popup overlays ── */}
+      {statPopup?.key==='sitter'      && <StatRoomPopup title="Sitter"       icon="👁" color="#5b21b6" rooms={sitterRooms}      allRooms={{}} nurseRooms={nurseRooms} nurses={nurses} anchor={statPopup.anchor} onClose={()=>setStatPopup(null)} />}
+      {statPopup?.key==='discharge'   && <StatRoomPopup title="Discharge"    icon="🚪" color="#0369a1" rooms={dischargeRooms}   allRooms={{}} nurseRooms={nurseRooms} nurses={nurses} anchor={statPopup.anchor} onClose={()=>setStatPopup(null)} />}
+      {statPopup?.key==='isolation'   && <StatRoomPopup title="Isolation"    icon="☣" color="#c2410c" rooms={isolationRooms}   allRooms={{}} nurseRooms={nurseRooms} nurses={nurses} anchor={statPopup.anchor} onClose={()=>setStatPopup(null)} />}
+      {statPopup?.key==='foley'       && <StatRoomPopup title="Foley"        icon="💧" color="#7c3aed" rooms={foleyRooms}       allRooms={{}} nurseRooms={nurseRooms} nurses={nurses} anchor={statPopup.anchor} onClose={()=>setStatPopup(null)} />}
+      {statPopup?.key==='centralLine' && <StatRoomPopup title="Central Line" icon="🩺" color="#1e3a5f" rooms={centralLineRooms} allRooms={{}} nurseRooms={nurseRooms} nurses={nurses} anchor={statPopup.anchor} onClose={()=>setStatPopup(null)} />}
+      {statPopup?.key==='neuroCheck'  && <StatRoomPopup title="Neuro Check"  icon="🧠" color="#1e40af" rooms={neuroCheckRooms}  allRooms={{}} nurseRooms={nurseRooms} nurses={nurses} anchor={statPopup.anchor} onClose={()=>setStatPopup(null)} />}
+      {statPopup?.key==='dailyWeight' && <StatRoomPopup title="Daily Weight" icon="⚖" color="#065f46" rooms={dailyWeightRooms} allRooms={{}} nurseRooms={nurseRooms} nurses={nurses} anchor={statPopup.anchor} onClose={()=>setStatPopup(null)} />}
 
-      {/* Zap Assign button */}
-      <div style={{ marginTop:18, paddingBottom:6 }}>
-        <button
-          className={`zap-btn${pressed || zapLoading ? ' zap-pressed' : ''}`}
-          onClick={handleZap}
-          disabled={zapLoading}
-          title="OpenAssign AI — AI-powered smart room assignment"
-          style={{ position:'relative' }}
-        >
-          <ZapAIIcon spinning={zapLoading} />
-          <span>{zapLoading ? 'Running…' : 'OpenAssign AI'}</span>
-          {/* Tuning indicator dot — lit when model weights have drifted from baseline */}
-          {isTuned && !zapLoading && (
-            <span title="Model tuned by your feedback" style={{
-              position:'absolute', top:6, right:8,
-              width:7, height:7, borderRadius:'50%',
-              background:'#86efac',
-              boxShadow:'0 0 6px #86efac',
-            }}/>
-          )}
-        </button>
-      </div>
+      {/* ── Divider ── */}
+      <div style={{ height:1, background:'rgba(255,255,255,0.08)', marginBottom:14 }}/>
+
+      {/* ── OpenAssign AI button ── */}
+      <button
+        className={`zap-btn${pressed || zapLoading ? ' zap-pressed' : ''}`}
+        onClick={handleZap}
+        disabled={zapLoading}
+        title="OpenAssign AI — smart room assignment"
+        style={{ position:'relative', marginBottom:0 }}
+      >
+        <ZapAIIcon spinning={zapLoading} />
+        <span>{zapLoading ? 'Running…' : 'OpenAssign AI'}</span>
+        {isTuned && !zapLoading && (
+          <span title="Model tuned by your feedback" style={{
+            position:'absolute', top:7, right:9,
+            width:6, height:6, borderRadius:'50%',
+            background:'#34d399', boxShadow:'0 0 6px #34d399',
+          }}/>
+        )}
+      </button>
     </div>
   );
 }
