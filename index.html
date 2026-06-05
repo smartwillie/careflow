@@ -894,7 +894,7 @@ function circDist(a, b) {
 
 function initRooms() {
   return ROOM_IDS.reduce((acc, id) => {
-    acc[id] = { id, occupied: false, gender: 'male', type: 'MEDSURG',
+    acc[id] = { id, occupied: false, clean: false, gender: 'male', type: 'MEDSURG',
                 foley: false, drip: false, prisoner: false, totalCare: false,
                 glucose: false, highAcuity: false, sitter: false,
                 discharge: false, isolation: false,
@@ -1123,7 +1123,7 @@ function RoomCard({ room, pos, cw, ch, selected, nurses, nurseRooms, onSelect, o
         onDragStart={onDragStart}
         title={`Room ${room.id}${room.occupied ? (room.type==='TELE' ? ' · TELE' : ' · M/S') : ' · Vacant'}`}
       >
-        {/* Assigned checkmark badge — always green */}
+        {/* Assigned checkmark badge — shown when nurse is assigned */}
         {room.nurseId && (
           <div style={{
             position:'absolute', top:-7, right:-7,
@@ -1134,6 +1134,24 @@ function RoomCard({ room, pos, cw, ch, selected, nurses, nurseRooms, onSelect, o
             fontSize:10, fontWeight:900, color:'white', lineHeight:1,
             zIndex:3, boxShadow:'0 2px 6px rgba(0,0,0,0.5)'
           }}>✓</div>
+        )}
+
+        {/* Clean badge — shown on vacant rooms marked clean */}
+        {!room.occupied && room.clean && (
+          <div title="Clean" style={{
+            position:'absolute', top:-7, right:-7,
+            height:17, borderRadius:9,
+            background:'#16a34a',
+            border:'2px solid var(--bg-base)',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            gap:2, padding:'0 5px',
+            fontSize:8, fontWeight:800, color:'white', lineHeight:1,
+            zIndex:3, boxShadow:'0 2px 6px rgba(0,0,0,0.4)',
+            letterSpacing:'0.02em',
+          }}>
+            <span style={{fontSize:9}}>✓</span>
+            <span>CLN</span>
+          </div>
         )}
 
         {/* TELE heart — anchored top-left so it never competes with the room number for space */}
@@ -1253,6 +1271,23 @@ function PatientModal({ room, nurses, onClose, onSave }) {
             <span style={{ fontSize:13, color:'var(--text-2)' }}>Occupied</span>
             <button className={`toggle${s.occupied?' on':''}`} onClick={()=>set('occupied',!s.occupied)}/>
           </div>
+
+          {/* Clean / Dirty toggle — only shown when room is vacant */}
+          {!s.occupied && (
+            <div className="toggle-row" style={{ borderBottom:'none' }}>
+              <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+                <span style={{ fontSize:13, color: s.clean ? '#22c55e' : 'var(--text-2)', fontWeight: s.clean ? 700 : 400, transition:'color 0.2s' }}>
+                  {s.clean ? '✓ Clean' : 'Dirty'}
+                </span>
+                <span style={{ fontSize:10, color:'var(--text-4)' }}>Room housekeeping status</span>
+              </div>
+              <button
+                className={`toggle${s.clean?' on':''}`}
+                style={s.clean ? { background:'#22c55e' } : {}}
+                onClick={()=>set('clean',!s.clean)}
+              />
+            </div>
+          )}
 
           {s.occupied && (<>
             <div className="toggle-row">
@@ -3443,12 +3478,12 @@ function App() {
     // When toggling a room to vacant: clear ALL patient properties, not just nurseId
     const finalRoom = becomingVacant
       ? { ...updated,
-          nurseId: null,
+          nurseId: null, clean: updated.clean ?? false,
           foley: false, drip: false, prisoner: false, totalCare: false,
           glucose: false, highAcuity: false, sitter: false,
           discharge: false, isolation: false, restraint: false, centralLine: false,
           chestTube: false, drain: false }
-      : updated;
+      : { ...updated, clean: false }; // clear clean status when room becomes occupied
     setRooms(prev => ({ ...prev, [updated.id]: finalRoom }));
     if (becomingVacant) {
       setSelected(prev => { const next = new Set(prev); next.delete(updated.id); return next; });
