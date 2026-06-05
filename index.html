@@ -315,7 +315,7 @@
     isolation: isolate;
     border-radius: 22px;
     transition: background 0.25s;
-    width: 340px;          /* explicit width so tiles have room to breathe */
+    width: 440px;          /* explicit width so tiles have room to breathe */
   }
   .dash-card::before {
     content: '';
@@ -337,7 +337,7 @@
   .dash-tile {
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    gap: 5px; padding: 16px 10px 13px; border-radius: 12px;
+    gap: 4px; padding: 11px 10px 9px; border-radius: 12px;
     flex: 1 1 0; min-width: 0;
     background: rgba(255,255,255,0.07);
     border: 1px solid rgba(255,255,255,0.12);
@@ -357,7 +357,7 @@
   .flag-tile {
     display: flex; flex-direction: column;
     align-items: center; justify-content: center;
-    gap: 3px; padding: 9px 6px 8px; border-radius: 10px;
+    gap: 3px; padding: 7px 6px 6px; border-radius: 10px;
     flex: 1 1 0; min-width: 0;
     background: rgba(255,255,255,0.05);
     border: 1px solid rgba(255,255,255,0.09);
@@ -2079,7 +2079,7 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
 
   return (
     <div className="dash-card dash-cockpit" style={{
-      padding:'60px 20px 20px',
+      padding:'58px 20px 16px',
       boxShadow:`0 8px 32px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.06) inset`,
     }}>
 
