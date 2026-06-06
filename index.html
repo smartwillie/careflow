@@ -233,8 +233,8 @@
   }
   .toggle-grid-item {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 7px 8px 7px 4px; border-bottom: 1px solid var(--border-sub);
-    gap: 6px;
+    padding: 9px 8px 9px 4px; border-bottom: 1px solid var(--border-sub);
+    gap: 8px;
   }
   .toggle-grid-item:nth-child(odd) { border-right: 1px solid var(--border-sub); padding-right: 12px; }
   .toggle-grid-item:nth-child(even) { padding-left: 12px; }
@@ -1274,7 +1274,7 @@ function PatientModal({ room, nurses, onClose, onSave }) {
   const assignedNurse = room.nurseId ? (nurses||[]).find(n => n.id === room.nurseId) : null;
   const GridToggle = ({ on, onChange, label, color }) => (
     <div className="toggle-grid-item">
-      <span style={{ fontSize:12, color: on ? color : 'var(--text-3)', fontWeight: on ? 700 : 400,
+      <span style={{ fontSize:14, color: on ? color : 'var(--text-3)', fontWeight: on ? 700 : 500,
         transition:'color 0.15s', lineHeight:1.2, flexShrink:1, minWidth:0 }}>{label}</span>
       <button className={`toggle${on?' on':''}`}
         style={on ? { background: color } : {}}
