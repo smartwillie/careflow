@@ -226,27 +226,27 @@
     -webkit-backdrop-filter: blur(20px) saturate(180%);
   }
   .modal {
-    background: var(--modal-bg); border-radius: 16px; width: 420px;
+    background: var(--modal-bg); border-radius: 16px; width: 500px;
     border: 1px solid var(--border);
     box-shadow: 0 24px 64px rgba(0,0,0,0.60), 0 0 0 0.5px rgba(255,255,255,0.08);
     transition: background 0.25s;
     display: flex; flex-direction: column;
-    max-height: 88vh; overflow: hidden;
+    max-height: 96vh; overflow: hidden;
   }
-  .modal-header { padding: 20px 20px 12px; flex-shrink: 0; }
+  .modal-header { padding: 16px 20px 10px; flex-shrink: 0; }
   .modal-body { padding: 0 20px; overflow-y: auto; flex: 1; min-height: 0; }
   .modal-footer {
-    padding: 12px 20px 18px; flex-shrink: 0;
+    padding: 10px 20px 14px; flex-shrink: 0;
     border-top: 1px solid var(--border);
   }
   .toggle-row {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 10px 0; border-bottom: 1px solid var(--border);
+    padding: 8px 0; border-bottom: 1px solid var(--border);
   }
   .toggle-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
   .toggle-grid-item {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 9px 8px 9px 4px; border-bottom: 1px solid var(--border);
+    padding: 7px 8px 7px 4px; border-bottom: 1px solid var(--border);
     gap: 8px;
   }
   .toggle-grid-item:nth-child(odd) { border-right: 1px solid var(--border); padding-right: 12px; }
@@ -1364,8 +1364,12 @@ function PatientModal({ room, nurses, onClose, onSave }) {
   const assignedNurse = room.nurseId ? (nurses||[]).find(n => n.id === room.nurseId) : null;
   const GridToggle = ({ on, onChange, label, color }) => (
     <div className="toggle-grid-item">
-      <span style={{ fontSize:15, color: on ? '#ffffff' : 'var(--text-2)', fontWeight: on ? 700 : 500,
-        transition:'color 0.15s', lineHeight:1.2, flexShrink:1, minWidth:0 }}>{label}</span>
+      <span style={{
+        fontSize:14, fontWeight:500,
+        color: on ? 'var(--text-1)' : 'var(--text-3)',
+        transition:'color 0.15s', lineHeight:1.2, flexShrink:1, minWidth:0,
+        letterSpacing:'-0.1px',
+      }}>{label}</span>
       <button className={`toggle${on?' on':''}`}
         style={on ? { background: color } : {}}
         onClick={()=>onChange(!on)}/>
@@ -1467,8 +1471,11 @@ function PatientModal({ room, nurses, onClose, onSave }) {
             </div>
 
             {/* 2-column acuity toggle grid */}
-            <div style={{ fontSize:10, fontWeight:700, color:'var(--text-4)', letterSpacing:'0.08em',
-              textTransform:'uppercase', padding:'8px 4px 4px' }}>Acuity &amp; Flags</div>
+            <div style={{
+              fontSize:17, fontWeight:700, color:'var(--text-1)',
+              letterSpacing:'-0.3px', padding:'12px 4px 6px',
+              borderTop:'1px solid var(--border)', marginTop:4,
+            }}>Acuity &amp; Flags</div>
             <div className="toggle-grid">
               <GridToggle on={s.foley}       onChange={v=>set('foley',v)}       label="Foley Catheter"  color="#8b5cf6"/>
               <GridToggle on={s.drip}        onChange={v=>set('drip',v)}        label="Infusion Drip"   color="#0891b2"/>
