@@ -1899,7 +1899,8 @@ function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, on
   const hasTele = occ.some(r=>r.type==='TELE');
   const cap = hasTele ? 4 : 5;
   const pct = Math.min((occ.length/cap)*100, 100);
-  const capColor = pct>=100 ? '#ef4444' : pct>=75 ? '#f59e0b' : '#22c55e';
+  // Green when fully assigned (complete), red when under capacity (incomplete/partial)
+  const capColor = pct>=100 ? '#30D158' : '#FF453A';
 
   const flagDefs = FLAG_DEFS; // shared definition
 
@@ -2030,10 +2031,18 @@ function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, on
       </div>
 
       {rooms.length>0 && (
-        <button className="btn btn-ghost" onClick={onRemoveAll}
-          style={{ fontSize:10, padding:'2px 8px', marginTop:6, width:'100%' }}>
-          Remove All Rooms
-        </button>
+        <div style={{ marginTop:16, borderTop:'1px solid var(--border)', paddingTop:10 }}>
+          <button className="btn btn-ghost"
+            onClick={() => {
+              if (window.confirm(`Remove all ${occ.length} room${occ.length!==1?'s':''} from ${nurse.name}?`))
+                onRemoveAll();
+            }}
+            style={{ fontSize:11, padding:'4px 10px', width:'100%',
+              color:'#FF453A', borderColor:'rgba(255,69,58,0.25)',
+              background:'rgba(255,69,58,0.06)' }}>
+            Remove All Rooms
+          </button>
+        </div>
       )}
 
       {/* Per-nurse Zap feedback strip */}
