@@ -1230,7 +1230,8 @@ function RoomCard({ room, pos, cw, ch, selected, nurses, nurseRooms, onSelect, o
   return (
     <>
       <div ref={cardRef} className={cls}
-        style={{ left: pos.x, top: pos.y, width: cw, height: ch }}
+        style={{ left: pos.x, top: pos.y, width: cw, height: ch,
+          zIndex: (!room.occupied && room.clean) ? 5 : undefined }}
         onClick={onSelect}
         onDoubleClick={onDblClick}
         draggable={room.occupied}
