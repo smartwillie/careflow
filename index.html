@@ -1008,7 +1008,7 @@ function circDist(a, b) {
 
 function initRooms() {
   return ROOM_IDS.reduce((acc, id) => {
-    acc[id] = { id, occupied: false, clean: false, gender: 'male', type: 'MEDSURG',
+    acc[id] = { id, occupied: false, clean: false, missingBed: false, gender: 'male', type: 'MEDSURG',
                 foley: false, drip: false, prisoner: false, totalCare: false,
                 glucose: false, highAcuity: false, sitter: false,
                 discharge: false, isolation: false,
@@ -1231,7 +1231,7 @@ function RoomCard({ room, pos, cw, ch, selected, nurses, nurseRooms, onSelect, o
     <>
       <div ref={cardRef} className={cls}
         style={{ left: pos.x, top: pos.y, width: cw, height: ch,
-          zIndex: (!room.occupied && room.clean) ? 5 : undefined }}
+          zIndex: (!room.occupied && (room.clean || room.missingBed)) ? 5 : undefined }}
         onClick={onSelect}
         onDoubleClick={onDblClick}
         draggable={room.occupied}
@@ -1270,6 +1270,24 @@ function RoomCard({ room, pos, cw, ch, selected, nurses, nurseRooms, onSelect, o
               <path d="M1.5 1 L8.5 2.8 L1.5 5.5 Z" fill="#22c55e"/>
             </svg>
             Clean
+          </div>
+        )}
+
+        {/* Missing Bed badge — amber pill on bottom-left of vacant rooms */}
+        {!room.occupied && room.missingBed && (
+          <div title="Bed frame missing" style={{
+            position:'absolute', bottom:-8, left:-4,
+            height:15, borderRadius:4,
+            background:'rgba(120,60,0,0.85)',
+            border:'1.5px solid #FF9F0A',
+            display:'flex', alignItems:'center', gap:2,
+            padding:'0 5px',
+            fontSize:8, fontWeight:700,
+            color:'#FF9F0A', lineHeight:1,
+            zIndex:3, boxShadow:'0 2px 6px rgba(255,159,10,0.30)',
+            whiteSpace:'nowrap',
+          }}>
+            🛏 No Bed
           </div>
         )}
 
@@ -1346,7 +1364,7 @@ function PatientModal({ room, nurses, onClose, onSave }) {
   const assignedNurse = room.nurseId ? (nurses||[]).find(n => n.id === room.nurseId) : null;
   const GridToggle = ({ on, onChange, label, color }) => (
     <div className="toggle-grid-item">
-      <span style={{ fontSize:14, color: on ? color : 'var(--text-3)', fontWeight: on ? 700 : 500,
+      <span style={{ fontSize:15, color: on ? '#ffffff' : 'var(--text-2)', fontWeight: on ? 700 : 500,
         transition:'color 0.15s', lineHeight:1.2, flexShrink:1, minWidth:0 }}>{label}</span>
       <button className={`toggle${on?' on':''}`}
         style={on ? { background: color } : {}}
@@ -1391,21 +1409,36 @@ function PatientModal({ room, nurses, onClose, onSave }) {
             <button className={`toggle${s.occupied?' on':''}`} onClick={()=>set('occupied',!s.occupied)}/>
           </div>
 
-          {/* Clean / Dirty toggle — only shown when room is vacant */}
+          {/* Vacant-only toggles: Clean/Dirty + Missing Bed */}
           {!s.occupied && (
-            <div className="toggle-row" style={{ borderBottom:'none' }}>
-              <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
-                <span style={{ fontSize:13, color: s.clean ? '#22c55e' : 'var(--text-2)', fontWeight: s.clean ? 700 : 400, transition:'color 0.2s' }}>
-                  {s.clean ? '✓ Clean' : 'Dirty'}
-                </span>
-                <span style={{ fontSize:10, color:'var(--text-4)' }}>Room housekeeping status</span>
+            <>
+              <div className="toggle-row">
+                <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+                  <span style={{ fontSize:13, color: s.clean ? '#30D158' : 'var(--text-2)', fontWeight: s.clean ? 700 : 400, transition:'color 0.2s' }}>
+                    {s.clean ? '✓ Clean' : 'Dirty'}
+                  </span>
+                  <span style={{ fontSize:10, color:'var(--text-4)' }}>Room housekeeping status</span>
+                </div>
+                <button
+                  className={`toggle${s.clean?' on':''}`}
+                  style={s.clean ? { background:'#30D158' } : {}}
+                  onClick={()=>set('clean',!s.clean)}
+                />
               </div>
-              <button
-                className={`toggle${s.clean?' on':''}`}
-                style={s.clean ? { background:'#22c55e' } : {}}
-                onClick={()=>set('clean',!s.clean)}
-              />
-            </div>
+              <div className="toggle-row" style={{ borderBottom:'none' }}>
+                <div style={{ display:'flex', flexDirection:'column', gap:2 }}>
+                  <span style={{ fontSize:13, color: s.missingBed ? '#FF9F0A' : 'var(--text-2)', fontWeight: s.missingBed ? 700 : 400, transition:'color 0.2s' }}>
+                    {s.missingBed ? '⚠ Missing Bed' : 'Bed Available'}
+                  </span>
+                  <span style={{ fontSize:10, color:'var(--text-4)' }}>Flag if bed frame is missing</span>
+                </div>
+                <button
+                  className={`toggle${s.missingBed?' on':''}`}
+                  style={s.missingBed ? { background:'#FF9F0A' } : {}}
+                  onClick={()=>set('missingBed',!s.missingBed)}
+                />
+              </div>
+            </>
           )}
 
           {s.occupied && (<>
@@ -2445,7 +2478,7 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
       <div style={{ display:'flex', gap:8, alignItems:'stretch', marginBottom:18 }}>
         <FlagTile icon="👁" value={sitter}      label="SITTER" color="#c4b5fd"
           onClick={()=>toggleStatPopup('sitter',sitterRef)} active={statPopup?.key==='sitter'} btnRef={sitterRef} />
-        <FlagTile icon="🚪" value={discharge}   label="DC"   color="#7dd3fc"
+        <FlagTile icon="🚪" value={discharge}   label="DISCHARGE" color="#7dd3fc"
           onClick={()=>toggleStatPopup('discharge',dischargeRef)} active={statPopup?.key==='discharge'} btnRef={dischargeRef} />
         <FlagTile icon="☣" value={isolation}   label="ISO"  color="#fb923c"
           onClick={()=>toggleStatPopup('isolation',isolationRef)} active={statPopup?.key==='isolation'} btnRef={isolationRef} />
@@ -3816,7 +3849,7 @@ function App() {
           discharge: false, isolation: false, restraint: false, centralLine: false,
           chestTube: false, drain: false }
       : becomingOccupied
-        ? { ...updated, clean: false }
+        ? { ...updated, clean: false, missingBed: false }
         : updated;
     setRooms(prev => ({ ...prev, [updated.id]: finalRoom }));
     if (becomingVacant) {
