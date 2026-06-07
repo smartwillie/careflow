@@ -56,6 +56,13 @@
     --btn-ghost-bg:   rgba(118,118,128,0.28);
     --btn-ghost-tx:   rgba(255,255,255,0.75);
     --stat-border:    rgba(84,84,88,0.45);
+    /* ── Dashboard text layer (dark mode) ── */
+    --dash-val:       rgba(255,255,255,0.92);
+    --dash-val-muted: rgba(255,255,255,0.28);
+    --dash-label:     rgba(255,255,255,0.55);
+    --dash-section:   rgba(255,255,255,0.35);
+    --dash-head:      rgba(255,255,255,0.92);
+    --dash-head-sub:  rgba(255,255,255,0.40);
   }
 
   /* ═══════════════════════════════════════════════════════════
@@ -105,6 +112,13 @@
     --btn-ghost-bg:   rgba(120,120,128,0.16);
     --btn-ghost-tx:   rgba(0,0,0,0.75);
     --stat-border:    rgba(0,0,0,0.08);
+    /* ── Dashboard text layer (day mode) ── */
+    --dash-val:       rgba(0,0,0,0.85);
+    --dash-val-muted: rgba(0,0,0,0.35);
+    --dash-label:     rgba(0,0,0,0.55);
+    --dash-section:   rgba(0,0,0,0.45);
+    --dash-head:      rgba(0,0,0,0.85);
+    --dash-head-sub:  rgba(0,0,0,0.45);
   }
 
   * { box-sizing: border-box; }
@@ -426,7 +440,7 @@
   /* ── Stat section label ── */
   .dash-section-label {
     font-size: 9.5px; font-weight: 700; letter-spacing: 0.12em;
-    text-transform: uppercase; color: rgba(255,255,255,0.32);
+    text-transform: uppercase; color: var(--dash-section);
     padding: 14px 2px 7px; user-select: none;
   }
 
@@ -626,12 +640,12 @@
   }
   .eco-toggle-off {
     background: rgba(118,118,128,0.24);
-    color: rgba(255,255,255,0.55);
-    border-color: rgba(255,255,255,0.10);
+    color: var(--dash-label);
+    border-color: rgba(118,118,128,0.30);
   }
   .eco-toggle-off:hover {
     background: rgba(118,118,128,0.36);
-    color: rgba(255,255,255,0.85);
+    color: var(--dash-head);
   }
   .eco-toggle-on {
     background: #FF9F0A;
@@ -651,13 +665,19 @@
     letter-spacing: -0.8px;
     display: inline-block;
     transform: rotate(-2deg) skewX(-3deg);
-    background: linear-gradient(110deg, #e0e7ff 0%, #818cf8 40%, #6366f1 70%, #4f46e5 100%);
+    background: linear-gradient(110deg, #0A84FF 0%, #5E5CE6 50%, #30D158 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
     background-size: 200% auto;
     animation: crazy-shimmer 4s ease-in-out infinite;
-    filter: drop-shadow(0 0 8px rgba(99,102,241,0.40));
+    filter: drop-shadow(0 0 6px rgba(10,132,255,0.35));
+  }
+  body[data-theme="day"] .crazy-word {
+    background: linear-gradient(110deg, #007AFF 0%, #5856D6 50%, #34C759 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    filter: drop-shadow(0 0 4px rgba(0,122,255,0.20));
   }
   @keyframes crazy-shimmer {
     0%, 100% { background-position: 0% center; }
@@ -2079,13 +2099,13 @@ function DashTile({ icon, value, label, color, accentColor, onClick, active, btn
       {/* Value */}
       <div style={{
         fontSize:32, fontWeight:900, color: numColor, lineHeight:1,
-        textShadow: numColor !== '#fff' && numColor !== 'rgba(255,255,255,0.55)' && numColor !== 'rgba(255,255,255,0.90)' && numColor !== 'rgba(255,255,255,0.25)' ? `0 0 18px ${numColor}66` : 'none',
+        textShadow: numColor && !numColor.startsWith('var(') && numColor !== '#fff' ? `0 0 18px ${numColor}66` : 'none',
         letterSpacing:'-1px',
       }}>{value}</div>
       {/* Label */}
       <div style={{
         fontSize:10, fontWeight:700, letterSpacing:'0.07em',
-        textTransform:'uppercase', color:'rgba(255,255,255,0.50)',
+        textTransform:'uppercase', color:'var(--dash-label)',
         lineHeight:1, textAlign:'center',
       }}>{label}</div>
       {/* Chevron */}
@@ -2305,14 +2325,12 @@ function FlagTile({ icon, value, label, color, onClick, active, btnRef }) {
       <span style={{ fontSize:13, lineHeight:1, opacity: lit ? 1 : 0.38 }}>{icon}</span>
       <span style={{
         fontSize:20, fontWeight:900, lineHeight:1, letterSpacing:'-0.5px',
-        color: '#ffffff',
-        opacity: lit ? 1 : 0.35,
+        color: lit ? 'var(--dash-val)' : 'var(--dash-val-muted)',
         textShadow: lit ? `0 0 18px ${color}99` : 'none',
       }}>{value}</span>
       <span style={{
         fontSize:9, fontWeight:800, letterSpacing:'0.07em', textTransform:'uppercase',
-        color: '#ffffff',
-        opacity: lit ? 0.95 : 0.30,
+        color: lit ? 'var(--dash-label)' : 'var(--dash-val-muted)',
         lineHeight:1, textAlign:'center',
       }}>{label}</span>
     </div>
@@ -2380,7 +2398,7 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
         gap:8, marginBottom:14, marginTop:10 }}>
         <div style={{ display:'flex', alignItems:'baseline', gap:6 }}>
           <span style={{ fontSize:15, fontWeight:800, letterSpacing:'-0.3px',
-            color:'rgba(255,255,255,0.90)' }}>Unit</span>
+            color:'var(--dash-head)' }}>Unit</span>
           <span className="crazy-word" style={{ fontSize:22 }}>Overview</span>
         </div>
         <button
@@ -2407,18 +2425,18 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
       <div className="dash-section-label">Room Status</div>
       <div style={{ display:'flex', gap:10, alignItems:'stretch', marginBottom:12 }}>
         <DashTile value={vacant}     label="Empty"
-          color={vacant > 0 ? 'rgba(255,255,255,0.50)' : 'rgba(255,255,255,0.25)'} />
-        <DashTile value={occupied}   label="Occupied"  color="rgba(255,255,255,0.90)" />
+          color={vacant > 0 ? 'var(--dash-val)' : 'var(--dash-val-muted)'} />
+        <DashTile value={occupied}   label="Occupied"  color="var(--dash-val)" />
         <DashTile value={assigned}   label="Assigned"
-          color={allFull ? '#34d399' : 'rgba(255,255,255,0.90)'}
-          accentColor={allFull ? '#34d399' : undefined} />
+          color={allFull ? '#30D158' : 'var(--dash-val)'}
+          accentColor={allFull ? '#30D158' : undefined} />
         <DashTile value={unassigned} label="Pending"
-          color={unassigned > 0 ? '#fbbf24' : 'rgba(255,255,255,0.90)'}
-          accentColor={unassigned > 0 ? '#fbbf24' : undefined}
+          color={unassigned > 0 ? '#FF9F0A' : 'var(--dash-val)'}
+          accentColor={unassigned > 0 ? '#FF9F0A' : undefined}
           onClick={onUnassignedClick} active={unassignedOpen} btnRef={unassignedBtnRef} />
         <DashTile value={tele} label="TELE"
-          color={tele > 0 ? '#f87171' : 'rgba(255,255,255,0.90)'}
-          accentColor={tele > 0 ? '#f87171' : undefined} />
+          color={tele > 0 ? '#FF453A' : 'var(--dash-val)'}
+          accentColor={tele > 0 ? '#FF453A' : undefined} />
       </div>
 
       {/* ── Acuity & flag stats ── */}
@@ -2450,7 +2468,7 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
       {statPopup?.key==='dailyWeight' && <StatRoomPopup title="Daily Weight" icon="⚖" color="#065f46" rooms={dailyWeightRooms} allRooms={{}} nurseRooms={nurseRooms} nurses={nurses} anchor={statPopup.anchor} onClose={()=>setStatPopup(null)} />}
 
       {/* ── Divider ── */}
-      <div style={{ height:1, background:'rgba(255,255,255,0.08)', marginBottom:14 }}/>
+      <div style={{ height:1, background:'var(--border)', marginBottom:14 }}/>
 
       {/* ── OpenAssign AI button ── */}
       <button
