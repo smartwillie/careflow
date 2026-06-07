@@ -3978,7 +3978,7 @@ function App() {
       {/* ── Main ── */}
       <div style={{ display:'flex', flex:1, overflow:'hidden' }}>
         {/* Nurse panel */}
-        <div className="nurse-panel" style={{ background:'rgba(28,28,30,0.95)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', borderRight:'1px solid rgba(255,255,255,0.08)', display:'flex', flexDirection:'column', overflow:'hidden', transition:'background 0.3s' }}>
+        <div className="nurse-panel" style={{ background:'rgba(28,28,30,0.95)', backdropFilter:'blur(20px)', WebkitBackdropFilter:'blur(20px)', borderRight:'1px solid rgba(255,255,255,0.08)', boxShadow:'4px 0 16px rgba(0,0,0,0.30)', display:'flex', flexDirection:'column', overflow:'hidden', transition:'background 0.3s', zIndex:2 }}>
           <div style={{ padding:'12px 12px 8px', borderBottom:'1px solid var(--border)' }}>
             <div style={{ fontSize:11, fontWeight:700, color:'var(--text-4)', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:8, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
               <span>Nursing Staff</span>
@@ -4056,7 +4056,7 @@ function App() {
         </div>
 
         {/* Room grid */}
-        <div className="room-panel" style={{ background:'var(--bg-base)', transition:'background 0.25s' }}>
+        <div className="room-panel" style={{ background:'var(--bg-base)', transition:'background 0.25s', paddingLeft:12 }}>
           <CorridorGrid
             allRooms={rooms}
             selected={selected}
