@@ -3942,6 +3942,7 @@ function App() {
               const next={};
               Object.keys(prev).forEach(id=>{
                 next[id]={...prev[id], occupied:true, gender:'female', type:'TELE',
+                  clean:false, missingBed:false,
                   foley:false, drip:false, prisoner:false, totalCare:false, glucose:false, highAcuity:false,
                   sitter:false, discharge:false, isolation:false,
                   restraint:false, centralLine:false, chestTube:false, drain:false,
