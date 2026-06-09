@@ -2363,9 +2363,9 @@ function FlagTile({ icon, value, label, color, onClick, active, btnRef }) {
 
 function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
                            discharge, isolation, restraint, centralLine, foley,
-                           neuroCheck, dailyWeight,
+                           neuroCheck, dailyWeight, glucose,
                            sitterRooms, dischargeRooms, isolationRooms, centralLineRooms, foleyRooms,
-                           neuroCheckRooms, dailyWeightRooms,
+                           neuroCheckRooms, dailyWeightRooms, glucoseRooms,
                            nurses, nurseRooms,
                            unassignedOpen, onUnassignedClick, unassignedBtnRef,
                            onZapAssign, zapLoading, fuelMode, onToggleFuel,
@@ -2380,6 +2380,7 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
   const foleyRef       = React.useRef();
   const neuroCheckRef  = React.useRef();
   const dailyWeightRef = React.useRef();
+  const glucoseRef     = React.useRef();
 
   function toggleStatPopup(key, ref) {
     setStatPopup(prev => prev?.key === key ? null : { key, anchor: ref.current?.getBoundingClientRect() });
@@ -2480,6 +2481,8 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
           onClick={()=>toggleStatPopup('neuroCheck',neuroCheckRef)} active={statPopup?.key==='neuroCheck'} btnRef={neuroCheckRef} />
         <FlagTile icon="⚖" value={dailyWeight} label="DW"   color="#6ee7b7"
           onClick={()=>toggleStatPopup('dailyWeight',dailyWeightRef)} active={statPopup?.key==='dailyWeight'} btnRef={dailyWeightRef} />
+        <FlagTile icon="🩸" value={glucose}    label="ACCU-CHEK" color="#fca5a5"
+          onClick={()=>toggleStatPopup('glucose',glucoseRef)} active={statPopup?.key==='glucose'} btnRef={glucoseRef} />
       </div>
 
       {/* ── Room popup overlays ── */}
@@ -2490,6 +2493,7 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
       {statPopup?.key==='centralLine' && <StatRoomPopup title="Central Line" icon="🩺" color="#1e3a5f" rooms={centralLineRooms} allRooms={{}} nurseRooms={nurseRooms} nurses={nurses} anchor={statPopup.anchor} onClose={()=>setStatPopup(null)} />}
       {statPopup?.key==='neuroCheck'  && <StatRoomPopup title="Neuro Check"  icon="🧠" color="#1e40af" rooms={neuroCheckRooms}  allRooms={{}} nurseRooms={nurseRooms} nurses={nurses} anchor={statPopup.anchor} onClose={()=>setStatPopup(null)} />}
       {statPopup?.key==='dailyWeight' && <StatRoomPopup title="Daily Weight" icon="⚖" color="#065f46" rooms={dailyWeightRooms} allRooms={{}} nurseRooms={nurseRooms} nurses={nurses} anchor={statPopup.anchor} onClose={()=>setStatPopup(null)} />}
+      {statPopup?.key==='glucose'     && <StatRoomPopup title="Accu-Chek"   icon="🩸" color="#b91c1c" rooms={glucoseRooms}     allRooms={{}} nurseRooms={nurseRooms} nurses={nurses} anchor={statPopup.anchor} onClose={()=>setStatPopup(null)} />}
 
       {/* ── Divider ── */}
       <div style={{ height:1, background:'var(--border)', marginBottom:14 }}/>
@@ -3863,6 +3867,7 @@ function App() {
   const totalFoley       = allOccRooms.filter(r=>r.foley).length;
   const totalNeuroCheck  = allOccRooms.filter(r=>r.neuroCheck).length;
   const totalDailyWeight = allOccRooms.filter(r=>r.dailyWeight).length;
+  const totalGlucose     = allOccRooms.filter(r=>r.glucose).length;
 
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100vh', overflow:'hidden' }}>
@@ -4072,8 +4077,10 @@ function App() {
               centralLineRooms: allOccRooms.filter(r=>r.centralLine),
               neuroCheck:       totalNeuroCheck,
               dailyWeight:      totalDailyWeight,
+              glucose:          totalGlucose,
               neuroCheckRooms:  allOccRooms.filter(r=>r.neuroCheck),
               dailyWeightRooms: allOccRooms.filter(r=>r.dailyWeight),
+              glucoseRooms:     allOccRooms.filter(r=>r.glucose),
             }}
             unassignedOpen={!!unassignedAnchor}
             unassignedBtnRef={unassignedBtnRef}
