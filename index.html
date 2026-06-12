@@ -2831,12 +2831,26 @@ function PolicySearchModal({ onClose }) {
   // ── Read view ──
   function ReadView({ policy }) {
     const [pdfUrl, setPdfUrl] = React.useState(null);
+    const printFrameRef = React.useRef();
     React.useEffect(() => {
       let url = null;
       try { url = generatePolicyPdf(policy); } catch(e) { console.warn('PDF gen failed', e); }
       setPdfUrl(url);
       return () => { if (url) URL.revokeObjectURL(url); };
     }, [policy.id, policy.title, policy.content]);
+
+    function handlePrint() {
+      const frame = printFrameRef.current;
+      try {
+        if (frame && frame.contentWindow) {
+          frame.contentWindow.focus();
+          frame.contentWindow.print();
+          return;
+        }
+      } catch(e) { console.warn('Print via iframe failed', e); }
+      // Fallback: open in a new tab and let the user print from there
+      if (pdfUrl) window.open(pdfUrl, '_blank');
+    }
 
     return (
       <>
@@ -2856,6 +2870,10 @@ function PolicySearchModal({ onClose }) {
                 padding:'3px 10px',fontWeight:700}}>{policy.category}</span>
             </div>
             <div style={{display:'flex',gap:6,flexShrink:0}}>
+              <button onClick={handlePrint} disabled={!pdfUrl}
+                style={{fontSize:12,padding:'5px 12px',borderRadius:7,border:'1px solid #e2e8f0',
+                  background:'#f8fafc',color:'#475569',cursor: pdfUrl ? 'pointer' : 'not-allowed',
+                  fontWeight:600, opacity: pdfUrl ? 1 : 0.5}}>🖶 Print</button>
               <button onClick={()=>startEdit(policy)}
                 style={{fontSize:12,padding:'5px 12px',borderRadius:7,border:'1px solid #e2e8f0',
                   background:'#f8fafc',color:'#475569',cursor:'pointer',fontWeight:600}}>✏ Edit</button>
@@ -2867,7 +2885,7 @@ function PolicySearchModal({ onClose }) {
           {/* PDF iframe */}
           <div style={{flex:1,borderRadius:10,overflow:'hidden',border:'1px solid #e2e8f0',background:'#f1f5f9'}}>
             {pdfUrl
-              ? <iframe src={pdfUrl} style={{width:'100%',height:'100%',border:'none',display:'block'}} title={policy.title}/>
+              ? <iframe ref={printFrameRef} src={pdfUrl} style={{width:'100%',height:'100%',border:'none',display:'block'}} title={policy.title}/>
               : <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100%',
                   color:'#94a3b8',fontSize:13}}>Generating PDF…</div>
             }
