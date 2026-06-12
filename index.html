@@ -1652,6 +1652,7 @@ function UnassignedPanel({ rooms, nurses, nurseRooms, onAssign, onDragStart, onC
 function ExportSheetModal({ nurses, rooms, onClose }) {
   const [status, setStatus] = React.useState('');
   const [loading, setLoading] = React.useState(false);
+  const printFrameRef = React.useRef();
 
   // Strip "11" prefix, drop leading zero → "1106"→"6", "1111A"→"11A"
   function fmtRoom(room) {
@@ -1677,11 +1678,69 @@ function ExportSheetModal({ nurses, rooms, onClose }) {
     return lines.join('\n\n');   // ONE blank line between pairs
   }
 
+  // Plain array of room labels for a nurse (used by the print view)
+  function buildRoomsList(nurseId) {
+    return Object.values(rooms)
+      .filter(r => r.nurseId === nurseId && r.occupied)
+      .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }))
+      .map(fmtRoom);
+  }
+
   function buildPreview() {
     return nurses.slice(0, 10).map(n => ({
       name: n.name,
       rooms: buildRoomsCell(n.id),
+      roomList: buildRoomsList(n.id),
     }));
+  }
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  function doPrint() {
+    const now   = new Date();
+    const mm    = String(now.getMonth()+1).padStart(2,'0');
+    const dd    = String(now.getDate()).padStart(2,'0');
+    const yyyy  = now.getFullYear();
+    const today = `${mm}/${dd}/${yyyy}`;
+
+    const rows = preview.map(({ name, roomList }, i) => `
+      <tr>
+        <td>${i+1}</td>
+        <td>${escapeHtml(name)}</td>
+        <td>${roomList.length ? roomList.map(escapeHtml).join(', ') : '<span class="empty">no rooms assigned</span>'}</td>
+      </tr>`).join('');
+
+    const html = `<!DOCTYPE html><html><head><title>ChargeFlow Assignment Sheet — ${today}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; padding: 28px; color:#0f172a; }
+  h1 { font-size: 19px; margin: 0 0 2px; }
+  .meta { font-size: 12px; color:#64748b; margin-bottom: 18px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { border: 1px solid #cbd5e1; padding: 7px 10px; text-align: left; vertical-align: top; }
+  th { background: #f1f5f9; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color:#475569; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  .empty { color:#94a3b8; font-style: italic; }
+  @media print { body { padding: 12px; } }
+</style></head><body>
+  <h1>ChargeFlow — Assignment Sheet</h1>
+  <div class="meta">Date: ${today}</div>
+  <table>
+    <thead><tr><th style="width:36px">#</th><th style="width:160px">Nurse</th><th>Assigned Rooms</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+</body></html>`;
+
+    const frame = printFrameRef.current;
+    if (!frame) { return; }
+    const doc = frame.contentDocument || frame.contentWindow.document;
+    doc.open(); doc.write(html); doc.close();
+    setTimeout(() => {
+      try { frame.contentWindow.focus(); frame.contentWindow.print(); }
+      catch(e) { console.warn('Print failed', e); }
+    }, 200);
   }
 
   async function doExport() {
@@ -1826,6 +1885,10 @@ function ExportSheetModal({ nurses, rooms, onClose }) {
               Template: MHF MED/TELE Staffing Record
             </span>
             <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+            <button className="btn btn-ghost" onClick={doPrint} disabled={preview.length === 0}
+              style={{ opacity: preview.length === 0 ? 0.5 : 1 }}>
+              🖶 Print
+            </button>
             <button className="btn btn-primary" onClick={doExport} disabled={loading}
               style={{ background:'linear-gradient(135deg,#4338ca,#4f8ef7)', minWidth:140,
                 opacity: loading ? 0.7 : 1 }}>
@@ -1833,6 +1896,7 @@ function ExportSheetModal({ nurses, rooms, onClose }) {
             </button>
           </div>
         </div>
+        <iframe ref={printFrameRef} title="print-frame" style={{position:'absolute',width:0,height:0,border:'none',visibility:'hidden'}} />
       </div>
     </div>
   );
