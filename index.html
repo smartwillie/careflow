@@ -1046,9 +1046,9 @@ const FLAG_DEFS = [
 
 const STORAGE_KEY = 'careflow_assignment';
 const DEFAULT_NURSES = [
-  { id:'n1', name:'RN — Smith', color:NURSE_COLORS[0] },
-  { id:'n2', name:'RN — Jones', color:NURSE_COLORS[1] },
-  { id:'n3', name:'RN — Patel', color:NURSE_COLORS[2] },
+  { id:'n1', name:'RN — Smith', color:NURSE_COLORS[0], shift:'AM' },
+  { id:'n2', name:'RN — Jones', color:NURSE_COLORS[1], shift:'AM' },
+  { id:'n3', name:'RN — Patel', color:NURSE_COLORS[2], shift:'AM' },
 ];
 
 function loadFromStorage() {
@@ -1686,12 +1686,40 @@ function ExportSheetModal({ nurses, rooms, onClose }) {
       .map(fmtRoom);
   }
 
-  function buildPreview() {
-    return nurses.slice(0, 10).map(n => ({
+  function buildGroup(groupNurses) {
+    return groupNurses.slice(0, 10).map(n => ({
       name: n.name,
+      nurseId: n.id,
       rooms: buildRoomsCell(n.id),
       roomList: buildRoomsList(n.id),
     }));
+  }
+
+  // Acuity/summary stats for the rooms assigned to a group of nurses
+  function groupStats(group) {
+    const ids = new Set(group.map(g => g.nurseId));
+    const assigned = Object.values(rooms).filter(r => r.occupied && ids.has(r.nurseId));
+    const count = key => assigned.filter(r => r[key]).length;
+    const listRooms = key => assigned.filter(r => r[key])
+      .sort((a,b) => a.id.localeCompare(b.id, undefined, { numeric: true }))
+      .map(fmtRoom);
+    return {
+      totalCare:      count('totalCare'),
+      iso:            count('isolation'),
+      fsbg:           count('glucose'),
+      q2:             count('neuroCheck'),
+      discharge:      count('discharge'),
+      sitterRooms:    listRooms('sitter'),
+      foleyRooms:     listRooms('foley'),
+      lineRooms:      listRooms('centralLine'),
+      restraintRooms: listRooms('restraint'),
+    };
+  }
+
+  function buildPreview() {
+    const am = nurses.filter(n => n.shift !== 'PM');
+    const pm = nurses.filter(n => n.shift === 'PM');
+    return { am: buildGroup(am), pm: buildGroup(pm) };
   }
 
   function escapeHtml(str) {
@@ -1705,32 +1733,54 @@ function ExportSheetModal({ nurses, rooms, onClose }) {
     const yyyy  = now.getFullYear();
     const today = `${mm}/${dd}/${yyyy}`;
 
-    const rows = preview.map(({ name, roomList }, i) => `
+    function buildRows(group) {
+      return group.map(({ name, roomList }, i) => `
       <tr>
         <td>${i+1}</td>
         <td>${escapeHtml(name)}</td>
         <td>${roomList.length ? roomList.map(escapeHtml).join(', ') : '<span class="empty">no rooms assigned</span>'}</td>
       </tr>`).join('');
+    }
+
+    function buildSection(title, group, stats) {
+      return `
+  <h2>${title}</h2>
+  <table>
+    <thead><tr><th style="width:36px">#</th><th style="width:160px">Nurse</th><th>Assigned Rooms</th></tr></thead>
+    <tbody>${group.length ? buildRows(group) : `<tr><td colspan="3"><span class="empty">No nurses on this shift</span></td></tr>`}</tbody>
+  </table>
+  <div class="acuity">
+    Total Care: <b>${stats.totalCare}</b> &nbsp;·&nbsp;
+    Isolation: <b>${stats.iso}</b> &nbsp;·&nbsp;
+    FSBG: <b>${stats.fsbg}</b> &nbsp;·&nbsp;
+    Q2 Turns: <b>${stats.q2}</b> &nbsp;·&nbsp;
+    D/C: <b>${stats.discharge}</b>
+    ${stats.sitterRooms.length ? `&nbsp;·&nbsp; Sitter: <b>${stats.sitterRooms.join(', ')}</b>` : ''}
+    ${stats.foleyRooms.length ? `&nbsp;·&nbsp; Foley: <b>${stats.foleyRooms.join(', ')}</b>` : ''}
+    ${stats.lineRooms.length ? `&nbsp;·&nbsp; Line: <b>${stats.lineRooms.join(', ')}</b>` : ''}
+    ${stats.restraintRooms.length ? `&nbsp;·&nbsp; Restraint: <b>${stats.restraintRooms.join(', ')}</b>` : ''}
+  </div>`;
+    }
 
     const html = `<!DOCTYPE html><html><head><title>ChargeFlow Assignment Sheet — ${today}</title>
 <style>
   * { box-sizing: border-box; }
   body { font-family: Arial, Helvetica, sans-serif; padding: 28px; color:#0f172a; }
   h1 { font-size: 19px; margin: 0 0 2px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color:#475569; margin: 22px 0 8px; }
   .meta { font-size: 12px; color:#64748b; margin-bottom: 18px; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th, td { border: 1px solid #cbd5e1; padding: 7px 10px; text-align: left; vertical-align: top; }
   th { background: #f1f5f9; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color:#475569; }
   tr:nth-child(even) td { background: #f8fafc; }
   .empty { color:#94a3b8; font-style: italic; }
-  @media print { body { padding: 12px; } }
+  .acuity { font-size: 11px; color:#475569; margin-top: 6px; }
+  @media print { body { padding: 12px; } h2:first-of-type { margin-top: 0; } }
 </style></head><body>
   <h1>ChargeFlow — Assignment Sheet</h1>
   <div class="meta">Date: ${today}</div>
-  <table>
-    <thead><tr><th style="width:36px">#</th><th style="width:160px">Nurse</th><th>Assigned Rooms</th></tr></thead>
-    <tbody>${rows}</tbody>
-  </table>
+  ${buildSection('AM Shift', preview.am, groupStats(preview.am))}
+  ${buildSection('PM / NOC Shift', preview.pm, groupStats(preview.pm))}
 </body></html>`;
 
     const frame = printFrameRef.current;
@@ -1791,14 +1841,39 @@ function ExportSheetModal({ nurses, rooms, onClose }) {
       setCell('C3',  `DATE\n\n${today}`);
       setCell('C14', `DATE\n\n${today}`);
 
-      // AM shift: row 5 names, row 9 rooms
+      // AM shift: row 5 names, row 9 rooms · PM/NOC shift: row 16 names, row 20 rooms
       const preview = buildPreview();
-      preview.forEach(({ name, rooms: roomsStr }, i) => {
+      preview.am.forEach(({ name, rooms: roomsStr }, i) => {
         const col = cols[i];
         if (!col) return;
         setCell(col + '5', name,     nameStyle);
         setCell(col + '9', roomsStr, roomStyle);
       });
+      preview.pm.forEach(({ name, rooms: roomsStr }, i) => {
+        const col = cols[i];
+        if (!col) return;
+        setCell(col + '16', name,     nameStyle);
+        setCell(col + '20', roomsStr, roomStyle);
+      });
+
+      // ── AM shift summary fields ──
+      const amStats = groupStats(preview.am);
+      setCell('K3', `TOTAL CARE\n\n${amStats.totalCare}`);
+      setCell('N3', `DAY ACUITY: \nISO - ${amStats.iso}\nFSBG - ${amStats.fsbg}\nQ2 TURNS - ${amStats.q2}\nTOTALS - ${amStats.iso + amStats.fsbg + amStats.q2}`);
+      setCell('N5', ` AM PYSCH SITTER\n\n${amStats.sitterRooms.join('\n')}`);
+      { const lines = [];
+        if (amStats.foleyRooms.length) lines.push(`FOLEY-${amStats.foleyRooms.join(', ')}`);
+        if (amStats.lineRooms.length)  lines.push(`LINE-${amStats.lineRooms.join(', ')}`);
+        setCell('N9', lines.join('\n')); }
+      setCell('N12', `D/C - ADMITS\n\nD/C= ${amStats.discharge}\nADMITS=`);
+
+      // ── PM/NOC shift summary fields ──
+      const pmStats = groupStats(preview.pm);
+      setCell('L14', `TOTAL CARE\n\n${pmStats.totalCare}`);
+      setCell('N14', `NIGHT ACUITY: \nISO - ${pmStats.iso}\nFSBG - ${pmStats.fsbg}\nQ2 TURNS - ${pmStats.q2}\nTOTALS - ${pmStats.iso + pmStats.fsbg + pmStats.q2}`);
+      setCell('N16', `  PM PSYCH SITTER \n \n${pmStats.sitterRooms.join('\n')}`);
+      setCell('N20', `PM SAFETY SITTER \n\n${pmStats.restraintRooms.join('\n')}`);
+      setCell('N23', `D/C - ADMITS\n\nD/C=  ${pmStats.discharge}\nADMITS = `);
 
       setStatus('Downloading…');
       const out = XLSX.write(wb, { type: 'array', bookType: 'xlsx', cellStyles: true });
@@ -1820,7 +1895,44 @@ function ExportSheetModal({ nurses, rooms, onClose }) {
   }
 
   const preview = buildPreview();
-  const assigned = preview.filter(n => n.rooms);
+  const totalNurses = preview.am.length + preview.pm.length;
+
+  function renderGroup(title, group) {
+    const assignedCount = group.filter(n=>n.rooms).length;
+    return (
+      <div style={{ marginBottom:14 }}>
+        <div style={{ fontSize:11, fontWeight:700, color:'var(--text-4)', textTransform:'uppercase',
+          letterSpacing:'0.09em', marginBottom:8 }}>
+          {title} — {assignedCount} of {group.length} nurses assigned
+        </div>
+        <div style={{ borderRadius:10, overflow:'hidden', border:'1px solid var(--border-sub)' }}>
+          {group.length === 0 ? (
+            <div style={{ padding:'18px 14px', color:'var(--text-4)', fontSize:12, fontStyle:'italic' }}>
+              No nurses on this shift. Use the AM/PM toggle on each nurse card to assign them.
+            </div>
+          ) : group.map(({ name, rooms: roomsStr }, i) => (
+            <div key={i} style={{
+              display:'flex', gap:0, borderBottom: i < group.length-1 ? '1px solid var(--border-sub)' : 'none',
+            }}>
+              <div style={{ width:130, flexShrink:0, padding:'8px 12px',
+                borderRight:'1px solid var(--border-sub)',
+                fontSize:12, fontWeight:700, color:'var(--text-1)',
+                background: roomsStr ? 'rgba(79,142,247,0.08)' : 'transparent',
+                display:'flex', alignItems:'center' }}>
+                #{i+1} {name}
+              </div>
+              <div style={{ flex:1, padding:'8px 12px',
+                fontSize:11, color: roomsStr ? 'var(--text-2)' : 'var(--text-5)',
+                fontStyle: roomsStr ? 'normal' : 'italic',
+                fontFamily:'monospace', lineHeight:1.6, whiteSpace:'pre' }}>
+                {roomsStr.replace(/\n\n/g, '  ·  ') || 'no rooms assigned'}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -1839,36 +1951,17 @@ function ExportSheetModal({ nurses, rooms, onClose }) {
         </div>
 
         <div className="modal-body" style={{ paddingTop:14, paddingBottom:14 }}>
-          {/* Assignment preview table */}
-          <div style={{ fontSize:11, fontWeight:700, color:'var(--text-4)', textTransform:'uppercase',
-            letterSpacing:'0.09em', marginBottom:8 }}>
-            AM Shift Assignments — {assigned.length} of {preview.length} nurses assigned
-          </div>
-          <div style={{ borderRadius:10, overflow:'hidden', border:'1px solid var(--border-sub)', marginBottom:14 }}>
-            {preview.length === 0 ? (
-              <div style={{ padding:'18px 14px', color:'var(--text-4)', fontSize:12, fontStyle:'italic' }}>
-                No nurses added yet.
-              </div>
-            ) : preview.map(({ name, rooms: roomsStr }, i) => (
-              <div key={i} style={{
-                display:'flex', gap:0, borderBottom: i < preview.length-1 ? '1px solid var(--border-sub)' : 'none',
-              }}>
-                <div style={{ width:130, flexShrink:0, padding:'8px 12px',
-                  borderRight:'1px solid var(--border-sub)',
-                  fontSize:12, fontWeight:700, color:'var(--text-1)',
-                  background: roomsStr ? 'rgba(79,142,247,0.08)' : 'transparent',
-                  display:'flex', alignItems:'center' }}>
-                  #{i+1} {name}
-                </div>
-                <div style={{ flex:1, padding:'8px 12px',
-                  fontSize:11, color: roomsStr ? 'var(--text-2)' : 'var(--text-5)',
-                  fontStyle: roomsStr ? 'normal' : 'italic',
-                  fontFamily:'monospace', lineHeight:1.6, whiteSpace:'pre' }}>
-                  {roomsStr.replace(/\n\n/g, '  ·  ') || 'no rooms assigned'}
-                </div>
-              </div>
-            ))}
-          </div>
+          {totalNurses === 0 ? (
+            <div style={{ padding:'18px 14px', color:'var(--text-4)', fontSize:12, fontStyle:'italic',
+              border:'1px solid var(--border-sub)', borderRadius:10, marginBottom:14 }}>
+              No nurses added yet.
+            </div>
+          ) : (
+            <>
+              {renderGroup('AM Shift', preview.am)}
+              {renderGroup('PM / NOC Shift', preview.pm)}
+            </>
+          )}
 
           {status && (
             <div style={{ fontSize:12, padding:'7px 11px', borderRadius:8, marginBottom:4,
@@ -1885,8 +1978,8 @@ function ExportSheetModal({ nurses, rooms, onClose }) {
               Template: MHF MED/TELE Staffing Record
             </span>
             <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-            <button className="btn btn-ghost" onClick={doPrint} disabled={preview.length === 0}
-              style={{ opacity: preview.length === 0 ? 0.5 : 1 }}>
+            <button className="btn btn-ghost" onClick={doPrint} disabled={totalNurses === 0}
+              style={{ opacity: totalNurses === 0 ? 0.5 : 1 }}>
               🖶 Print
             </button>
             <button className="btn btn-primary" onClick={doExport} disabled={loading}
@@ -1991,7 +2084,7 @@ function NurseFeedbackStrip({ onGood, onBad, nurseColor }) {
 }
 
 // ── NURSE CARD ────────────────────────────────────────────────────────────────
-function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, onRename, onDelete, locked, onToggleLock, showFeedback, onFeedbackGood, onFeedbackBad }) {
+function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, onRename, onDelete, locked, onToggleLock, onToggleShift, showFeedback, onFeedbackGood, onFeedbackBad }) {
   const [dragOver, setDragOver] = useState(false);
   const [trashOver, setTrashOver] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -2064,6 +2157,20 @@ function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, on
           transition:'color 0.2s, background 0.2s', whiteSpace:'nowrap',
         }}>{occ.length}/{cap}</span>
         {hasTele && <span style={{ fontSize:10, background:'rgba(127,29,29,0.7)', color:'#fca5a5', borderRadius:4, padding:'1px 6px', letterSpacing:'0.04em', whiteSpace:'nowrap' }}>TELE</span>}
+        {/* Shift toggle */}
+        <button
+          onClick={onToggleShift}
+          title={`Shift: ${nurse.shift==='PM'?'PM/NOC':'AM'} — click to switch (used by Export Sheet)`}
+          style={{
+            background: nurse.shift==='PM' ? 'rgba(99,102,241,0.18)' : 'rgba(245,158,11,0.18)',
+            border: nurse.shift==='PM' ? '1px solid rgba(99,102,241,0.55)' : '1px solid rgba(245,158,11,0.55)',
+            color: nurse.shift==='PM' ? '#a5b4fc' : '#fcd34d',
+            borderRadius: 6, padding:'1px 6px', cursor:'pointer', fontSize:10, fontWeight:800,
+            lineHeight:1.6, letterSpacing:'0.03em', whiteSpace:'nowrap',
+            transition:'background 0.15s, border-color 0.15s',
+          }}
+        >{nurse.shift==='PM' ? 'PM' : 'AM'}</button>
+
         {/* Lock toggle */}
         <button
           onClick={onToggleLock}
@@ -3898,7 +4005,7 @@ function App() {
     const name = newNurseName.trim() || `RN — Nurse ${nurses.length+1}`;
     const color = NURSE_COLORS[colorIdx.current % NURSE_COLORS.length];
     colorIdx.current++;
-    setNurses(prev=>[...prev,{id:'n'+Date.now(),name,color}]);
+    setNurses(prev=>[...prev,{id:'n'+Date.now(),name,color,shift:'AM'}]);
     setNewNurseName('');
   }
 
@@ -4109,6 +4216,7 @@ function App() {
                 onRemoveAll={()=>removeAllRooms(nurse.id)}
                 onDrop={(e,trash)=>handleDropOnNurse(nurse.id,e,trash)}
                 onRename={name=>setNurses(prev=>prev.map(n=>n.id===nurse.id?{...n,name}:n))}
+                onToggleShift={()=>setNurses(prev=>prev.map(n=>n.id===nurse.id?{...n,shift:n.shift==='PM'?'AM':'PM'}:n))}
                 onDelete={()=>deleteNurse(nurse.id)}
                 locked={lockedNurses.has(nurse.id)}
                 onToggleLock={()=>setLockedNurses(prev=>{
