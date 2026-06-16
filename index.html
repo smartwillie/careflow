@@ -1015,7 +1015,8 @@ function initRooms() {
                 restraint: false, centralLine: false,
                 chestTube: false, drain: false,
                 neuroCheck: false, dailyWeight: false,
-                tubeFeed: false, tpn: false, nurseId: null };
+                tubeFeed: false, tpn: false, nurseId: null,
+                preferredNurses: [], blockedNurses: [] };
     return acc;
   }, {});
 }
@@ -1067,6 +1068,9 @@ function mergeRooms(saved) {
 // ── ASSIGNMENT RULES ──────────────────────────────────────────────────────────
 function checkAssignment(nurseId, roomIds, allRooms) {
   const rms = roomIds.map(id => allRooms[id]).filter(Boolean);
+  // Blocked-nurse check: any room in this assignment has this nurse blocked
+  const blockedRoom = rms.find(r => r.occupied && (r.blockedNurses||[]).includes(nurseId));
+  if (blockedRoom) return `Nurse is blocked from room ${blockedRoom.id}`;
   const hasTele = rms.some(r => r.occupied && r.type === 'TELE');
   const cap = hasTele ? 4 : 5;
   const occ = rms.filter(r => r.occupied);
@@ -1163,6 +1167,8 @@ function getCorridorLayout(W, H) {
 // ── ROOM DROPDOWN (portal) ────────────────────────────────────────────────────
 function RoomDropdown({ room, nurses, nurseRooms, anchor, onAssign, onUnassign, onClose }) {
   const ref = useRef();
+  const preferred = room.preferredNurses || [];
+  const blocked   = room.blockedNurses   || [];
 
   useEffect(() => {
     const h = e => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
@@ -1173,27 +1179,47 @@ function RoomDropdown({ room, nurses, nurseRooms, anchor, onAssign, onUnassign, 
   const menuH = nurses.length * 38 + 60;
   const spaceBelow = window.innerHeight - anchor.bottom;
   const style = {
-    left: Math.min(anchor.left, window.innerWidth - 220),
+    left: Math.min(anchor.left, window.innerWidth - 240),
     ...(spaceBelow > menuH
       ? { top: anchor.bottom + 4 }
       : { bottom: window.innerHeight - anchor.top + 4 })
   };
 
+  // Sort: preferred first, blocked last
+  const sorted = [...nurses].sort((a, b) => {
+    const ap = preferred.includes(a.id) ? 0 : blocked.includes(a.id) ? 2 : 1;
+    const bp = preferred.includes(b.id) ? 0 : blocked.includes(b.id) ? 2 : 1;
+    return ap - bp;
+  });
+
   return ReactDOM.createPortal(
     <div ref={ref} className="room-dropdown" style={style}>
       <div style={{ padding:'5px 10px 6px', fontSize:10, color:'var(--dd-label)', borderBottom:'1px solid var(--border-sub)', fontWeight:700, letterSpacing:'0.05em' }}>
         ASSIGN ROOM {room.id}
+        {preferred.length > 0 && <span style={{ marginLeft:6, color:'#fbbf24' }}>⭐ {preferred.length} preferred</span>}
+        {blocked.length   > 0 && <span style={{ marginLeft:6, color:'#f87171' }}>🚫 {blocked.length} blocked</span>}
       </div>
-      {nurses.map(n => {
-        const pts = (nurseRooms[n.id]||[]).length;
-        const isMe = room.nurseId === n.id;
+      {sorted.map(n => {
+        const pts      = (nurseRooms[n.id]||[]).length;
+        const isMe     = room.nurseId === n.id;
+        const isPref   = preferred.includes(n.id);
+        const isBlocked = blocked.includes(n.id);
         return (
-          <div key={n.id} className={`dd-item${isMe?' active':''}`}
-            onClick={() => { onAssign(n.id); onClose(); }}>
+          <div key={n.id}
+            className={`dd-item${isMe?' active':''}`}
+            onClick={() => { if (!isBlocked) { onAssign(n.id); onClose(); } }}
+            style={{
+              opacity:      isBlocked ? 0.45 : 1,
+              cursor:       isBlocked ? 'not-allowed' : 'pointer',
+              background:   isPref    ? 'rgba(251,191,36,0.10)' : undefined,
+              borderLeft:   isPref    ? '3px solid #fbbf24' : isBlocked ? '3px solid #f87171' : '3px solid transparent',
+            }}>
             <div style={{ width:8,height:8,borderRadius:'50%',background:n.color,flexShrink:0 }}/>
-            <span style={{ flex:1 }}>{n.name}</span>
+            <span style={{ flex:1, textDecoration: isBlocked ? 'line-through' : 'none' }}>{n.name}</span>
             <span style={{ fontSize:10,color:'var(--dd-label)' }}>{pts}pt</span>
-            {isMe && <span style={{ color:'#22c55e',fontSize:11 }}>✓</span>}
+            {isPref    && <span title="Preferred for this room" style={{ fontSize:12 }}>⭐</span>}
+            {isBlocked && <span title="Blocked from this room" style={{ fontSize:12 }}>🚫</span>}
+            {isMe      && <span style={{ color:'#22c55e',fontSize:11 }}>✓</span>}
           </div>
         );
       })}
@@ -1495,6 +1521,85 @@ function PatientModal({ room, nurses, onClose, onSave }) {
               <GridToggle on={s.prisoner}    onChange={v=>set('prisoner',v)}    label="Prisoner"        color="#b45309"/>
               <GridToggle on={s.discharge}   onChange={v=>set('discharge',v)}   label="Discharge"       color="#0ea5e9"/>
             </div>
+
+            {/* Nurse Preferences */}
+            {nurses && nurses.length > 0 && (
+              <div style={{ marginTop:4 }}>
+                <div style={{
+                  fontSize:17, fontWeight:700, color:'var(--text-1)',
+                  letterSpacing:'-0.3px', padding:'12px 4px 6px',
+                  borderTop:'1px solid var(--border)',
+                }}>Nurse Preferences</div>
+                <div style={{ fontSize:11, color:'var(--text-4)', marginBottom:10, padding:'0 2px' }}>
+                  ⭐ Preferred &nbsp;·&nbsp; 🚫 Blocked — cannot be assigned
+                </div>
+                <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
+                  {nurses.map(n => {
+                    const isPref    = (s.preferredNurses||[]).includes(n.id);
+                    const isBlocked = (s.blockedNurses||[]).includes(n.id);
+                    function togglePref() {
+                      setS(p => {
+                        const wasPref = (p.preferredNurses||[]).includes(n.id);
+                        return {
+                          ...p,
+                          preferredNurses: wasPref
+                            ? (p.preferredNurses||[]).filter(id=>id!==n.id)
+                            : [...(p.preferredNurses||[]), n.id],
+                          blockedNurses: (p.blockedNurses||[]).filter(id=>id!==n.id),
+                        };
+                      });
+                    }
+                    function toggleBlock() {
+                      setS(p => {
+                        const wasBlocked = (p.blockedNurses||[]).includes(n.id);
+                        return {
+                          ...p,
+                          blockedNurses: wasBlocked
+                            ? (p.blockedNurses||[]).filter(id=>id!==n.id)
+                            : [...(p.blockedNurses||[]), n.id],
+                          preferredNurses: (p.preferredNurses||[]).filter(id=>id!==n.id),
+                        };
+                      });
+                    }
+                    return (
+                      <div key={n.id} style={{
+                        display:'flex', alignItems:'center', gap:8,
+                        padding:'7px 10px', borderRadius:9,
+                        background: isPref    ? 'rgba(251,191,36,0.10)'
+                                  : isBlocked ? 'rgba(248,113,113,0.08)'
+                                  : 'rgba(255,255,255,0.03)',
+                        border: isPref    ? '1px solid rgba(251,191,36,0.30)'
+                              : isBlocked ? '1px solid rgba(248,113,113,0.25)'
+                              : '1px solid var(--border-sub)',
+                        transition:'background 0.15s',
+                      }}>
+                        <div style={{ width:8, height:8, borderRadius:'50%', background:n.color, flexShrink:0 }}/>
+                        <span style={{
+                          flex:1, fontSize:13, fontWeight:600,
+                          color: isBlocked ? 'var(--text-4)' : 'var(--text-1)',
+                          textDecoration: isBlocked ? 'line-through' : 'none',
+                        }}>{n.name}</span>
+                        {isPref    && <span style={{ fontSize:10, color:'#fbbf24', fontWeight:700 }}>PREFERRED</span>}
+                        {isBlocked && <span style={{ fontSize:10, color:'#f87171', fontWeight:700 }}>BLOCKED</span>}
+                        <button onClick={togglePref} title="Mark preferred"
+                          style={{
+                            fontSize:17, lineHeight:1, padding:'3px 6px', borderRadius:6,
+                            cursor:'pointer', border: isPref ? '1px solid rgba(251,191,36,0.5)' : '1px solid transparent',
+                            background: isPref ? 'rgba(251,191,36,0.22)' : 'transparent',
+                          }}>⭐</button>
+                        <button onClick={toggleBlock} title="Block from room"
+                          style={{
+                            fontSize:17, lineHeight:1, padding:'3px 6px', borderRadius:6,
+                            cursor:'pointer', border: isBlocked ? '1px solid rgba(248,113,113,0.45)' : '1px solid transparent',
+                            background: isBlocked ? 'rgba(248,113,113,0.20)' : 'transparent',
+                          }}>🚫</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
           </>)}
         </div>
 
@@ -4143,7 +4248,8 @@ function App() {
                   sitter:false, discharge:false, isolation:false,
                   restraint:false, centralLine:false, chestTube:false, drain:false,
                   neuroCheck:false, dailyWeight:false,
-                  tubeFeed:false, tpn:false, nurseId:null};
+                  tubeFeed:false, tpn:false, nurseId:null,
+                  preferredNurses:[], blockedNurses:[]};
               });
               return next;
             });
