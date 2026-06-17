@@ -1385,7 +1385,7 @@ function Toggle({ on, onChange, label, color='#22c55e' }) {
 
 // ── PATIENT MODAL ─────────────────────────────────────────────────────────────
 function NursePickerSection({ nurses, nurseRooms, nurseId, preferredNurses, blockedNurses, onAssign }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const assignedNurse = nurses.find(n => n.id === nurseId);
   return (
     <div style={{ borderTop:'1px solid var(--border)', marginTop:4 }}>
@@ -1543,17 +1543,6 @@ function PatientModal({ room, nurses, nurseRooms, onClose, onSave }) {
               </div>
             </div>
 
-            {/* Nurse assignment picker */}
-            {nurses && nurses.length > 0 && (
-              <NursePickerSection
-                nurses={nurses} nurseRooms={nurseRooms}
-                nurseId={s.nurseId}
-                preferredNurses={s.preferredNurses||[]}
-                blockedNurses={s.blockedNurses||[]}
-                onAssign={nid => setS(p=>({...p, nurseId: p.nurseId===nid ? null : nid}))}
-              />
-            )}
-
             {/* 2-column acuity toggle grid */}
             <div style={{
               fontSize:17, fontWeight:700, color:'var(--text-1)',
@@ -1579,6 +1568,17 @@ function PatientModal({ room, nurses, nurseRooms, onClose, onSave }) {
               <GridToggle on={s.prisoner}    onChange={v=>set('prisoner',v)}    label="Prisoner"        color="#b45309"/>
               <GridToggle on={s.discharge}   onChange={v=>set('discharge',v)}   label="Discharge"       color="#0ea5e9"/>
             </div>
+
+            {/* Nurse assignment picker */}
+            {nurses && nurses.length > 0 && (
+              <NursePickerSection
+                nurses={nurses} nurseRooms={nurseRooms}
+                nurseId={s.nurseId}
+                preferredNurses={s.preferredNurses||[]}
+                blockedNurses={s.blockedNurses||[]}
+                onAssign={nid => setS(p=>({...p, nurseId: p.nurseId===nid ? null : nid}))}
+              />
+            )}
 
             {/* Nurse Preferences */}
             {nurses && nurses.length > 0 && (
