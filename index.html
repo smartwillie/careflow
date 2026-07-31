@@ -2744,10 +2744,9 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
       <div className="rabbit-track">
         <div className="rabbit-runner" onClick={onMonkeyClick} title="Click to search unit policies">
           <div className="monkey-group">
-            <div className="monkey-bubble" onClick={e=>{e.stopPropagation();onMonkeyClick();}}>I am your policy monkey, click me</div>
+            <div className="monkey-bubble" onClick={e=>{e.stopPropagation();onMonkeyClick();}}>I am your policy Baby Yoda, click me</div>
             <div className="rabbit-flip">
-              <span className="rabbit-emoji"><span style={{display:'inline-block',transform:'scaleX(-1)'}}>🐒</span></span>
-              <span className="monkey-banana">🍌</span>
+              <span className="rabbit-emoji"><span style={{display:'inline-block',transform:'scaleX(-1)'}}>🧒</span></span>
             </div>
             <div className="monkey-shadow"/>
           </div>
@@ -3321,7 +3320,7 @@ function PolicySearchModal({ onClose }) {
   return (
     <PolicyDrawer onClose={onClose}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
-        <h2 style={{margin:0,fontSize:16,fontWeight:800,color:'var(--text-1)'}}>🐒 Policy Search</h2>
+        <h2 style={{margin:0,fontSize:16,fontWeight:800,color:'var(--text-1)'}}>🧒 Policy Search</h2>
         <div style={{display:'flex',gap:8}}>
           <button className="btn btn-ghost" style={{fontSize:11}} onClick={()=>setView('manage')}>⚙ Manage</button>
           <button className="btn btn-ghost" onClick={onClose}>✕</button>
@@ -3341,7 +3340,7 @@ function PolicySearchModal({ onClose }) {
       </div>
       {!query && (
         <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',color:'var(--text-4)',gap:10,paddingBottom:20}}>
-          <div style={{fontSize:36}}>🐒</div>
+          <div style={{fontSize:36}}>🧒</div>
           <div style={{fontSize:13,fontWeight:700,color:'var(--text-2)'}}>Policy Monkey is ready!</div>
           <div style={{fontSize:11,textAlign:'center',lineHeight:1.8,maxWidth:300,opacity:.8}}>
             Type to search <strong style={{color:'var(--text-2)'}}>{policies.length}</strong> unit policies.<br/>
