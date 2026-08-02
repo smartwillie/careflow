@@ -1015,7 +1015,7 @@ function initRooms() {
                 restraint: false, centralLine: false,
                 chestTube: false, drain: false,
                 neuroCheck: false, dailyWeight: false,
-                tubeFeed: false, tpn: false, dialysis: false, nurseId: null,
+                tubeFeed: false, tpn: false, dialysis: false, etoh: false, nurseId: null,
                 preferredNurses: [], blockedNurses: [] };
     return acc;
   }, {});
@@ -1568,6 +1568,7 @@ function PatientModal({ room, nurses, nurseRooms, onClose, onSave }) {
               <GridToggle on={s.prisoner}    onChange={v=>set('prisoner',v)}    label="Prisoner"        color="#b45309"/>
               <GridToggle on={s.discharge}   onChange={v=>set('discharge',v)}   label="Discharge"       color="#0ea5e9"/>
               <GridToggle on={s.dialysis}    onChange={v=>set('dialysis',v)}    label="Dialysis"        color="#6366f1"/>
+              <GridToggle on={s.etoh}        onChange={v=>set('etoh',v)}        label="ETOH"            color="#b45309"/>
             </div>
 
             {/* Nurse assignment picker */}
@@ -2698,9 +2699,9 @@ function FlagTile({ icon, value, label, color, onClick, active, btnRef }) {
 
 function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
                            discharge, isolation, restraint, centralLine, foley,
-                           neuroCheck, dailyWeight, glucose, dialysis,
+                           neuroCheck, dailyWeight, glucose, dialysis, etoh,
                            sitterRooms, dischargeRooms, isolationRooms, centralLineRooms, foleyRooms,
-                           neuroCheckRooms, dailyWeightRooms, glucoseRooms, dialysisRooms,
+                           neuroCheckRooms, dailyWeightRooms, glucoseRooms, dialysisRooms, etohRooms,
                            nurses, nurseRooms,
                            unassignedOpen, onUnassignedClick, unassignedBtnRef,
                            onZapAssign, zapLoading, fuelMode, onToggleFuel,
@@ -2717,6 +2718,7 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
   const dailyWeightRef = React.useRef();
   const glucoseRef     = React.useRef();
   const dialysisRef    = React.useRef();
+  const etohRef        = React.useRef();
 
   function toggleStatPopup(key, ref) {
     setStatPopup(prev => prev?.key === key ? null : { key, anchor: ref.current?.getBoundingClientRect() });
@@ -2821,6 +2823,8 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
           onClick={()=>toggleStatPopup('glucose',glucoseRef)} active={statPopup?.key==='glucose'} btnRef={glucoseRef} />
         <FlagTile icon="💉" value={dialysis}   label="DIALYSIS"  color="#818cf8"
           onClick={()=>toggleStatPopup('dialysis',dialysisRef)} active={statPopup?.key==='dialysis'} btnRef={dialysisRef} />
+        <FlagTile icon="🍺" value={etoh}       label="ETOH"      color="#d97706"
+          onClick={()=>toggleStatPopup('etoh',etohRef)} active={statPopup?.key==='etoh'} btnRef={etohRef} />
       </div>
 
       {/* ── Room popup overlays ── */}
@@ -2833,6 +2837,7 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
       {statPopup?.key==='dailyWeight' && <StatRoomPopup title="Daily Weight" icon="⚖" color="#065f46" rooms={dailyWeightRooms} allRooms={{}} nurseRooms={nurseRooms} nurses={nurses} anchor={statPopup.anchor} onClose={()=>setStatPopup(null)} />}
       {statPopup?.key==='glucose'     && <StatRoomPopup title="Accu-Chek"   icon="🩸" color="#b91c1c" rooms={glucoseRooms}     allRooms={{}} nurseRooms={nurseRooms} nurses={nurses} anchor={statPopup.anchor} onClose={()=>setStatPopup(null)} />}
       {statPopup?.key==='dialysis'    && <StatRoomPopup title="Dialysis"     icon="💉" color="#4338ca" rooms={dialysisRooms}    allRooms={{}} nurseRooms={nurseRooms} nurses={nurses} anchor={statPopup.anchor} onClose={()=>setStatPopup(null)} />}
+      {statPopup?.key==='etoh'        && <StatRoomPopup title="ETOH"         icon="🍺" color="#92400e" rooms={etohRooms}        allRooms={{}} nurseRooms={nurseRooms} nurses={nurses} anchor={statPopup.anchor} onClose={()=>setStatPopup(null)} />}
 
       {/* ── Divider ── */}
       <div style={{ height:1, background:'var(--border)', marginBottom:14 }}/>
@@ -2938,10 +2943,12 @@ function CorridorGrid({ allRooms, selected, nurses, nurseRooms, dragPreviewIds, 
             dailyWeight={dashStats.dailyWeight}
             glucose={dashStats.glucose}
             dialysis={dashStats.dialysis}
+            etoh={dashStats.etoh}
             neuroCheckRooms={dashStats.neuroCheckRooms}
             dailyWeightRooms={dashStats.dailyWeightRooms}
             glucoseRooms={dashStats.glucoseRooms}
             dialysisRooms={dashStats.dialysisRooms}
+            etohRooms={dashStats.etohRooms}
             nurses={nurses}
             nurseRooms={nurseRooms}
             unassignedOpen={unassignedOpen}
@@ -4230,6 +4237,7 @@ function App() {
   const totalDailyWeight = allOccRooms.filter(r=>r.dailyWeight).length;
   const totalGlucose     = allOccRooms.filter(r=>r.glucose).length;
   const totalDialysis    = allOccRooms.filter(r=>r.dialysis).length;
+  const totalEtoh        = allOccRooms.filter(r=>r.etoh).length;
 
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100vh', overflow:'hidden' }}>
@@ -4443,10 +4451,12 @@ function App() {
               dailyWeight:      totalDailyWeight,
               glucose:          totalGlucose,
               dialysis:         totalDialysis,
+              etoh:             totalEtoh,
               neuroCheckRooms:  allOccRooms.filter(r=>r.neuroCheck),
               dailyWeightRooms: allOccRooms.filter(r=>r.dailyWeight),
               glucoseRooms:     allOccRooms.filter(r=>r.glucose),
               dialysisRooms:    allOccRooms.filter(r=>r.dialysis),
+              etohRooms:        allOccRooms.filter(r=>r.etoh),
             }}
             unassignedOpen={!!unassignedAnchor}
             unassignedBtnRef={unassignedBtnRef}
