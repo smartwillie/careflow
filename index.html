@@ -2746,14 +2746,14 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
       <div className="rabbit-track">
         <div className="rabbit-runner" onClick={onMonkeyClick} title="Click to search unit policies">
           <div className="monkey-group">
-            <div className="monkey-bubble" onClick={e=>{e.stopPropagation();onMonkeyClick();}}>I am your policy Yoda, click me</div>
+            <div className="monkey-bubble" onClick={e=>{e.stopPropagation();onMonkeyClick();}}>I am your policy Yoda, click me for wisdom</div>
             <div className="rabbit-flip">
               <span className="rabbit-emoji" style={{display:'inline-block',transform:'scaleX(-1)'}}>
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 175" width="52" height="46" style={{display:'block'}}>
-                  <ellipse cx="38" cy="62" rx="40" ry="21" fill="#6DC83C" stroke="#111" strokeWidth="4" transform="rotate(-8 38 62)"/>
-                  <ellipse cx="42" cy="63" rx="24" ry="12" fill="#7B4A22" transform="rotate(-8 42 63)"/>
-                  <ellipse cx="162" cy="62" rx="40" ry="21" fill="#6DC83C" stroke="#111" strokeWidth="4" transform="rotate(8 162 62)"/>
-                  <ellipse cx="158" cy="63" rx="24" ry="12" fill="#7B4A22" transform="rotate(8 158 63)"/>
+                  <path d="M50,76 C20,76 -2,56 6,22 C16,0 50,44 50,58 Z" fill="#6DC83C" stroke="#111" strokeWidth="4" strokeLinejoin="round"/>
+                  <path d="M50,72 C26,72 8,54 14,27 C22,10 50,48 50,62 Z" fill="#7B4A22"/>
+                  <path d="M150,76 C180,76 202,56 194,22 C184,0 150,44 150,58 Z" fill="#6DC83C" stroke="#111" strokeWidth="4" strokeLinejoin="round"/>
+                  <path d="M150,72 C174,72 192,54 186,27 C178,10 150,48 150,62 Z" fill="#7B4A22"/>
                   <path d="M55 108 Q40 140 46 172 L154 172 Q160 140 145 108 Q124 94 100 94 Q76 94 55 108 Z" fill="#5C2E0E" stroke="#111" strokeWidth="4"/>
                   <ellipse cx="100" cy="68" rx="53" ry="50" fill="#6DC83C" stroke="#111" strokeWidth="4"/>
                   <circle cx="83" cy="68" r="18" fill="#2C1608" stroke="#111" strokeWidth="2.5"/>
