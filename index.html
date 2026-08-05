@@ -7,6 +7,7 @@
 <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 <script src="https://unpkg.com/@babel/standalone@7.23.9/babel.min.js"></script>
+<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   /* ═══════════════════════════════════════════════════════════
@@ -1814,6 +1815,392 @@ function UnassignedPanel({ rooms, nurses, nurseRooms, onAssign, onDragStart, onC
 }
 
 // ── EXPORT SHEET MODAL ────────────────────────────────────────────────────────
+// ── ROSTER BUILDER ────────────────────────────────────────────────────────────
+function FileZone({ file, onFile, onClear, icon, label, hint, required }) {
+  const chosen = !!file;
+  return (
+    <label style={{
+      display:'block', cursor:'pointer', borderRadius:10,
+      border:`2px dashed ${chosen ? '#22c55e' : 'var(--border)'}`,
+      padding:'12px 16px', marginBottom:10,
+      background: chosen ? 'rgba(34,197,94,0.06)' : 'var(--bg-card)',
+      transition:'border-color 0.2s,background 0.2s',
+    }}>
+      <input type="file" accept=".xlsx,.xls,.csv" style={{display:'none'}}
+        onChange={e => { const f=e.target.files[0]; if(f) onFile(f); e.target.value=''; }}/>
+      <div style={{display:'flex',alignItems:'center',gap:10}}>
+        <span style={{fontSize:22}}>{icon}</span>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontSize:13,fontWeight:700,color:'var(--text-1)'}}>
+            {label} {required && <span style={{color:'#f87171',fontSize:10,marginLeft:4}}>required</span>}
+          </div>
+          <div style={{fontSize:11,color:chosen?'#22c55e':'var(--text-2)',marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+            {chosen ? `✓ ${file.name}` : hint}
+          </div>
+        </div>
+        {chosen && (
+          <button onClick={e=>{e.preventDefault();e.stopPropagation();onClear();}}
+            style={{flexShrink:0,background:'none',border:'none',color:'var(--text-2)',cursor:'pointer',fontSize:16,lineHeight:1}}>✕</button>
+        )}
+      </div>
+    </label>
+  );
+}
+
+function RosterBuilderModal({ onClose }) {
+  const [files, setFiles]   = React.useState({ roster:null, tracker:null, assign:null });
+  const [result, setResult] = React.useState(null);
+  const [err,    setErr]    = React.useState('');
+  const [busy,   setBusy]   = React.useState(false);
+  const [view,   setView]   = React.useState('upload');
+
+  function setFile(key, f) { setFiles(p => ({...p, [key]: f})); }
+
+  function readWb(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        try { resolve(XLSX.read(new Uint8Array(e.target.result), { type:'array', cellDates:true })); }
+        catch(ex) { reject(ex); }
+      };
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+  }
+
+  function toRows(wb, idx=0) {
+    const ws = wb.Sheets[wb.SheetNames[idx]];
+    if (!ws) return [];
+    return XLSX.utils.sheet_to_json(ws, { defval:'' });
+  }
+
+  function findCol(row, kws) {
+    const keys = Object.keys(row);
+    for (const kw of kws) {
+      const k = keys.find(k => k.toLowerCase().includes(kw.toLowerCase()));
+      if (k) return k;
+    }
+    return null;
+  }
+
+  function norm(s) { return String(s).trim().toUpperCase().replace(/\s+/g,' '); }
+
+  function fmtDate(v) {
+    if (!v) return '';
+    if (v instanceof Date) {
+      if (isNaN(v)) return '';
+      return v.toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'2-digit'});
+    }
+    const s = String(v).trim();
+    if (!s || s==='0' || s==='false') return '';
+    const d = new Date(s);
+    if (!isNaN(d)) return d.toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'2-digit'});
+    return s;
+  }
+
+  function classOf(s) {
+    const c = String(s).toUpperCase();
+    if (/\bRN\b|LVN\b|LPN\b|NURSE/.test(c)) return 'RN';
+    if (/\bCNA\b|\bNA\b|AIDE|TECH|PCT/.test(c)) return 'CNA';
+    return '';
+  }
+
+  // Build full name from row — handles combined col or separate first/last cols
+  function buildName(row) {
+    const keys = Object.keys(row);
+    const combined = keys.find(k => /name|employee|staff/i.test(k) && !/(first|last|mid)/i.test(k));
+    if (combined) return String(row[combined]||'').trim();
+    const first = keys.find(k => /first.*(name)?|fname/i.test(k));
+    const last  = keys.find(k => /last.*(name)?|lname|surname/i.test(k));
+    if (first && last) return `${String(row[first]||'').trim()} ${String(row[last]||'').trim()}`.trim();
+    const any = keys.find(k => /name/i.test(k));
+    return any ? String(row[any]||'').trim() : '';
+  }
+
+  async function generate() {
+    setErr(''); setBusy(true);
+    try {
+      if (!files.roster)  throw new Error('Please select the Daily Roster file.');
+      if (!files.tracker) throw new Error('Please select the Rotation Tracker file.');
+
+      const rWb = await readWb(files.roster);
+      const tWb = await readWb(files.tracker);
+
+      const rRows = toRows(rWb);
+      const tRows = toRows(tWb);
+      if (!rRows.length) throw new Error('Roster file appears empty or has no data rows.');
+      if (!tRows.length) throw new Error('Tracker file appears empty or has no data rows.');
+
+      // Detect tracker columns
+      const ts    = tRows[0];
+      const hcCol  = findCol(ts, ['hc','house','coverage']);
+      const fltCol = findCol(ts, ['float','flt']);
+      const sitCol = findCol(ts, ['sit','sitter']);
+
+      // Tracker lookup by normalised name
+      const tMap = {};
+      tRows.forEach(r => {
+        const n = norm(buildName(r));
+        if (n) tMap[n] = r;
+      });
+
+      // Detect roster columns
+      const rs    = rRows[0];
+      const classCol = findCol(rs, ['class','title','position','type','role','job','classification']);
+      const shiftCol = findCol(rs, ['shift','sch']);
+
+      // Process roster
+      let rnSeq = 0, cnaSeq = 0, unmatched = 0;
+      const rows = [];
+
+      rRows.forEach(r => {
+        const name = buildName(r);
+        if (!name) return;
+        const rawCls = classCol ? String(r[classCol]||'') : '';
+        const klass  = classOf(rawCls) || classOf(name);
+        const shift  = shiftCol ? String(r[shiftCol]||'').trim() : '';
+
+        let seq = '';
+        if (klass==='RN')  { rnSeq++;  seq = String(rnSeq); }
+        if (klass==='CNA') { cnaSeq++; seq = String(cnaSeq); }
+
+        const t   = tMap[norm(name)];
+        if (klass && !t) unmatched++;
+        const hc  = t && hcCol  ? fmtDate(t[hcCol])  : '';
+        const flt = t && fltCol ? fmtDate(t[fltCol]) : '';
+        const sit = t && sitCol ? fmtDate(t[sitCol]) : '';
+
+        rows.push({ seq, name, klass, rawCls, shift, hc, flt, sit, rooms:'' });
+      });
+
+      // Optional assignment sheet — pull room assignments
+      if (files.assign) {
+        const aWb   = await readWb(files.assign);
+        const aRows = toRows(aWb);
+        if (aRows.length) {
+          const as = aRows[0];
+          const aN = findCol(as, ['name','employee','nurse','staff']) || Object.keys(as)[0];
+          const aR = findCol(as, ['room','assignment','rooms','assign']);
+          if (aN && aR) aRows.forEach(r => {
+            const n = norm(String(r[aN]||'').trim());
+            const row = rows.find(x => norm(x.name)===n);
+            if (row) row.rooms = String(r[aR]||'').trim();
+          });
+        }
+      }
+
+      const hasRooms = rows.some(r => r.rooms);
+      setResult({ rows, rnCount:rnSeq, cnaCount:cnaSeq, unmatched,
+        hasHC:!!hcCol, hasFlt:!!fltCol, hasSit:!!sitCol, hasRooms });
+      setView('preview');
+    } catch(e) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function downloadExcel() {
+    if (!result) return;
+    const wb = XLSX.utils.book_new();
+    const rnRows  = result.rows.filter(r => r.klass==='RN');
+    const cnaRows = result.rows.filter(r => r.klass==='CNA');
+    const othRows = result.rows.filter(r => !r.klass);
+
+    function makeRow(r) {
+      const o = { '#':r.seq, 'Name':r.name, 'Class':r.klass||r.rawCls, 'Shift':r.shift };
+      if (result.hasRooms) o['Rooms'] = r.rooms;
+      if (result.hasHC)    o['Last HC']    = r.hc;
+      if (result.hasFlt)   o['Last Float'] = r.flt;
+      if (result.hasSit)   o['Last Sit']   = r.sit;
+      return o;
+    }
+
+    const mainData = [...rnRows, ...cnaRows, ...othRows].map(makeRow);
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(mainData), 'Final Roster');
+
+    if (result.hasHC) {
+      const hcSorted = [...result.rows].filter(r=>r.hc).sort((a,b)=>a.hc<b.hc?-1:1);
+      if (hcSorted.length) XLSX.utils.book_append_sheet(wb,
+        XLSX.utils.json_to_sheet(hcSorted.map(r=>({'Name':r.name,'Class':r.klass,'Last HC':r.hc}))),
+        'By HC Date');
+    }
+    if (result.hasFlt) {
+      const fltSorted = [...result.rows].filter(r=>r.flt).sort((a,b)=>a.flt<b.flt?-1:1);
+      if (fltSorted.length) XLSX.utils.book_append_sheet(wb,
+        XLSX.utils.json_to_sheet(fltSorted.map(r=>({'Name':r.name,'Class':r.klass,'Last Float':r.flt}))),
+        'By Float Date');
+    }
+
+    const today = new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'2-digit'}).replace(/\//g,'-');
+    XLSX.writeFile(wb, `Final_Roster_${today}.xlsx`);
+  }
+
+  function doPrint() {
+    if (!result) return;
+    const { rows, rnCount, cnaCount, hasHC, hasFlt, hasSit, hasRooms } = result;
+    const thStyle = 'padding:6px 10px;background:#e5e7eb;font-weight:700;font-size:11px;text-align:left;border:1px solid #d1d5db;';
+    const tdStyle = 'padding:5px 10px;font-size:12px;border:1px solid #e5e7eb;';
+    const rnStyle = 'background:#eff6ff;';
+    const cnaStyle = 'background:#f0fdf4;';
+
+    const html = `<html><head><title>Final Roster</title>
+      <style>body{font-family:Arial,sans-serif;padding:20px}h2{margin:0 0 4px;font-size:15px}
+      .meta{font-size:11px;color:#6b7280;margin-bottom:14px}
+      table{border-collapse:collapse;width:100%}
+      .badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700;color:#fff}
+      .rn-b{background:#1d4ed8}.cna-b{background:#15803d}
+      @media print{body{padding:8px}button{display:none}}</style></head>
+      <body>
+        <h2>Final Roster — ${new Date().toLocaleDateString()}</h2>
+        <div class="meta">RN: <b>${rnCount}</b> &nbsp;·&nbsp; CNA: <b>${cnaCount}</b> &nbsp;·&nbsp; Total: <b>${rows.length}</b></div>
+        <table><thead><tr>
+          <th style="${thStyle}">#</th>
+          <th style="${thStyle}">Name</th>
+          <th style="${thStyle}">Class</th>
+          <th style="${thStyle}">Shift</th>
+          ${hasRooms ? `<th style="${thStyle}">Rooms</th>` : ''}
+          ${hasHC  ? `<th style="${thStyle}">Last HC</th>` : ''}
+          ${hasFlt ? `<th style="${thStyle}">Last Float</th>` : ''}
+          ${hasSit ? `<th style="${thStyle}">Last Sit</th>` : ''}
+        </tr></thead><tbody>
+        ${rows.map(r => `<tr style="${r.klass==='RN'?rnStyle:r.klass==='CNA'?cnaStyle:''}">
+          <td style="${tdStyle}"><span class="badge ${r.klass==='RN'?'rn-b':r.klass==='CNA'?'cna-b':''}">${r.seq||'—'}</span></td>
+          <td style="${tdStyle}"><b>${r.name}</b></td>
+          <td style="${tdStyle}">${r.klass||r.rawCls}</td>
+          <td style="${tdStyle}">${r.shift}</td>
+          ${hasRooms ? `<td style="${tdStyle}">${r.rooms}</td>` : ''}
+          ${hasHC  ? `<td style="${tdStyle}">${r.hc||'—'}</td>`  : ''}
+          ${hasFlt ? `<td style="${tdStyle}">${r.flt||'—'}</td>` : ''}
+          ${hasSit ? `<td style="${tdStyle}">${r.sit||'—'}</td>` : ''}
+        </tr>`).join('')}
+        </tbody></table>
+      </body></html>`;
+
+    const w = window.open('','_blank','width=900,height=700');
+    if (w) { w.document.write(html); w.document.close(); setTimeout(()=>w.print(),400); }
+  }
+
+  const canGen = files.roster && files.tracker && !busy;
+  const baseBtn = { border:'none', borderRadius:8, cursor:'pointer', fontSize:12, fontWeight:700, padding:'7px 14px', transition:'opacity 0.15s' };
+  const th = { padding:'8px 10px', textAlign:'left', borderBottom:'1px solid var(--border)', fontWeight:700, color:'var(--text-2)', fontSize:10, letterSpacing:'0.06em', whiteSpace:'nowrap' };
+  const td = (extra='') => ({ padding:'6px 10px', color:'var(--text-1)', fontSize:12, ...Object.fromEntries((extra||'').split(';').filter(Boolean).map(s=>s.split(':').map(t=>t.trim()))) });
+
+  return (
+    <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.72)',zIndex:1200,display:'flex',alignItems:'center',justifyContent:'center',padding:12}}>
+      <div style={{background:'var(--bg-panel)',borderRadius:16,width:'min(96vw,700px)',maxHeight:'92vh',display:'flex',flexDirection:'column',overflow:'hidden',boxShadow:'0 24px 80px rgba(0,0,0,0.55)'}}>
+
+        {/* Header */}
+        <div style={{padding:'14px 18px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
+          <span style={{fontSize:20}}>📊</span>
+          <div>
+            <div style={{fontSize:15,fontWeight:800,color:'var(--text-1)'}}>Daily Staffing Roster Builder</div>
+            <div style={{fontSize:11,color:'var(--text-2)'}}>Upload files · generate · view &amp; print</div>
+          </div>
+          <div style={{marginLeft:'auto',display:'flex',gap:8,alignItems:'center'}}>
+            {view==='preview' && (
+              <button onClick={()=>{setView('upload');setResult(null);setErr('');}}
+                style={{...baseBtn,background:'var(--bg-card)',color:'var(--text-2)'}}>← Back</button>
+            )}
+            <button onClick={onClose} style={{background:'none',border:'none',color:'var(--text-2)',cursor:'pointer',fontSize:20,lineHeight:1,padding:4}}>✕</button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div style={{overflowY:'auto',flex:1,padding:'16px 18px'}}>
+
+          {view==='upload' && (
+            <div>
+              <FileZone file={files.roster}  onFile={f=>setFile('roster',f)}  onClear={()=>setFile('roster',null)}
+                icon="📅" label="Daily Roster by Shift" hint="DailyRoster.xlsx — the shift schedule export" required/>
+              <FileZone file={files.tracker} onFile={f=>setFile('tracker',f)} onClear={()=>setFile('tracker',null)}
+                icon="🔄" label="RN / CNA Rotation Tracker" hint="RN_CNA_ROTATION_TRACKER.xlsx — HC &amp; Float history" required/>
+              <FileZone file={files.assign}  onFile={f=>setFile('assign',f)}  onClear={()=>setFile('assign',null)}
+                icon="📋" label="Assignment Sheet" hint="Optional — room assignments (.xlsx)"/>
+
+              {err && (
+                <div style={{background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.3)',borderRadius:8,padding:'10px 14px',color:'#f87171',fontSize:12,marginTop:4,whiteSpace:'pre-wrap'}}>{err}</div>
+              )}
+
+              <button onClick={generate} disabled={!canGen}
+                style={{...baseBtn,marginTop:14,width:'100%',padding:'11px',fontSize:14,
+                  background:canGen?'#3b82f6':'var(--bg-card)',
+                  color:canGen?'white':'var(--text-2)',
+                  opacity:busy?0.7:1,
+                }}>
+                {busy ? '⏳ Processing…' : '⚡  Generate Final Sheet'}
+              </button>
+            </div>
+          )}
+
+          {view==='preview' && result && (
+            <div>
+              {/* Summary + action bar */}
+              <div style={{display:'flex',gap:8,marginBottom:12,flexWrap:'wrap',alignItems:'center'}}>
+                <div style={{background:'rgba(59,130,246,0.15)',borderRadius:8,padding:'6px 12px',fontSize:12,fontWeight:700,color:'#60a5fa'}}>RN: {result.rnCount}</div>
+                <div style={{background:'rgba(34,197,94,0.15)',borderRadius:8,padding:'6px 12px',fontSize:12,fontWeight:700,color:'#4ade80'}}>CNA: {result.cnaCount}</div>
+                <div style={{background:'rgba(168,85,247,0.15)',borderRadius:8,padding:'6px 12px',fontSize:12,fontWeight:700,color:'#c084fc'}}>Total: {result.rows.length}</div>
+                <div style={{marginLeft:'auto',display:'flex',gap:6}}>
+                  <button onClick={downloadExcel} style={{...baseBtn,background:'#15803d',color:'white'}}>⬇ Excel</button>
+                  <button onClick={doPrint}        style={{...baseBtn,background:'#0284c7',color:'white'}}>🖨 Print</button>
+                </div>
+              </div>
+
+              {result.unmatched > 0 && (
+                <div style={{background:'rgba(251,146,60,0.12)',border:'1px solid rgba(251,146,60,0.3)',borderRadius:8,padding:'8px 12px',fontSize:11,color:'#fb923c',marginBottom:10}}>
+                  ⚠ {result.unmatched} staff member{result.unmatched>1?'s':''} not found in tracker — HC/Float dates will be blank for them.
+                </div>
+              )}
+
+              {/* Preview table */}
+              <div style={{overflowX:'auto',borderRadius:10,border:'1px solid var(--border)'}}>
+                <table style={{width:'100%',borderCollapse:'collapse',fontSize:12}}>
+                  <thead>
+                    <tr style={{background:'var(--bg-card)'}}>
+                      <th style={th}>#</th>
+                      <th style={th}>NAME</th>
+                      <th style={th}>CLASS</th>
+                      <th style={th}>SHIFT</th>
+                      {result.hasRooms && <th style={th}>ROOMS</th>}
+                      {result.hasHC    && <th style={th}>LAST HC</th>}
+                      {result.hasFlt   && <th style={th}>LAST FLOAT</th>}
+                      {result.hasSit   && <th style={th}>LAST SIT</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.rows.map((r,i) => (
+                      <tr key={i} style={{
+                        background:r.klass==='RN'?'rgba(59,130,246,0.05)':r.klass==='CNA'?'rgba(34,197,94,0.05)':'transparent',
+                        borderBottom:'1px solid var(--border)',
+                      }}>
+                        <td style={{padding:'5px 10px'}}>
+                          {r.seq ? (
+                            <span style={{display:'inline-block',padding:'1px 7px',borderRadius:4,fontSize:11,fontWeight:700,color:'white',
+                              background:r.klass==='RN'?'#1d4ed8':r.klass==='CNA'?'#15803d':'#555'}}>
+                              {r.seq}
+                            </span>
+                          ) : '—'}
+                        </td>
+                        <td style={{padding:'5px 10px',fontWeight:600,color:'var(--text-1)'}}>{r.name}</td>
+                        <td style={{padding:'5px 10px',color:'var(--text-2)',fontSize:11}}>{r.klass||r.rawCls}</td>
+                        <td style={{padding:'5px 10px',color:'var(--text-2)'}}>{r.shift}</td>
+                        {result.hasRooms && <td style={{padding:'5px 10px',color:'var(--text-2)',fontFamily:'monospace'}}>{r.rooms||'—'}</td>}
+                        {result.hasHC    && <td style={{padding:'5px 10px',color:r.hc ?'#fbbf24':'var(--text-2)'}}>{r.hc ||'—'}</td>}
+                        {result.hasFlt   && <td style={{padding:'5px 10px',color:r.flt?'#fbbf24':'var(--text-2)'}}>{r.flt||'—'}</td>}
+                        {result.hasSit   && <td style={{padding:'5px 10px',color:r.sit?'#fbbf24':'var(--text-2)'}}>{r.sit||'—'}</td>}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ExportSheetModal({ nurses, rooms, onClose }) {
   const [status, setStatus] = React.useState('');
   const [loading, setLoading] = React.useState(false);
@@ -3559,6 +3946,7 @@ function App() {
   const [phoneDir,         setPhoneDir]         = useState(false);
   const [exportSheetOpen,  setExportSheetOpen]  = useState(false);
   const [policySearchOpen, setPolicySearchOpen] = useState(false);
+  const [rosterBuilderOpen, setRosterBuilderOpen] = useState(false);
   const [fuelMode, setFuelMode] = useState(false);
   const [feedbackStore, setFeedbackStore] = useState(() => loadFB());
   const [zapFeedbackNurses, setZapFeedbackNurses] = useState(new Set()); // Set of nurseIds awaiting per-nurse feedback
@@ -4302,6 +4690,16 @@ function App() {
             onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
             📋 <span>Export</span>
           </button>
+          <button onClick={()=>setRosterBuilderOpen(true)}
+            title="Daily Staffing Roster Builder"
+            style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 11px',
+              borderRadius:8, border:'1px solid var(--border-sub)', background:'transparent',
+              cursor:'pointer', fontSize:12, color:'var(--text-2)', fontWeight:600,
+              transition:'background 0.15s' }}
+            onMouseEnter={e=>e.currentTarget.style.background='var(--bg-panel)'}
+            onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+            📊 <span>Roster</span>
+          </button>
           <button onClick={()=>setPhoneDir(true)}
             title="Hospital Phone Directory"
             style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 11px',
@@ -4499,6 +4897,7 @@ function App() {
       {phoneDir         && <PhoneDirectory    onClose={()=>setPhoneDir(false)}/>}
       {exportSheetOpen  && <ExportSheetModal nurses={nurses} rooms={rooms} onClose={()=>setExportSheetOpen(false)}/>}
       {policySearchOpen && <PolicySearchModal onClose={()=>setPolicySearchOpen(false)}/>}
+      {rosterBuilderOpen && <RosterBuilderModal onClose={()=>setRosterBuilderOpen(false)}/>}
       {toast && <div className="warn-toast">{toast}</div>}
     </div>
   );
