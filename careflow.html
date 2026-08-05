@@ -2001,45 +2001,89 @@ function RosterBuilderModal({ onClose }) {
 
   async function generate() {
     setErr(''); setBusy(true);
+    const dbg = [];
     try {
       if (!files.roster)  throw new Error('Please select the Daily Roster file.');
       if (!files.tracker) throw new Error('Please select the Rotation Tracker file.');
 
       const rWb = await readWb(files.roster);
       const tWb = await readWb(files.tracker);
+      dbg.push(`Roster sheets: ${rWb.SheetNames.join(', ')}`);
+      dbg.push(`Tracker sheets: ${tWb.SheetNames.join(', ')}`);
 
-      // Use Sheet2 if present (standard roster format), else first sheet
-      const sheetName = rWb.SheetNames.find(n=>n==='Sheet2') || rWb.SheetNames[0];
-      const rWs = rWb.Sheets[sheetName];
-      if (!rWs) throw new Error('Could not read roster sheet.');
+      // Try Sheet2 first (skill default), then any sheet containing employee data
+      let rWs = null, usedSheet = '';
+      const trySheets = rWb.SheetNames.filter(n=>n==='Sheet2').concat(rWb.SheetNames.filter(n=>n!=='Sheet2'));
+      for (const sn of trySheets) {
+        const ws = rWb.Sheets[sn];
+        if (!ws) continue;
+        // Quick sanity check: does it have any non-empty cells?
+        if (wsMaxRow(ws) > 5) { rWs = ws; usedSheet = sn; break; }
+      }
+      if (!rWs) throw new Error('Could not read any sheet from the roster file.');
+      dbg.push(`Using roster sheet: "${usedSheet}"`);
 
-      // Detect shift from Coverage Period line (col A, rows 1-14)
+      // Detect shift from any cell in rows 1-20 containing "Coverage Period"
       let shift = 'day';
-      for (let r=1; r<=14; r++) {
-        const v = getCell(rWs,r,1);
-        if (v && typeof v==='string' && v.includes('Coverage Period')) {
-          const m = /(\d{3,4})\s*-\s*(\d{3,4})/.exec(v);
-          if (m) { const s=parseInt(m[1]); shift=(s>=1700||s<600)?'noc':'day'; }
-          break;
+      outer: for (let r=1; r<=20; r++) {
+        for (let c=1; c<=5; c++) {
+          const v = getCell(rWs,r,c);
+          if (v && typeof v==='string' && v.includes('Coverage Period')) {
+            const m = /(\d{3,4})\s*-\s*(\d{3,4})/.exec(v);
+            if (m) { const s=parseInt(m[1]); shift=(s>=1700||s<600)?'noc':'day'; }
+            break outer;
+          }
         }
       }
+      dbg.push(`Shift: ${shift.toUpperCase()}`);
 
-      // Find header row: "Employee Name" in col C (col 3)
-      let headerRow = 14;
-      for (let r=1; r<=30; r++) {
-        const v = getCell(rWs,r,3);
-        if (v && typeof v==='string' && v.includes('Employee Name')) { headerRow=r; break; }
+      // Find header row and name column by scanning for "Employee Name" anywhere in rows 1-30
+      let headerRow = -1, nameCol = 3, profCol = 6, codeCol = 10;
+      outer2: for (let r=1; r<=30; r++) {
+        for (let c=1; c<=20; c++) {
+          const v = getCell(rWs,r,c);
+          if (v && typeof v==='string' && /employee.?name/i.test(v)) {
+            headerRow = r; nameCol = c;
+            dbg.push(`Found "Employee Name" at row ${r} col ${c}`);
+            // Now scan the same row for Profile/Type, and Code columns
+            for (let cc=1; cc<=20; cc++) {
+              const hv = String(getCell(rWs,r,cc)||'').toUpperCase();
+              if (/\bPROFILE\b|\bTYPE\b|\bCLASS\b|\bPOSITION\b/.test(hv) && cc!==nameCol) profCol=cc;
+              if (/\bCODE\b|\bSCHED/.test(hv) && cc!==nameCol) codeCol=cc;
+            }
+            break outer2;
+          }
+        }
       }
+      // Fall back to known skill positions if header not found
+      if (headerRow === -1) {
+        headerRow = 14; nameCol = 3; profCol = 6; codeCol = 10;
+        dbg.push(`Header not found, using defaults: row ${headerRow}, name col ${nameCol}`);
+      }
+      dbg.push(`Columns — name:${nameCol} profile:${profCol} code:${codeCol}`);
+
       const dataStart = headerRow + 1;
-      let dataEnd = dataStart;
-      for (let r=dataStart; r<=wsMaxRow(rWs); r++) {
-        const name = getCell(rWs,r,3);
-        if (!name || !String(name).trim()) break;
-        dataEnd = r;
+      // Find data end: scan from dataStart until we hit 3 consecutive empty name cells
+      let dataEnd = headerRow; // start at header so we can detect 0-data case
+      let emptyRun = 0;
+      for (let r=dataStart; r<=Math.min(wsMaxRow(rWs), dataStart+200); r++) {
+        const name = getCell(rWs,r,nameCol);
+        const hasName = name && String(name).trim().length > 0;
+        if (hasName) { dataEnd=r; emptyRun=0; }
+        else { emptyRun++; if (emptyRun>=3) break; }
       }
-      if (dataEnd < dataStart) throw new Error('No employee data found in roster. Expected "Employee Name" header in column C.');
+      dbg.push(`Data rows: ${dataStart}–${dataEnd} (${dataEnd-dataStart+1} rows)`);
+
+      if (dataEnd < dataStart) {
+        throw new Error(
+          `No employee rows found in roster.\n` +
+          `Looked in col ${nameCol} starting at row ${dataStart}.\n` +
+          dbg.join('\n')
+        );
+      }
 
       const lookups = loadTracker(tWb, shift);
+      dbg.push(`Tracker — RN HC: ${Object.keys(lookups.rn_hc).length}, Float: ${Object.keys(lookups.rn_float).length}, CNA Sit: ${Object.keys(lookups.cna_sit).length}, Float: ${Object.keys(lookups.cna_float).length}`);
       const hasAnyHC  = Object.keys(lookups.rn_hc).length>0;
       const hasAnyFlt = Object.keys(lookups.rn_float).length>0||Object.keys(lookups.cna_float).length>0;
       const hasAnySit = Object.keys(lookups.cna_sit).length>0;
@@ -2057,13 +2101,13 @@ function RosterBuilderModal({ onClose }) {
       const rows=[], unmatched=[];
 
       for (let r=dataStart; r<=dataEnd; r++) {
-        const nameVal = getCell(rWs,r,3);
-        const profVal = getCell(rWs,r,6);
-        const codeVal = getCell(rWs,r,10);
+        const nameVal = getCell(rWs,r,nameCol);
+        const profVal = getCell(rWs,r,profCol);
+        const codeVal = getCell(rWs,r,codeCol);
         const name    = nameVal ? String(nameVal).trim() : '';
+        if (!name) continue;
         const profile = profVal ? String(profVal).trim() : '';
         const code    = codeVal ? String(codeVal).trim().toUpperCase() : '';
-        if (!name) continue;
 
         const key       = normKey(name);
         const overrides = (key && EMP_OVERRIDES[key]) || new Set();
@@ -2098,6 +2142,7 @@ function RosterBuilderModal({ onClose }) {
           rooms:'', isMedSurg:false,
           isRN, isCNA:isCNA||isCNAND, noTrack });
       }
+      dbg.push(`Processed: ${rows.length} employees (RN: ${rnSeq}, CNA: ${cnaSeq}, unmatched: ${unmatched.length})`);
 
       // ── Optional assignment sheet: room assignment + Med/Surg detection (ms-turn style) ──
       let turnOrder = null;
@@ -2197,10 +2242,10 @@ function RosterBuilderModal({ onClose }) {
 
       const hasRooms = rows.some(r=>r.rooms);
       setResult({ rows, rnCount:rnSeq, cnaCount:cnaSeq, unmatched, shift:shift.toUpperCase(),
-        hasHC:hasAnyHC, hasFlt:hasAnyFlt, hasSit:hasAnySit, hasRooms, turnOrder });
+        hasHC:hasAnyHC, hasFlt:hasAnyFlt, hasSit:hasAnySit, hasRooms, turnOrder, dbg });
       setView('preview');
     } catch(e) {
-      setErr(e.message || String(e));
+      setErr((e.message || String(e)) + (dbg.length ? '\n\nDiagnostic:\n'+dbg.join('\n') : ''));
     } finally {
       setBusy(false);
     }
@@ -2450,6 +2495,22 @@ function RosterBuilderModal({ onClose }) {
                       </div>
                     );
                   })()}
+                </div>
+              )}
+
+              {/* Diagnostic panel */}
+              {result.dbg && result.dbg.length > 0 && (
+                <details style={{marginTop:12}}>
+                  <summary style={{cursor:'pointer',fontSize:10,color:'var(--text-2)',userSelect:'none'}}>🔍 Diagnostic info</summary>
+                  <pre style={{margin:'6px 0 0',padding:'8px 10px',background:'var(--bg-card)',borderRadius:6,fontSize:10,color:'var(--text-2)',overflowX:'auto',whiteSpace:'pre-wrap'}}>
+                    {result.dbg.join('\n')}
+                  </pre>
+                </details>
+              )}
+
+              {result.rows.length === 0 && (
+                <div style={{textAlign:'center',padding:'32px 0',color:'var(--text-2)',fontSize:13}}>
+                  ⚠️ No employee rows were found. Check the Diagnostic info above.
                 </div>
               )}
             </div>
