@@ -3598,30 +3598,48 @@ function CenterDashboard({ vacant, occupied, assigned, unassigned, tele, sitter,
     const CYCLE = 22000;
     const PAUSES = [[3000, 8000], [14000, 19000]];
     let lastIdle = false;
-    const id = setInterval(() => {
-      // Read the exact position from the CSS animation — eliminates startup offset
-      let t = null;
-      const runner = _runnerRef.current;
-      if (runner?.getAnimations) {
-        for (const anim of runner.getAnimations()) {
-          if (anim.animationName === 'monkey-walk' && anim.currentTime != null) {
-            t = ((anim.currentTime % CYCLE) + CYCLE) % CYCLE;
-            break;
-          }
-        }
+    let startMs = null; // wall-clock ms when monkey-walk animation began
+
+    const runner = _runnerRef.current;
+
+    // Primary: capture exact start via animationstart event
+    const onStart = (e) => {
+      if (startMs === null && (!e.animationName || e.animationName === 'monkey-walk')) {
+        startMs = performance.now();
       }
-      if (t === null) return; // animation not started yet
-      const idle = PAUSES.some(([s, e]) => t >= s && t <= e);
-      if (idle === lastIdle) return; // no change, skip DOM write
+    };
+    runner?.addEventListener('animationstart', onStart);
+
+    function applyIdle(idle) {
+      if (idle === lastIdle) return;
       lastIdle = idle;
       if (_emojiRef.current) {
-        // animation:none lets the element rest at the inline transform; '' restores the CSS class animation
         _emojiRef.current.style.animation = idle ? 'none' : '';
         _emojiRef.current.style.transform = idle ? 'translateY(0px)' : '';
       }
-      if (_shadowRef.current) _shadowRef.current.classList.toggle('monkey-idle', idle);
+      _shadowRef.current?.classList.toggle('monkey-idle', idle);
+    }
+
+    const id = setInterval(() => {
+      // Fallback: if animationstart was missed (effect ran after first paint),
+      // read currentTime directly from the first animation on the runner
+      if (startMs === null && runner?.getAnimations) {
+        try {
+          const anims = runner.getAnimations();
+          if (anims.length > 0 && anims[0].currentTime != null) {
+            startMs = performance.now() - ((anims[0].currentTime % CYCLE + CYCLE) % CYCLE);
+          }
+        } catch (_) {}
+      }
+      if (startMs === null) return;
+      const t = (performance.now() - startMs) % CYCLE;
+      applyIdle(PAUSES.some(([s, e]) => t >= s && t <= e));
     }, 50);
-    return () => clearInterval(id);
+
+    return () => {
+      clearInterval(id);
+      runner?.removeEventListener('animationstart', onStart);
+    };
   }, []);
   const sitterRef      = React.useRef();
   const dischargeRef   = React.useRef();
