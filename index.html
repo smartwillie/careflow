@@ -1847,8 +1847,77 @@ function FileZone({ file, onFile, onClear, icon, label, hint, required }) {
   );
 }
 
+function MultiFileZone({ files, onAdd, onRemove, icon, label, hint }) {
+  const hasFiles = files && files.length > 0;
+  const [dragging, setDragging] = React.useState(false);
+  const inputRef = React.useRef(null);
+
+  function handleDrop(e) {
+    e.preventDefault(); setDragging(false);
+    const dropped = Array.from(e.dataTransfer.files).filter(f => /\.(xlsx|xls|csv)$/i.test(f.name));
+    dropped.forEach(f => onAdd(f));
+  }
+
+  return (
+    <div style={{marginBottom:10}}>
+      <label
+        onDragOver={e=>{e.preventDefault();setDragging(true);}}
+        onDragLeave={()=>setDragging(false)}
+        onDrop={handleDrop}
+        style={{
+          display:'block', cursor:'pointer', borderRadius:10,
+          border:`2px dashed ${dragging ? '#3b82f6' : hasFiles ? '#22c55e' : 'var(--border)'}`,
+          padding:'11px 16px',
+          background: dragging ? 'rgba(59,130,246,0.07)' : hasFiles ? 'rgba(34,197,94,0.06)' : 'var(--bg-card)',
+          transition:'border-color 0.2s,background 0.2s',
+        }}>
+        <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" multiple style={{display:'none'}}
+          onChange={e => { Array.from(e.target.files).forEach(f => onAdd(f)); e.target.value=''; }}/>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <span style={{fontSize:22}}>{icon}</span>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:13,fontWeight:700,color:'var(--text-1)',display:'flex',alignItems:'center',gap:6}}>
+              {label}
+              {hasFiles && (
+                <span style={{background:'#3b82f6',color:'white',borderRadius:10,fontSize:10,fontWeight:800,padding:'1px 7px'}}>
+                  {files.length}
+                </span>
+              )}
+            </div>
+            <div style={{fontSize:11,color:hasFiles?'#22c55e':'var(--text-2)',marginTop:2}}>
+              {hasFiles ? `${files.length} file${files.length>1?'s':''} selected — click or drop to add more` : hint}
+            </div>
+          </div>
+          <span style={{fontSize:18,color:'var(--text-2)',flexShrink:0}}>＋</span>
+        </div>
+      </label>
+
+      {hasFiles && (
+        <div style={{display:'flex',flexDirection:'column',gap:4,marginTop:4,marginLeft:4}}>
+          {files.map((f,i) => (
+            <div key={i} style={{
+              display:'flex',alignItems:'center',gap:8,
+              background:'var(--bg-card)',borderRadius:7,
+              border:'1px solid var(--border)',padding:'5px 10px',
+            }}>
+              <span style={{fontSize:14}}>📄</span>
+              <span style={{flex:1,fontSize:12,color:'var(--text-1)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                {f.name}
+              </span>
+              <button
+                onClick={e=>{e.preventDefault();e.stopPropagation();onRemove(i);}}
+                style={{flexShrink:0,background:'none',border:'none',color:'var(--text-2)',cursor:'pointer',fontSize:15,lineHeight:1,padding:'0 2px'}}
+                title="Remove">✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RosterBuilderModal({ onClose }) {
-  const [files, setFiles]   = React.useState({ roster:null, tracker:null, assign:null, msHistory:null });
+  const [files, setFiles]   = React.useState({ roster:null, tracker:null, assign:[], msHistory:null });
   const [result, setResult] = React.useState(null);
   const [err,    setErr]    = React.useState('');
   const [busy,   setBusy]   = React.useState(false);
@@ -2144,24 +2213,26 @@ function RosterBuilderModal({ onClose }) {
       }
       dbg.push(`Processed: ${rows.length} employees (RN: ${rnSeq}, CNA: ${cnaSeq}, unmatched: ${unmatched.length})`);
 
-      // ── Optional assignment sheet: room assignment + Med/Surg detection (ms-turn style) ──
+      // ── Optional assignment sheets: room assignment + Med/Surg detection (ms-turn style) ──
       let turnOrder = null;
-      if (files.assign) {
-        const aWb = await readWb(files.assign);
-        const aWs = aWb.Sheets[aWb.SheetNames[0]];
-        if (aWs) {
-          const HEART = '♥';
-          const ROOM_RE = /\d+[A-Za-z]?[♥]?/g;
-          const SKIP_KW = ['FOLEY','LINE','NAME','EXT','SHIFT','CENSUS','SITTER'];
-          const looksLikeRooms = v => {
-            if (!v) return false;
-            const s = String(v);
-            if (SKIP_KW.some(k => s.toUpperCase().includes(k))) return false;
-            const t = s.match(ROOM_RE)||[];
-            return t.length >= 2 && !t.some(x => x.length > 5);
-          };
+      const assignFiles = Array.isArray(files.assign) ? files.assign : (files.assign ? [files.assign] : []);
+      if (assignFiles.length > 0) {
+        const HEART = '♥';
+        const ROOM_RE = /\d+[A-Za-z]?[♥]?/g;
+        const SKIP_KW = ['FOLEY','LINE','NAME','EXT','SHIFT','CENSUS','SITTER'];
+        const looksLikeRooms = v => {
+          if (!v) return false;
+          const s = String(v);
+          if (SKIP_KW.some(k => s.toUpperCase().includes(k))) return false;
+          const t = s.match(ROOM_RE)||[];
+          return t.length >= 2 && !t.some(x => x.length > 5);
+        };
+
+        for (const assignFile of assignFiles) {
+          const aWb = await readWb(assignFile);
+          const aWs = aWb.Sheets[aWb.SheetNames[0]];
+          if (!aWs) continue;
           const maxR=wsMaxRow(aWs), maxC=wsMaxCol(aWs);
-          // Find the best name row (like ms-turn: check rows 1-7, score by room density below)
           let nameRow=null, roomRow=null, bestScore=0;
           for (let nr=1; nr<=Math.min(maxR-1,7); nr++) {
             for (let rr=nr+1; rr<=Math.min(nr+7,maxR); rr++) {
@@ -2182,21 +2253,22 @@ function RosterBuilderModal({ onClose }) {
                 return nk && ak && nk===ak;
               }) || rows.find(x => x.name.toUpperCase()===nm.toUpperCase());
               if (row) {
-                row.rooms = rm;
+                row.rooms = row.rooms ? `${row.rooms} / ${rm}` : rm;
                 const tokens = rm.match(ROOM_RE)||[];
                 if (tokens.length >= 2 && !tokens.some(t => t.includes(HEART))) row.isMedSurg = true;
               }
             }
           }
+          dbg.push(`Assignment "${assignFile.name}": nameRow=${nameRow} roomRow=${roomRow} score=${bestScore}`);
+        }
 
-          // Med/Surg turn order: RN + RES/BRK only, not RN CHG
-          const eligible = rows.filter(r => r.isRN && r.profile !== 'RN CHG');
-          if (eligible.length) {
-            turnOrder = eligible.map(r => ({
-              name: r.name, nick: getNick(r.name), profile: r.profile,
-              isMedSurgToday: r.isMedSurg, lastMS: null, daysAgo: 9999,
-            }));
-          }
+        // Med/Surg turn order: RN + RES/BRK only, not RN CHG
+        const eligible = rows.filter(r => r.isRN && r.profile !== 'RN CHG');
+        if (eligible.length) {
+          turnOrder = eligible.map(r => ({
+            name: r.name, nick: getNick(r.name), profile: r.profile,
+            isMedSurgToday: r.isMedSurg, lastMS: null, daysAgo: 9999,
+          }));
         }
       }
 
@@ -2458,8 +2530,10 @@ function RosterBuilderModal({ onClose }) {
                 icon="📅" label="Daily Roster by Shift" hint="DailyRoster.xlsx — the shift schedule export" required/>
               <FileZone file={files.tracker} onFile={f=>setFile('tracker',f)} onClear={()=>setFile('tracker',null)}
                 icon="🔄" label="RN / CNA Rotation Tracker" hint="RN_CNA_ROTATION_TRACKER.xlsx — HC &amp; Float history" required/>
-              <FileZone file={files.assign}  onFile={f=>setFile('assign',f)}  onClear={()=>setFile('assign',null)}
-                icon="📋" label="Assignment Sheet" hint="Optional — daily room assignment (.xlsx). Enables Med/Surg turn analysis."/>
+              <MultiFileZone files={files.assign}
+                onAdd={f=>setFiles(p=>({...p,assign:[...p.assign,f]}))}
+                onRemove={i=>setFiles(p=>({...p,assign:p.assign.filter((_,j)=>j!==i)}))}
+                icon="📋" label="Assignment Sheets" hint="Optional — daily room assignment (.xlsx). Select one or more. Enables Med/Surg turn analysis."/>
               <FileZone file={files.msHistory} onFile={f=>setFile('msHistory',f)} onClear={()=>setFile('msHistory',null)}
                 icon="📈" label="Med/Surg History" hint="Optional — MedSurg_Assignments_Summary.xlsx. Required for turn-order days ranking."/>
 
