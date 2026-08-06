@@ -1848,7 +1848,7 @@ function FileZone({ file, onFile, onClear, icon, label, hint, required }) {
 }
 
 function RosterBuilderModal({ onClose }) {
-  const [files, setFiles]   = React.useState({ roster:null, tracker:null, assign:null });
+  const [files, setFiles]   = React.useState({ roster:null, tracker:null, assign:null, msHistory:null });
   const [result, setResult] = React.useState(null);
   const [err,    setErr]    = React.useState('');
   const [busy,   setBusy]   = React.useState(false);
@@ -1868,172 +1868,515 @@ function RosterBuilderModal({ onClose }) {
     });
   }
 
-  function toRows(wb, idx=0) {
-    const ws = wb.Sheets[wb.SheetNames[idx]];
-    if (!ws) return [];
-    return XLSX.utils.sheet_to_json(ws, { defval:'' });
+  // ── Skill-grade name normalization (mirrors daily-roster-builder / ms-turn) ──
+  const _PAREN_RE = /\([^)]*\)/g;
+  const _GEN_KW   = new Set(['JR','SR','II','III','IV','V','VI','VII','VIII','IX','X']);
+  function _isGenSuffix(s) {
+    s = s.toUpperCase();
+    return _GEN_KW.has(s) || (s.length >= 2 && s.length <= 4 && /^[ILil]+$/.test(s));
+  }
+  function normalizeName(raw) {
+    if (!raw || typeof raw !== 'string') return null;
+    let s = raw.replace(_PAREN_RE, '').trim(); if (!s) return null;
+    let last, first;
+    if (s.includes(',')) { [last, first] = s.split(',', 2); }
+    else { const p = s.split(/\s+/); if (p.length < 2) return null; last=p[0]; first=p.slice(1).join(' '); }
+    const lt = last.trim().split(/\s+/);
+    if (lt.length > 1 && _isGenSuffix(lt[lt.length-1])) last = lt.slice(0,-1).join(' ');
+    last  = last.replace(/\W+/g,'').toUpperCase();
+    first = first.replace(/\W+/g,'').toUpperCase();
+    return last ? [last, first] : null;
+  }
+  const _NAME_ALIASES = {
+    'EIERMAN,DESTINY':     ['EIRMAN','DESTINY'],
+    'HUELE,EVAJOANNE':     ['HUELE','EVA'],
+    'MANALO,ANNKRISTIE':   ['MANALO','ANN'],
+    'WILHELM,NICHOLAS':    ['WILHELM','NICK'],
+    'WILHEM,NICHOLAS':     ['WILHELM','NICK'],
+    'WILHEM,NICK':         ['WILHELM','NICK'],
+    'MENDEZRIVERA,VICTOR': ['MENDEZRIVERA','ANDREW'],
+    'AGUILAR,NORANATALIE': ['AGUILAR','NORA'],
+    'CALVAN,SUERTE':       ['CALVAN','SUE'],
+  };
+  const _NICK_MAP = {
+    'AGUILAR,NORA':'NORA','ADHIKARI,BIMALA':'BIMALA','BALGOS,DENNIS':'DENNIS',
+    'BELY,JULIA':'JULIA','BERANGO,KATHRYN':'KATHRYN','BOREHAM,JANA':'JANA',
+    'BROTHERS,JOHN':'JOHN','BURLAKOTI,MUNA':'MUNA','CARPENTER,SUSANNA':'SUSANNA',
+    'CHEN,AIHUA':'AIHUA','CICHELLA,COURTNIE':'COURTNIE','FORST,RYAN':'RYAN',
+    'GAMBETTI,ALBERT':'AL','GAAS,REINETTE':'REINETTE','HABIBI,MARYAM':'MARYAM',
+    'HECHONA,MEREMEL':'MEREMEL','HENDERSON,NATALIE':'NATALIE','HERNANDEZ,DONNA':'DONNA',
+    'IMMEKER,REBECCA':'REBECCA','JARDINIANO,CATHERINE':'CATHERINE','JARDIANIANO,CATHERINE':'CATHERINE',
+    'JOHN,JOMINA':'JOMINA','JONES,STEVEN':'STEVEN','KAUR,KAMALDEEP':'KAMALDEEP',
+    'LOPEZ,DENISE':'DENISE','MADUIKE,SAMANTHA':'SAMANTHA','MAGNO,ROWENA':'ROWENA',
+    'MCKEETH,CURTIS':'CURTIS','OYANGOREN,MASOCORRO':'MA','ROBSON,KELLI':'KELLI',
+    'RYAN,MALGORZATA':'GOSIA','SHOQUIST,MICHAEL':'MICHAEL','SIGL,JOCELYN':'JOCELYN',
+    'TRAN,TRANG':'TRANG','VARELA,CARMEN':'CARMEN','VARGHESE,ANU':'ANU',
+    'VARGHESE,ASHA':'ASHA','VLASIK,MARIYA':'MARIYA','WALTON,RAVEN':'RAVEN',
+  };
+  function normKey(raw) {
+    const n = normalizeName(raw); if (!n) return null;
+    const k = n[0]+','+n[1];
+    const a = _NAME_ALIASES[k]; return a ? a[0]+','+a[1] : k;
+  }
+  function getNick(rawName) {
+    const k = normKey(rawName); if (!k) return rawName;
+    if (_NICK_MAP[k]) return _NICK_MAP[k];
+    const first = k.split(',')[1] || ''; return first || rawName;
   }
 
-  function findCol(row, kws) {
-    const keys = Object.keys(row);
-    for (const kw of kws) {
-      const k = keys.find(k => k.toLowerCase().includes(kw.toLowerCase()));
-      if (k) return k;
-    }
+  // ── Date extraction (mirrors skill: handles Date obj, M/D strings, DO NOT ASSIGN, etc.) ──
+  const _MD_RE = /(\d{1,2})\/(\d{1,2})/;
+  function extractMD(val) {
+    if (val == null) return null;
+    if (val instanceof Date) { if (isNaN(val)) return null; return `${val.getMonth()+1}/${val.getDate()}`; }
+    const s = String(val).trim(); if (!s) return null;
+    if (/DO NOT ASSIGN/i.test(s)) return 'NA';
+    if (/NEVER FLOAT/i.test(s)) return null;
+    const m = _MD_RE.exec(s); if (m) return `${parseInt(m[1])}/${parseInt(m[2])}`;
     return null;
   }
 
-  function norm(s) { return String(s).trim().toUpperCase().replace(/\s+/g,' '); }
+  // ── Cell access helpers (1-indexed row/col) ──
+  function getCell(ws, row, col) {
+    const addr = XLSX.utils.encode_cell({r:row-1, c:col-1});
+    const cell = ws[addr]; if (!cell) return null;
+    if (cell.t==='d') return cell.v;
+    return cell.v !== undefined ? cell.v : null;
+  }
+  function wsMaxRow(ws) { if (!ws['!ref']) return 0; return XLSX.utils.decode_range(ws['!ref']).e.r + 1; }
+  function wsMaxCol(ws) { if (!ws['!ref']) return 0; return XLSX.utils.decode_range(ws['!ref']).e.c + 1; }
 
-  function fmtDate(v) {
-    if (!v) return '';
-    if (v instanceof Date) {
-      if (isNaN(v)) return '';
-      return v.toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'2-digit'});
+  // ── Tracker lookup: name col + rightward date scan (freshest = rightmost non-empty) ──
+  function buildLookup(ws, nameCol, startDateCol, startRow, endRow) {
+    const maxCol = wsMaxCol(ws), maxRow = wsMaxRow(ws);
+    const table = {};
+    for (let r = startRow; r <= Math.min(endRow, maxRow); r++) {
+      const key = normKey(String(getCell(ws,r,nameCol)||''));
+      if (!key) continue;
+      let latest = null;
+      for (let c = startDateCol; c <= maxCol; c++) { const md = extractMD(getCell(ws,r,c)); if (md !== null) latest = md; }
+      if (latest !== null && !(key in table)) table[key] = latest;
     }
-    const s = String(v).trim();
-    if (!s || s==='0' || s==='false') return '';
-    const d = new Date(s);
-    if (!isNaN(d)) return d.toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'2-digit'});
-    return s;
+    return table;
   }
 
-  function classOf(s) {
-    const c = String(s).toUpperCase();
-    if (/\bRN\b|LVN\b|LPN\b|NURSE/.test(c)) return 'RN';
-    if (/\bCNA\b|\bNA\b|AIDE|TECH|PCT/.test(c)) return 'CNA';
-    return '';
-  }
+  function loadTracker(wb, shift) {
+    const isNoc = shift === 'noc';
+    const hcName    = isNoc ? 'NOC RN HC LIST'       : 'DAY RN HC LIST';
+    const floatName = isNoc ? 'NOC RN FLOAT ROTATION' : 'DAY RN FLOAT ROTATION';
+    const lookups = { rn_hc:{}, rn_float:{}, cna_sit:{}, cna_float:{} };
+    const findWs = name => { const k = wb.SheetNames.find(n => n.toUpperCase()===name.toUpperCase()); return k ? wb.Sheets[k] : null; };
 
-  // Build full name from row — handles combined col or separate first/last cols
-  function buildName(row) {
-    const keys = Object.keys(row);
-    const combined = keys.find(k => /name|employee|staff/i.test(k) && !/(first|last|mid)/i.test(k));
-    if (combined) return String(row[combined]||'').trim();
-    const first = keys.find(k => /first.*(name)?|fname/i.test(k));
-    const last  = keys.find(k => /last.*(name)?|lname|surname/i.test(k));
-    if (first && last) return `${String(row[first]||'').trim()} ${String(row[last]||'').trim()}`.trim();
-    const any = keys.find(k => /name/i.test(k));
-    return any ? String(row[any]||'').trim() : '';
+    const hcWs = findWs(hcName);
+    if (hcWs) lookups.rn_hc = buildLookup(hcWs, 1, 3, 3, wsMaxRow(hcWs));
+    const floatWs = findWs(floatName);
+    if (floatWs) lookups.rn_float = buildLookup(floatWs, 1, 4, 4, wsMaxRow(floatWs));
+
+    const cnaWs = findWs('CNA ROTATION');
+    if (cnaWs) {
+      const maxRow = wsMaxRow(cnaWs);
+      let sitHdr=null, sitbreakHdr=null;
+      for (let r=1; r<=Math.min(maxRow,400); r++) {
+        const v = getCell(cnaWs,r,1); if (!v||typeof v!=='string') continue;
+        const up = v.trim().toUpperCase();
+        if (up==='CNA ROTATION LIST'||up.includes('IF CNA FLOATS')) continue;
+        if (up.includes('SITTER BREAK ROTATION')) sitbreakHdr=r;
+        else if (up.includes('SITTER ROTATION')) sitHdr=r;
+      }
+      const findDayHdr = (after,before) => { for(let r=after;r<before;r++){ const v=getCell(cnaWs,r,1); if(v&&typeof v==='string'&&v.toUpperCase().includes('EMPLOYEE-DAY')) return r; } return null; };
+      const findNocHdr = (after,before) => { for(let r=after;r<before;r++){ const v=getCell(cnaWs,r,1); if(v&&typeof v==='string'&&v.toUpperCase().includes('EMPLOYEE-NOC')) return r; } return null; };
+      const floatDayHdr = findDayHdr(1, sitHdr||maxRow);
+      if (floatDayHdr) lookups.cna_float = buildLookup(cnaWs,1,3,floatDayHdr+1,(sitHdr||maxRow)-1);
+      if (sitHdr) {
+        const sitDayHdr = findDayHdr(sitHdr, sitbreakHdr||maxRow);
+        const sitEnd = (sitbreakHdr||maxRow)-1;
+        if (sitDayHdr) {
+          if (isNoc) { const nHdr=findNocHdr(sitDayHdr,sitbreakHdr||maxRow); if(nHdr) lookups.cna_sit=buildLookup(cnaWs,1,3,nHdr+1,sitEnd); }
+          else { const nHdr=findNocHdr(sitDayHdr,sitbreakHdr||maxRow); lookups.cna_sit=buildLookup(cnaWs,1,3,sitDayHdr+1,nHdr?nHdr-1:sitEnd); }
+        }
+      }
+    }
+    return lookups;
   }
 
   async function generate() {
     setErr(''); setBusy(true);
+    const dbg = [];
     try {
       if (!files.roster)  throw new Error('Please select the Daily Roster file.');
       if (!files.tracker) throw new Error('Please select the Rotation Tracker file.');
 
       const rWb = await readWb(files.roster);
       const tWb = await readWb(files.tracker);
+      dbg.push(`Roster sheets: ${rWb.SheetNames.join(', ')}`);
+      dbg.push(`Tracker sheets: ${tWb.SheetNames.join(', ')}`);
 
-      const rRows = toRows(rWb);
-      const tRows = toRows(tWb);
-      if (!rRows.length) throw new Error('Roster file appears empty or has no data rows.');
-      if (!tRows.length) throw new Error('Tracker file appears empty or has no data rows.');
+      // Try Sheet2 first (skill default), then any sheet containing employee data
+      let rWs = null, usedSheet = '';
+      const trySheets = rWb.SheetNames.filter(n=>n==='Sheet2').concat(rWb.SheetNames.filter(n=>n!=='Sheet2'));
+      for (const sn of trySheets) {
+        const ws = rWb.Sheets[sn];
+        if (!ws) continue;
+        // Quick sanity check: does it have any non-empty cells?
+        if (wsMaxRow(ws) > 5) { rWs = ws; usedSheet = sn; break; }
+      }
+      if (!rWs) throw new Error('Could not read any sheet from the roster file.');
+      dbg.push(`Using roster sheet: "${usedSheet}"`);
 
-      // Detect tracker columns
-      const ts    = tRows[0];
-      const hcCol  = findCol(ts, ['hc','house','coverage']);
-      const fltCol = findCol(ts, ['float','flt']);
-      const sitCol = findCol(ts, ['sit','sitter']);
+      // Detect shift from any cell in rows 1-20 containing "Coverage Period"
+      let shift = 'day';
+      outer: for (let r=1; r<=20; r++) {
+        for (let c=1; c<=5; c++) {
+          const v = getCell(rWs,r,c);
+          if (v && typeof v==='string' && v.includes('Coverage Period')) {
+            const m = /(\d{3,4})\s*-\s*(\d{3,4})/.exec(v);
+            if (m) { const s=parseInt(m[1]); shift=(s>=1700||s<600)?'noc':'day'; }
+            break outer;
+          }
+        }
+      }
+      dbg.push(`Shift: ${shift.toUpperCase()}`);
 
-      // Tracker lookup by normalised name
-      const tMap = {};
-      tRows.forEach(r => {
-        const n = norm(buildName(r));
-        if (n) tMap[n] = r;
-      });
+      // Find header row and name column by scanning for "Employee Name" anywhere in rows 1-30
+      let headerRow = -1, nameCol = 3, profCol = 6, codeCol = 10;
+      outer2: for (let r=1; r<=30; r++) {
+        for (let c=1; c<=20; c++) {
+          const v = getCell(rWs,r,c);
+          if (v && typeof v==='string' && /employee.?name/i.test(v)) {
+            headerRow = r; nameCol = c;
+            dbg.push(`Found "Employee Name" at row ${r} col ${c}`);
+            // Now scan the same row for Profile/Type, and Code columns
+            for (let cc=1; cc<=20; cc++) {
+              const hv = String(getCell(rWs,r,cc)||'').toUpperCase();
+              if (/\bPROFILE\b|\bTYPE\b|\bCLASS\b|\bPOSITION\b/.test(hv) && cc!==nameCol) profCol=cc;
+              if (/\bCODE\b|\bSCHED/.test(hv) && cc!==nameCol) codeCol=cc;
+            }
+            break outer2;
+          }
+        }
+      }
+      // Fall back to known skill positions if header not found
+      if (headerRow === -1) {
+        headerRow = 14; nameCol = 3; profCol = 6; codeCol = 10;
+        dbg.push(`Header not found, using defaults: row ${headerRow}, name col ${nameCol}`);
+      }
+      dbg.push(`Columns — name:${nameCol} profile:${profCol} code:${codeCol}`);
 
-      // Detect roster columns
-      const rs    = rRows[0];
-      const classCol = findCol(rs, ['class','title','position','type','role','job','classification']);
-      const shiftCol = findCol(rs, ['shift','sch']);
+      const dataStart = headerRow + 1;
+      // Find data end: scan from dataStart until we hit 3 consecutive empty name cells
+      let dataEnd = headerRow; // start at header so we can detect 0-data case
+      let emptyRun = 0;
+      for (let r=dataStart; r<=Math.min(wsMaxRow(rWs), dataStart+200); r++) {
+        const name = getCell(rWs,r,nameCol);
+        const hasName = name && String(name).trim().length > 0;
+        if (hasName) { dataEnd=r; emptyRun=0; }
+        else { emptyRun++; if (emptyRun>=3) break; }
+      }
+      dbg.push(`Data rows: ${dataStart}–${dataEnd} (${dataEnd-dataStart+1} rows)`);
 
-      // Process roster
-      let rnSeq = 0, cnaSeq = 0, unmatched = 0;
-      const rows = [];
+      if (dataEnd < dataStart) {
+        throw new Error(
+          `No employee rows found in roster.\n` +
+          `Looked in col ${nameCol} starting at row ${dataStart}.\n` +
+          dbg.join('\n')
+        );
+      }
 
-      rRows.forEach(r => {
-        const name = buildName(r);
-        if (!name) return;
-        const rawCls = classCol ? String(r[classCol]||'') : '';
-        const klass  = classOf(rawCls) || classOf(name);
-        const shift  = shiftCol ? String(r[shiftCol]||'').trim() : '';
+      const lookups = loadTracker(tWb, shift);
+      dbg.push(`Tracker — RN HC: ${Object.keys(lookups.rn_hc).length}, Float: ${Object.keys(lookups.rn_float).length}, CNA Sit: ${Object.keys(lookups.cna_sit).length}, Float: ${Object.keys(lookups.cna_float).length}`);
+      const hasAnyHC  = Object.keys(lookups.rn_hc).length>0;
+      const hasAnyFlt = Object.keys(lookups.rn_float).length>0||Object.keys(lookups.cna_float).length>0;
+      const hasAnySit = Object.keys(lookups.cna_sit).length>0;
 
-        let seq = '';
-        if (klass==='RN')  { rnSeq++;  seq = String(rnSeq); }
-        if (klass==='CNA') { cnaSeq++; seq = String(cnaSeq); }
+      // Profile classification (exact match to skill spec)
+      const RN_CLASS  = new Set(['RN','RES/BRK','RN CHG']);
+      const CNA_CLASS = new Set(['CNA']);
+      const CNA_NO_DATES = new Set(['SA(P)']);
+      const NO_TRACK  = new Set(['US','NSM','MON TECH','MGR']);
+      const NO_NUMBER = new Set(['LT DUTY']);
+      const NO_DATES  = new Set(['PRCPT']);
+      const EMP_OVERRIDES = { 'BHANGU,PAVANDEEP': new Set(['skip_left']) };
 
-        const t   = tMap[norm(name)];
-        if (klass && !t) unmatched++;
-        const hc  = t && hcCol  ? fmtDate(t[hcCol])  : '';
-        const flt = t && fltCol ? fmtDate(t[fltCol]) : '';
-        const sit = t && sitCol ? fmtDate(t[sitCol]) : '';
+      let rnSeq=0, cnaSeq=0;
+      const rows=[], unmatched=[];
 
-        rows.push({ seq, name, klass, rawCls, shift, hc, flt, sit, rooms:'' });
-      });
+      for (let r=dataStart; r<=dataEnd; r++) {
+        const nameVal = getCell(rWs,r,nameCol);
+        const profVal = getCell(rWs,r,profCol);
+        const codeVal = getCell(rWs,r,codeCol);
+        const name    = nameVal ? String(nameVal).trim() : '';
+        if (!name) continue;
+        const profile = profVal ? String(profVal).trim() : '';
+        const code    = codeVal ? String(codeVal).trim().toUpperCase() : '';
 
-      // Optional assignment sheet — pull room assignments
+        const key       = normKey(name);
+        const overrides = (key && EMP_OVERRIDES[key]) || new Set();
+        const isRN      = RN_CLASS.has(profile);
+        const isCNA     = CNA_CLASS.has(profile);
+        const isCNAND   = CNA_NO_DATES.has(profile);
+        const noTrack   = NO_TRACK.has(profile);
+        const noNumber  = NO_NUMBER.has(code);
+        const noDate    = NO_DATES.has(code);
+
+        let seq=null, hc='', flt='', sit='';
+
+        if (!noNumber && !noTrack) {
+          if (isRN)              { rnSeq++;  seq=rnSeq; }
+          else if (isCNA||isCNAND) { cnaSeq++; seq=cnaSeq; }
+
+          if (!noDate && !isCNAND) {
+            if (isRN && key) {
+              const attempted=[];
+              if (!overrides.has('skip_left'))  { hc  = lookups.rn_hc[key]    || ''; attempted.push(hc); }
+              if (!overrides.has('skip_right')) { flt = lookups.rn_float[key] || ''; attempted.push(flt); }
+              if (attempted.length && attempted.every(x=>!x)) unmatched.push(name);
+            } else if (isCNA && key) {
+              if (!overrides.has('skip_left'))  sit = lookups.cna_sit[key]   || '';
+              if (!overrides.has('skip_right')) flt = lookups.cna_float[key] || '';
+              if (!sit && !flt) unmatched.push(name);
+            }
+          }
+        }
+
+        rows.push({ seq:seq?String(seq):'', name, profile, code, shift, hc, flt, sit,
+          rooms:'', isMedSurg:false, excelRow:r,
+          isRN, isCNA:isCNA||isCNAND, noTrack });
+      }
+      dbg.push(`Processed: ${rows.length} employees (RN: ${rnSeq}, CNA: ${cnaSeq}, unmatched: ${unmatched.length})`);
+
+      // ── Optional assignment sheet: room assignment + Med/Surg detection (ms-turn style) ──
+      let turnOrder = null;
       if (files.assign) {
-        const aWb   = await readWb(files.assign);
-        const aRows = toRows(aWb);
-        if (aRows.length) {
-          const as = aRows[0];
-          const aN = findCol(as, ['name','employee','nurse','staff']) || Object.keys(as)[0];
-          const aR = findCol(as, ['room','assignment','rooms','assign']);
-          if (aN && aR) aRows.forEach(r => {
-            const n = norm(String(r[aN]||'').trim());
-            const row = rows.find(x => norm(x.name)===n);
-            if (row) row.rooms = String(r[aR]||'').trim();
+        const aWb = await readWb(files.assign);
+        const aWs = aWb.Sheets[aWb.SheetNames[0]];
+        if (aWs) {
+          const HEART = '♥';
+          const ROOM_RE = /\d+[A-Za-z]?[♥]?/g;
+          const SKIP_KW = ['FOLEY','LINE','NAME','EXT','SHIFT','CENSUS','SITTER'];
+          const looksLikeRooms = v => {
+            if (!v) return false;
+            const s = String(v);
+            if (SKIP_KW.some(k => s.toUpperCase().includes(k))) return false;
+            const t = s.match(ROOM_RE)||[];
+            return t.length >= 2 && !t.some(x => x.length > 5);
+          };
+          const maxR=wsMaxRow(aWs), maxC=wsMaxCol(aWs);
+          // Find the best name row (like ms-turn: check rows 1-7, score by room density below)
+          let nameRow=null, roomRow=null, bestScore=0;
+          for (let nr=1; nr<=Math.min(maxR-1,7); nr++) {
+            for (let rr=nr+1; rr<=Math.min(nr+7,maxR); rr++) {
+              let score=0;
+              for (let c=1;c<=maxC;c++) { if(looksLikeRooms(getCell(aWs,rr,c))) score++; }
+              if (score > bestScore) { bestScore=score; nameRow=nr; roomRow=rr; }
+            }
+          }
+          if (nameRow && roomRow && bestScore >= 2) {
+            for (let c=1; c<=maxC; c++) {
+              const nmV = getCell(aWs,nameRow,c);
+              const rmV = getCell(aWs,roomRow,c);
+              if (!nmV||!rmV) continue;
+              const nm = String(nmV).trim(); if (nm.length < 2) continue;
+              const rm = String(rmV).trim();
+              const row = rows.find(x => {
+                const nk = normKey(x.name), ak = normKey(nm);
+                return nk && ak && nk===ak;
+              }) || rows.find(x => x.name.toUpperCase()===nm.toUpperCase());
+              if (row) {
+                row.rooms = rm;
+                const tokens = rm.match(ROOM_RE)||[];
+                if (tokens.length >= 2 && !tokens.some(t => t.includes(HEART))) row.isMedSurg = true;
+              }
+            }
+          }
+
+          // Med/Surg turn order: RN + RES/BRK only, not RN CHG
+          const eligible = rows.filter(r => r.isRN && r.profile !== 'RN CHG');
+          if (eligible.length) {
+            turnOrder = eligible.map(r => ({
+              name: r.name, nick: getNick(r.name), profile: r.profile,
+              isMedSurgToday: r.isMedSurg, lastMS: null, daysAgo: 9999,
+            }));
+          }
+        }
+      }
+
+      // ── Optional Med/Surg history (MedSurg_Assignments_Summary.xlsx) ──
+      if (files.msHistory && turnOrder) {
+        const mWb = await readWb(files.msHistory);
+        const byDayName = mWb.SheetNames.find(n=>n==='By Day') || mWb.SheetNames[0];
+        const mWs = mWb.Sheets[byDayName];
+        if (mWs) {
+          const lastMSMap = {};
+          for (let r=2; r<=wsMaxRow(mWs); r++) {
+            const dateV  = getCell(mWs,r,1);
+            const nurseV = getCell(mWs,r,2);
+            if (!dateV||!nurseV) continue;
+            const nick = String(nurseV).split('/')[0].trim();
+            const md = extractMD(dateV);
+            if (!md) continue;
+            // Parse to Date for comparison (assume current year)
+            const parts = md.split('/');
+            const yr = 2026;
+            const dt = new Date(yr, parseInt(parts[0])-1, parseInt(parts[1]));
+            if (!lastMSMap[nick] || dt > lastMSMap[nick]) lastMSMap[nick] = { dt, label: md };
+          }
+          const today = new Date();
+          turnOrder.forEach(t => {
+            const rec = lastMSMap[t.nick];
+            if (rec) {
+              t.lastMS  = rec.label;
+              t.daysAgo = Math.floor((today - rec.dt) / 86400000);
+            }
           });
         }
       }
 
-      const hasRooms = rows.some(r => r.rooms);
-      setResult({ rows, rnCount:rnSeq, cnaCount:cnaSeq, unmatched,
-        hasHC:!!hcCol, hasFlt:!!fltCol, hasSit:!!sitCol, hasRooms });
+      // Sort: NEVER first, then most days ago
+      if (turnOrder) {
+        turnOrder.sort((a,b) => {
+          if (a.daysAgo===9999 && b.daysAgo!==9999) return -1;
+          if (b.daysAgo===9999 && a.daysAgo!==9999) return 1;
+          return b.daysAgo - a.daysAgo;
+        });
+      }
+
+      const hasRooms = rows.some(r=>r.rooms);
+      setResult({ rows, rnCount:rnSeq, cnaCount:cnaSeq, unmatched, shift:shift.toUpperCase(),
+        hasHC:hasAnyHC, hasFlt:hasAnyFlt, hasSit:hasAnySit, hasRooms, turnOrder, dbg,
+        rWb, usedSheet, headerRow, nameCol });
       setView('preview');
     } catch(e) {
-      setErr(e.message);
+      setErr((e.message || String(e)) + (dbg.length ? '\n\nDiagnostic:\n'+dbg.join('\n') : ''));
     } finally {
       setBusy(false);
     }
   }
 
   function downloadExcel() {
-    if (!result) return;
-    const wb = XLSX.utils.book_new();
-    const rnRows  = result.rows.filter(r => r.klass==='RN');
-    const cnaRows = result.rows.filter(r => r.klass==='CNA');
-    const othRows = result.rows.filter(r => !r.klass);
+    if (!result || !result.rWb) return;
 
-    function makeRow(r) {
-      const o = { '#':r.seq, 'Name':r.name, 'Class':r.klass||r.rawCls, 'Shift':r.shift };
-      if (result.hasRooms) o['Rooms'] = r.rooms;
-      if (result.hasHC)    o['Last HC']    = r.hc;
-      if (result.hasFlt)   o['Last Float'] = r.flt;
-      if (result.hasSit)   o['Last Sit']   = r.sit;
-      return o;
+    // Use the original roster workbook as the base (preserves layout/formatting)
+    const wb = result.rWb;
+    const ws = wb.Sheets[result.usedSheet];
+    const hdr = result.headerRow; // 1-indexed
+
+    // Date sort: M/D strings ascending (e.g. '3/9' < '7/22')
+    function mdVal(s) {
+      if (!s || s === 'NA') return s === 'NA' ? 99999 : Infinity;
+      const [m,d] = s.split('/').map(Number);
+      return m*100 + (d||0);
     }
 
-    const mainData = [...rnRows, ...cnaRows, ...othRows].map(makeRow);
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(mainData), 'Final Roster');
-
-    if (result.hasHC) {
-      const hcSorted = [...result.rows].filter(r=>r.hc).sort((a,b)=>a.hc<b.hc?-1:1);
-      if (hcSorted.length) XLSX.utils.book_append_sheet(wb,
-        XLSX.utils.json_to_sheet(hcSorted.map(r=>({'Name':r.name,'Class':r.klass,'Last HC':r.hc}))),
-        'By HC Date');
+    // Remove only the sheets that aren't Sheet2; we'll add our own
+    for (const sn of [...wb.SheetNames]) {
+      if (sn !== result.usedSheet) { delete wb.Sheets[sn]; }
     }
-    if (result.hasFlt) {
-      const fltSorted = [...result.rows].filter(r=>r.flt).sort((a,b)=>a.flt<b.flt?-1:1);
-      if (fltSorted.length) XLSX.utils.book_append_sheet(wb,
-        XLSX.utils.json_to_sheet(fltSorted.map(r=>({'Name':r.name,'Class':r.klass,'Last Float':r.flt}))),
-        'By Float Date');
+    wb.SheetNames = [result.usedSheet];
+
+    // Strip merged cells that overlap col B(1), M(12), N(13), O(14)
+    // for header row and all data rows — so our writes aren't swallowed by merges
+    const targetCols = new Set([1,12,13,14]); // 0-based col indices
+    const dataRowIdxSet = new Set(result.rows.map(r => r.excelRow - 1));
+    dataRowIdxSet.add(hdr - 1);
+    if (ws['!merges']) {
+      ws['!merges'] = ws['!merges'].filter(mr => {
+        if (!dataRowIdxSet.has(mr.s.r)) return true;
+        for (let c = mr.s.c; c <= mr.e.c; c++) {
+          if (targetCols.has(c)) return false;
+        }
+        return true;
+      });
+    }
+
+    // Write column headers in header row: 'hc' → M, 'float' → O
+    function setCell(ri, ci, val) { // ri/ci are 0-based
+      const addr = XLSX.utils.encode_cell({r:ri, c:ci});
+      if (val === null || val === undefined || val === '') { delete ws[addr]; return; }
+      ws[addr] = typeof val === 'number' ? {t:'n', v:val} : {t:'s', v:String(val)};
+    }
+    setCell(hdr-1, 12, 'hc');
+    setCell(hdr-1, 14, 'float');
+
+    // Write each employee row: col B = seq#, col L = clear, col M = HC/sit, col O = float
+    result.rows.forEach(r => {
+      const ri = r.excelRow - 1; // 0-based
+      if (r.seq) setCell(ri, 1, parseInt(r.seq, 10)); else setCell(ri, 1, null);
+      setCell(ri, 11, null); // clear Hours (col L)
+      const leftDate = r.isRN ? r.hc : r.sit;
+      setCell(ri, 12, leftDate || null);
+      setCell(ri, 14, r.flt || null);
+    });
+
+    // Clear rows below last data row (summary block)
+    const lastDataExcelRow = result.rows.length > 0
+      ? Math.max(...result.rows.map(r => r.excelRow)) : hdr;
+    const maxR = (() => {
+      if (!ws['!ref']) return lastDataExcelRow;
+      const ref = XLSX.utils.decode_range(ws['!ref']);
+      return ref.e.r + 1; // convert to 1-based
+    })();
+    for (let r = lastDataExcelRow + 1; r <= maxR; r++) {
+      for (let c = 0; c < 20; c++) {
+        const addr = XLSX.utils.encode_cell({r:r-1, c});
+        delete ws[addr];
+      }
+    }
+    // Update sheet ref to trim to last data row
+    if (ws['!ref']) {
+      const ref = XLSX.utils.decode_range(ws['!ref']);
+      ref.e.r = lastDataExcelRow - 1;
+      ws['!ref'] = XLSX.utils.encode_range(ref);
+    }
+
+    // Helper: append a new sheet from array-of-arrays
+    function appendSheet(name, aoa) {
+      const newWs = XLSX.utils.aoa_to_sheet(aoa);
+      XLSX.utils.book_append_sheet(wb, newWs, name);
+    }
+
+    // RN HC List — sorted by HC ascending
+    const rnClass = result.rows.filter(r => r.isRN);
+    const hcSorted = [...rnClass].filter(r=>r.hc).sort((a,b) => mdVal(a.hc) - mdVal(b.hc));
+    const hcAoa = [
+      ['RN-class — sorted by HC (ascending)'],
+      [],
+      ['#', 'HC', 'Name'],
+      ...hcSorted.map((r,i) => [i+1, r.hc, r.name])
+    ];
+    appendSheet('RN HC List', hcAoa);
+
+    // RN Float List — sorted by Float ascending
+    const fltSorted = [...rnClass].filter(r=>r.flt).sort((a,b) => mdVal(a.flt) - mdVal(b.flt));
+    const fltAoa = [
+      ['RN-class — sorted by Float (ascending)'],
+      [],
+      ['Float', 'Name'],
+      ...fltSorted.map(r => [r.flt, r.name])
+    ];
+    appendSheet('RN Float List', fltAoa);
+
+    // MS Turn sheet (if turn analysis was done)
+    if (result.turnOrder && result.turnOrder.length > 0) {
+      const dateStr = new Date().toLocaleDateString('en-US',{month:'numeric',day:'numeric',year:'numeric'});
+      const shiftLabel = result.shift || 'DAY';
+      const msAoa = [
+        [`${dateStr} ${shiftLabel} Shift — Med/Surg Turn`],
+        [],
+        ['NURSE', 'PROFILE', 'LAST MED/SURG', 'DAYS AGO'],
+        ...result.turnOrder.map(t => [
+          t.name, t.profile,
+          t.lastDate || (t.daysAgo === 9999 ? 'NEVER' : ''),
+          t.daysAgo === 9999 ? 'NEVER' : (t.daysAgo ?? '')
+        ]),
+        [],
+        ['RECOMMENDATION'],
+        ['Next Med/Surg:', result.turnOrder[0]?.name || '']
+      ];
+      appendSheet('MS Turn', msAoa);
     }
 
     const today = new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'2-digit'}).replace(/\//g,'-');
-    XLSX.writeFile(wb, `Final_Roster_${today}.xlsx`);
+    XLSX.writeFile(wb, `Final_${today}.xlsx`);
   }
 
   function doPrint() {
@@ -2064,10 +2407,10 @@ function RosterBuilderModal({ onClose }) {
           ${hasFlt ? `<th style="${thStyle}">Last Float</th>` : ''}
           ${hasSit ? `<th style="${thStyle}">Last Sit</th>` : ''}
         </tr></thead><tbody>
-        ${rows.map(r => `<tr style="${r.klass==='RN'?rnStyle:r.klass==='CNA'?cnaStyle:''}">
-          <td style="${tdStyle}"><span class="badge ${r.klass==='RN'?'rn-b':r.klass==='CNA'?'cna-b':''}">${r.seq||'—'}</span></td>
+        ${rows.map(r => `<tr style="${r.isRN?rnStyle:r.isCNA?cnaStyle:''}">
+          <td style="${tdStyle}"><span class="badge ${r.isRN?'rn-b':r.isCNA?'cna-b':''}">${r.seq||'—'}</span></td>
           <td style="${tdStyle}"><b>${r.name}</b></td>
-          <td style="${tdStyle}">${r.klass||r.rawCls}</td>
+          <td style="${tdStyle}">${r.profile}</td>
           <td style="${tdStyle}">${r.shift}</td>
           ${hasRooms ? `<td style="${tdStyle}">${r.rooms}</td>` : ''}
           ${hasHC  ? `<td style="${tdStyle}">${r.hc||'—'}</td>`  : ''}
@@ -2116,7 +2459,9 @@ function RosterBuilderModal({ onClose }) {
               <FileZone file={files.tracker} onFile={f=>setFile('tracker',f)} onClear={()=>setFile('tracker',null)}
                 icon="🔄" label="RN / CNA Rotation Tracker" hint="RN_CNA_ROTATION_TRACKER.xlsx — HC &amp; Float history" required/>
               <FileZone file={files.assign}  onFile={f=>setFile('assign',f)}  onClear={()=>setFile('assign',null)}
-                icon="📋" label="Assignment Sheet" hint="Optional — room assignments (.xlsx)"/>
+                icon="📋" label="Assignment Sheet" hint="Optional — daily room assignment (.xlsx). Enables Med/Surg turn analysis."/>
+              <FileZone file={files.msHistory} onFile={f=>setFile('msHistory',f)} onClear={()=>setFile('msHistory',null)}
+                icon="📈" label="Med/Surg History" hint="Optional — MedSurg_Assignments_Summary.xlsx. Required for turn-order days ranking."/>
 
               {err && (
                 <div style={{background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.3)',borderRadius:8,padding:'10px 14px',color:'#f87171',fontSize:12,marginTop:4,whiteSpace:'pre-wrap'}}>{err}</div>
@@ -2159,7 +2504,7 @@ function RosterBuilderModal({ onClose }) {
                     <tr style={{background:'var(--bg-card)'}}>
                       <th style={th}>#</th>
                       <th style={th}>NAME</th>
-                      <th style={th}>CLASS</th>
+                      <th style={th}>PROFILE</th>
                       <th style={th}>SHIFT</th>
                       {result.hasRooms && <th style={th}>ROOMS</th>}
                       {result.hasHC    && <th style={th}>LAST HC</th>}
@@ -2170,21 +2515,24 @@ function RosterBuilderModal({ onClose }) {
                   <tbody>
                     {result.rows.map((r,i) => (
                       <tr key={i} style={{
-                        background:r.klass==='RN'?'rgba(59,130,246,0.05)':r.klass==='CNA'?'rgba(34,197,94,0.05)':'transparent',
+                        background:r.isRN?'rgba(59,130,246,0.05)':r.isCNA?'rgba(34,197,94,0.05)':'transparent',
                         borderBottom:'1px solid var(--border)',
                       }}>
                         <td style={{padding:'5px 10px'}}>
                           {r.seq ? (
                             <span style={{display:'inline-block',padding:'1px 7px',borderRadius:4,fontSize:11,fontWeight:700,color:'white',
-                              background:r.klass==='RN'?'#1d4ed8':r.klass==='CNA'?'#15803d':'#555'}}>
+                              background:r.isRN?'#1d4ed8':r.isCNA?'#15803d':'#555'}}>
                               {r.seq}
                             </span>
                           ) : '—'}
                         </td>
-                        <td style={{padding:'5px 10px',fontWeight:600,color:'var(--text-1)'}}>{r.name}</td>
-                        <td style={{padding:'5px 10px',color:'var(--text-2)',fontSize:11}}>{r.klass||r.rawCls}</td>
+                        <td style={{padding:'5px 10px',fontWeight:600,color:'var(--text-1)'}}>
+                          {r.name}
+                          {r.isMedSurg && <span style={{marginLeft:5,fontSize:9,fontWeight:700,color:'#f59e0b',background:'rgba(245,158,11,0.15)',borderRadius:3,padding:'1px 4px'}}>MS</span>}
+                        </td>
+                        <td style={{padding:'5px 10px',color:'var(--text-2)',fontSize:11}}>{r.profile}</td>
                         <td style={{padding:'5px 10px',color:'var(--text-2)'}}>{r.shift}</td>
-                        {result.hasRooms && <td style={{padding:'5px 10px',color:'var(--text-2)',fontFamily:'monospace'}}>{r.rooms||'—'}</td>}
+                        {result.hasRooms && <td style={{padding:'5px 10px',color:'var(--text-2)',fontFamily:'monospace',fontSize:11}}>{r.rooms||'—'}</td>}
                         {result.hasHC    && <td style={{padding:'5px 10px',color:r.hc ?'#fbbf24':'var(--text-2)'}}>{r.hc ||'—'}</td>}
                         {result.hasFlt   && <td style={{padding:'5px 10px',color:r.flt?'#fbbf24':'var(--text-2)'}}>{r.flt||'—'}</td>}
                         {result.hasSit   && <td style={{padding:'5px 10px',color:r.sit?'#fbbf24':'var(--text-2)'}}>{r.sit||'—'}</td>}
@@ -2193,6 +2541,70 @@ function RosterBuilderModal({ onClose }) {
                   </tbody>
                 </table>
               </div>
+
+              {/* Med/Surg Turn Order (shown when assignment sheet uploaded) */}
+              {result.turnOrder && result.turnOrder.length > 0 && (
+                <div style={{marginTop:16,borderRadius:10,border:'1px solid rgba(245,158,11,0.3)',background:'rgba(245,158,11,0.05)',padding:'12px 14px'}}>
+                  <div style={{fontSize:12,fontWeight:800,color:'#f59e0b',marginBottom:8,letterSpacing:'0.05em'}}>
+                    🏥 MED/SURG TURN ORDER
+                    {!files.msHistory && <span style={{fontWeight:400,fontSize:10,marginLeft:8,color:'var(--text-2)'}}>Upload Med/Surg History for days-ago ranking</span>}
+                  </div>
+                  {(() => {
+                    const never = result.turnOrder.filter(t => t.daysAgo===9999);
+                    const had   = result.turnOrder.filter(t => t.daysAgo!==9999);
+                    return (
+                      <div>
+                        {never.length > 0 && (
+                          <div style={{marginBottom:8}}>
+                            <div style={{fontSize:10,fontWeight:700,color:'#ef4444',marginBottom:4,textTransform:'uppercase',letterSpacing:'0.05em'}}>Has NEVER had Med/Surg — assign first:</div>
+                            {never.map((t,i) => (
+                              <div key={i} style={{display:'flex',alignItems:'center',gap:8,padding:'4px 0',borderBottom:'1px solid rgba(245,158,11,0.1)'}}>
+                                <span style={{width:20,height:20,borderRadius:'50%',background:'#ef4444',color:'white',fontSize:10,fontWeight:800,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{i+1}</span>
+                                <span style={{fontWeight:600,color:'var(--text-1)',fontSize:12}}>{t.name}</span>
+                                <span style={{fontSize:10,color:'var(--text-2)'}}>{t.profile}</span>
+                                {t.isMedSurgToday && <span style={{fontSize:9,fontWeight:700,color:'#f59e0b',background:'rgba(245,158,11,0.2)',borderRadius:3,padding:'1px 5px'}}>TODAY</span>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {had.length > 0 && (
+                          <div>
+                            <div style={{fontSize:10,fontWeight:700,color:'#60a5fa',marginBottom:4,textTransform:'uppercase',letterSpacing:'0.05em'}}>
+                              {never.length > 0 ? 'Then by most overdue:' : 'Most overdue for Med/Surg:'}
+                            </div>
+                            {had.map((t,i) => (
+                              <div key={i} style={{display:'flex',alignItems:'center',gap:8,padding:'4px 0',borderBottom:'1px solid rgba(245,158,11,0.1)'}}>
+                                <span style={{width:20,height:20,borderRadius:'50%',background:'#60a5fa',color:'white',fontSize:10,fontWeight:800,display:'inline-flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>{never.length+i+1}</span>
+                                <span style={{fontWeight:600,color:'var(--text-1)',fontSize:12}}>{t.name}</span>
+                                <span style={{fontSize:10,color:'var(--text-2)'}}>{t.profile}</span>
+                                {t.lastMS && <span style={{fontSize:10,color:'var(--text-2)'}}>last: {t.lastMS}</span>}
+                                {t.daysAgo < 9999 && <span style={{fontSize:10,color:t.daysAgo>20?'#4ade80':t.daysAgo>10?'#fbbf24':'#f87171'}}>{t.daysAgo}d ago</span>}
+                                {t.isMedSurgToday && <span style={{fontSize:9,fontWeight:700,color:'#f59e0b',background:'rgba(245,158,11,0.2)',borderRadius:3,padding:'1px 5px'}}>TODAY</span>}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* Diagnostic panel */}
+              {result.dbg && result.dbg.length > 0 && (
+                <details style={{marginTop:12}}>
+                  <summary style={{cursor:'pointer',fontSize:10,color:'var(--text-2)',userSelect:'none'}}>🔍 Diagnostic info</summary>
+                  <pre style={{margin:'6px 0 0',padding:'8px 10px',background:'var(--bg-card)',borderRadius:6,fontSize:10,color:'var(--text-2)',overflowX:'auto',whiteSpace:'pre-wrap'}}>
+                    {result.dbg.join('\n')}
+                  </pre>
+                </details>
+              )}
+
+              {result.rows.length === 0 && (
+                <div style={{textAlign:'center',padding:'32px 0',color:'var(--text-2)',fontSize:13}}>
+                  ⚠️ No employee rows were found. Check the Diagnostic info above.
+                </div>
+              )}
             </div>
           )}
         </div>
