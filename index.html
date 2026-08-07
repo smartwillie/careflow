@@ -1056,6 +1056,7 @@ const FLAG_DEFS = [
   { key:'dailyWeight', label:'DW',  bg:'#065f46', tc:'#6ee7b7' },
   { key:'tubeFeed',    label:'TF',  bg:'#92400e', tc:'#fde68a' },
   { key:'tpn',         label:'TPN', bg:'#4c1d95', tc:'#ddd6fe', glow:'#a78bfa' },
+  { key:'etoh',        label:'EtOH', bg:'#92400e', tc:'#fef3c7', glow:'#fbbf2488' },
 ];
 
 const STORAGE_KEY = 'careflow_assignment';
@@ -3324,7 +3325,7 @@ function Legend() {
       <span style={{ display:'flex',alignItems:'center',gap:4 }}><span style={sw('var(--room-vacant-bg)')}/>Vacant</span>
       <span style={{ display:'flex',alignItems:'center',gap:4 }}><span style={sw('#bfdbfe')}/>Male</span>
       <span style={{ display:'flex',alignItems:'center',gap:4 }}><span style={sw('#f9a8d4')}/>Female</span>
-      <span>♥ TELE</span><span>F=Foley</span><span>IV=Drip</span><span>TC=Total Care</span><span>BG=Glucose</span><span>HA=High Acuity</span>
+      <span>♥ TELE</span><span>F=Foley</span><span>IV=Drip</span><span>TC=Total Care</span><span>BG=Glucose</span><span>HA=High Acuity</span><span>EtOH=ETOH</span>
     </div>
   );
 }
