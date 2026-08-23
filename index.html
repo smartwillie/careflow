@@ -4728,7 +4728,7 @@ function App() {
           return (r.highAcuity ? 2 : 0) + (r.isolation ? 2 : 0) + (r.totalCare ? 2 : 0)
                + (r.chestTube ? 2 : 0) + (r.tpn ? 2 : 0)
                + (r.drain ? 1 : 0) + (r.neuroCheck ? 1 : 0)
-               + (r.dailyWeight ? 1 : 0) + (r.tubeFeed ? 1 : 0) + (r.etoh ? 1 : 0);
+               + (r.dailyWeight ? 1 : 0) + (r.tubeFeed ? 1 : 0) + (r.etoh ? 1 : 0) + (r.dialysis ? 1 : 0);
         }
 
         // Nurse state: locked nurses seed with their preserved rooms;
@@ -4768,8 +4768,8 @@ function App() {
 
         // Sort rooms: heaviest acuity first — ECO mode manages its own ordering internally
         const toAssign = [...unassigned].sort((a, b) => {
-          const wa = (a.isolation?4:0)+(a.highAcuity?3:0)+(a.totalCare?2:0)+(a.type==='TELE'?1:0)+(a.etoh?1:0);
-          const wb = (b.isolation?4:0)+(b.highAcuity?3:0)+(b.totalCare?2:0)+(b.type==='TELE'?1:0)+(b.etoh?1:0);
+          const wa = (a.isolation?4:0)+(a.highAcuity?3:0)+(a.totalCare?2:0)+(a.type==='TELE'?1:0)+(a.etoh?1:0)+(a.dialysis?1:0);
+          const wb = (b.isolation?4:0)+(b.highAcuity?3:0)+(b.totalCare?2:0)+(b.type==='TELE'?1:0)+(b.etoh?1:0)+(b.dialysis?1:0);
           if (wa !== wb) return wb - wa;
           return Math.random() - 0.5;
         });
@@ -5069,7 +5069,7 @@ function App() {
           //   Step 2: any leftover MedSurg rooms fold into TELE pool → TELE nurses (cap 4)
           //   Step 3: anything still unassigned → normal score() greedy across all nurses
 
-          const acuityKey = r => (r.isolation?4:0)+(r.highAcuity?3:0)+(r.chestTube?3:0)+(r.totalCare?2:0)+(r.drain?1:0)+(r.etoh?1:0);
+          const acuityKey = r => (r.isolation?4:0)+(r.highAcuity?3:0)+(r.chestTube?3:0)+(r.totalCare?2:0)+(r.drain?1:0)+(r.etoh?1:0)+(r.dialysis?1:0);
 
           const telePool = unassigned
             .filter(r => r.type === 'TELE')
