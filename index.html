@@ -1057,6 +1057,7 @@ const FLAG_DEFS = [
   { key:'tubeFeed',    label:'TF',  bg:'#92400e', tc:'#fde68a' },
   { key:'tpn',         label:'TPN', bg:'#4c1d95', tc:'#ddd6fe', glow:'#a78bfa' },
   { key:'etoh',        label:'EtOH', bg:'#92400e', tc:'#fef3c7', glow:'#fbbf2488' },
+  { key:'dialysis',    label:'DLY',  bg:'#4338ca', tc:'#e0e7ff' },
 ];
 
 const STORAGE_KEY = 'careflow_assignment';
@@ -1357,14 +1358,28 @@ function RoomCard({ room, pos, cw, ch, selected, nurses, nurseRooms, onSelect, o
         {/* Flags */}
         {room.occupied && flags.length > 0 && (
           <div style={{ display:'flex', flexWrap:'wrap', justifyContent:'center', gap:1, marginTop:2 }}>
-            {flags.slice(0, ch > 44 ? 4 : 2).map(f => (
-              <span key={f.key} style={{
-                fontSize:8, fontWeight:800, borderRadius:3,
-                padding:'1px 3px', lineHeight:1.3,
-                background: f.bg, color: f.tc,
-                boxShadow: f.glow ? `0 0 5px ${f.glow}88` : 'none',
-              }}>{f.label}</span>
-            ))}
+            {(() => {
+              const MAX = ch > 44 ? 4 : 2;
+              const hasMore = flags.length > MAX;
+              const shown = hasMore ? flags.slice(0, MAX - 1) : flags;
+              return [
+                ...shown.map(f => (
+                  <span key={f.key} style={{
+                    fontSize:8, fontWeight:800, borderRadius:3,
+                    padding:'1px 3px', lineHeight:1.3,
+                    background: f.bg, color: f.tc,
+                    boxShadow: f.glow ? `0 0 5px ${f.glow}88` : 'none',
+                  }}>{f.label}</span>
+                )),
+                hasMore && (
+                  <span key="more" style={{
+                    fontSize:8, fontWeight:800, borderRadius:3,
+                    padding:'1px 3px', lineHeight:1.3,
+                    background:'#374151', color:'#d1d5db',
+                  }}>…</span>
+                ),
+              ];
+            })()}
           </div>
         )}
 
@@ -4736,8 +4751,10 @@ function App() {
         function roomAcuityPts(r) {
           return (r.highAcuity ? 2 : 0) + (r.isolation ? 2 : 0) + (r.totalCare ? 2 : 0)
                + (r.chestTube ? 2 : 0) + (r.tpn ? 2 : 0)
-               + (r.drain ? 1 : 0) + (r.neuroCheck ? 1 : 0)
-               + (r.dailyWeight ? 1 : 0) + (r.tubeFeed ? 1 : 0) + (r.etoh ? 1 : 0) + (r.dialysis ? 1 : 0) + (r.drip ? 1 : 0);
+               + (r.drain ? 1 : 0) + (r.neuroCheck ? 1 : 0) + (r.dailyWeight ? 1 : 0)
+               + (r.tubeFeed ? 1 : 0) + (r.etoh ? 1 : 0) + (r.dialysis ? 1 : 0) + (r.drip ? 1 : 0)
+               + (r.foley ? 1 : 0) + (r.centralLine ? 1 : 0) + (r.glucose ? 1 : 0)
+               + (r.restraint ? 1 : 0) + (r.sitter ? 1 : 0) + (r.prisoner ? 1 : 0) + (r.discharge ? 1 : 0);
         }
 
         // Nurse state: locked nurses seed with their preserved rooms;
@@ -4777,8 +4794,8 @@ function App() {
 
         // Sort rooms: heaviest acuity first — ECO mode manages its own ordering internally
         const toAssign = [...unassigned].sort((a, b) => {
-          const wa = (a.isolation?4:0)+(a.highAcuity?3:0)+(a.totalCare?2:0)+(a.type==='TELE'?1:0)+(a.etoh?1:0)+(a.dialysis?1:0)+(a.drip?1:0);
-          const wb = (b.isolation?4:0)+(b.highAcuity?3:0)+(b.totalCare?2:0)+(b.type==='TELE'?1:0)+(b.etoh?1:0)+(b.dialysis?1:0)+(b.drip?1:0);
+          const wa = (a.isolation?4:0)+(a.highAcuity?3:0)+(a.totalCare?2:0)+(a.type==='TELE'?1:0)+(a.etoh?1:0)+(a.dialysis?1:0)+(a.drip?1:0)+(a.foley?1:0)+(a.centralLine?1:0)+(a.glucose?1:0)+(a.restraint?1:0)+(a.sitter?1:0)+(a.prisoner?1:0)+(a.discharge?1:0);
+          const wb = (b.isolation?4:0)+(b.highAcuity?3:0)+(b.totalCare?2:0)+(b.type==='TELE'?1:0)+(b.etoh?1:0)+(b.dialysis?1:0)+(b.drip?1:0)+(b.foley?1:0)+(b.centralLine?1:0)+(b.glucose?1:0)+(b.restraint?1:0)+(b.sitter?1:0)+(b.prisoner?1:0)+(b.discharge?1:0);
           if (wa !== wb) return wb - wa;
           return Math.random() - 0.5;
         });
@@ -5078,7 +5095,7 @@ function App() {
           //   Step 2: any leftover MedSurg rooms fold into TELE pool → TELE nurses (cap 4)
           //   Step 3: anything still unassigned → normal score() greedy across all nurses
 
-          const acuityKey = r => (r.isolation?4:0)+(r.highAcuity?3:0)+(r.chestTube?3:0)+(r.totalCare?2:0)+(r.drain?1:0)+(r.etoh?1:0)+(r.dialysis?1:0)+(r.drip?1:0);
+          const acuityKey = r => (r.isolation?4:0)+(r.highAcuity?3:0)+(r.chestTube?3:0)+(r.totalCare?2:0)+(r.drain?1:0)+(r.etoh?1:0)+(r.dialysis?1:0)+(r.drip?1:0)+(r.foley?1:0)+(r.centralLine?1:0)+(r.glucose?1:0)+(r.restraint?1:0)+(r.sitter?1:0)+(r.prisoner?1:0)+(r.discharge?1:0);
 
           const telePool = unassigned
             .filter(r => r.type === 'TELE')
