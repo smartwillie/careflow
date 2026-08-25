@@ -1854,7 +1854,7 @@ function FileZone({ file, onFile, onClear, icon, label, hint, required }) {
       background: chosen ? 'rgba(34,197,94,0.06)' : 'var(--bg-card)',
       transition:'border-color 0.2s,background 0.2s',
     }}>
-      <input type="file" accept=".xlsx,.xls,.csv" style={{display:'none'}}
+      <input type="file" accept=".xlsx,.xls,.xlsm,.csv" style={{display:'none'}}
         onChange={e => { const f=e.target.files[0]; if(f) onFile(f); e.target.value=''; }}/>
       <div style={{display:'flex',alignItems:'center',gap:10}}>
         <span style={{fontSize:22}}>{icon}</span>
@@ -1882,7 +1882,7 @@ function MultiFileZone({ files, onAdd, onRemove, icon, label, hint }) {
 
   function handleDrop(e) {
     e.preventDefault(); setDragging(false);
-    const dropped = Array.from(e.dataTransfer.files).filter(f => /\.(xlsx|xls|csv)$/i.test(f.name));
+    const dropped = Array.from(e.dataTransfer.files).filter(f => /\.(xlsx|xlsm|xls|csv)$/i.test(f.name));
     dropped.forEach(f => onAdd(f));
   }
 
@@ -1899,7 +1899,7 @@ function MultiFileZone({ files, onAdd, onRemove, icon, label, hint }) {
           background: dragging ? 'rgba(59,130,246,0.07)' : hasFiles ? 'rgba(34,197,94,0.06)' : 'var(--bg-card)',
           transition:'border-color 0.2s,background 0.2s',
         }}>
-        <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" multiple style={{display:'none'}}
+        <input ref={inputRef} type="file" accept=".xlsx,.xls,.xlsm,.csv" multiple style={{display:'none'}}
           onChange={e => { Array.from(e.target.files).forEach(f => onAdd(f)); e.target.value=''; }}/>
         <div style={{display:'flex',alignItems:'center',gap:10}}>
           <span style={{fontSize:22}}>{icon}</span>
@@ -2108,13 +2108,36 @@ function RosterBuilderModal({ onClose }) {
       dbg.push(`Roster sheets: ${rWb.SheetNames.join(', ')}`);
       dbg.push(`Tracker sheets: ${tWb.SheetNames.join(', ')}`);
 
-      // Try Sheet2 first (skill default), then any sheet containing employee data
+      // Pick the MT / Med Tele sheet.
+      // Strategy 1: scan rows 8-14 of each sheet for "TELEMETRY" or "MED.*TEL" in the department line.
+      // Strategy 2: fall back to sheet-name matching ("MT", "MED/TELE", "Med Tele", etc.)
+      // Strategy 3: try Sheet2 first, then first sheet with data (xlsx default).
+      const normSN = n => n.toLowerCase().replace(/[^a-z0-9]/g, '');
+      function sheetHasTelemetry(ws) {
+        if (!ws) return false;
+        for (let r = 8; r <= 14; r++) {
+          const v = getCell(ws, r, 1);
+          if (v && typeof v === 'string' && /TELEMETRY|MED.*TEL/i.test(v)) return true;
+        }
+        return false;
+      }
       let rWs = null, usedSheet = '';
-      const trySheets = rWb.SheetNames.filter(n=>n==='Sheet2').concat(rWb.SheetNames.filter(n=>n!=='Sheet2'));
-      for (const sn of trySheets) {
+      // Strategy 1: department name scan (most reliable for xlsm multi-unit files)
+      const telSheet = rWb.SheetNames.find(n => sheetHasTelemetry(rWb.Sheets[n]));
+      // Strategy 2: sheet name matching
+      const mtByName = !telSheet && rWb.SheetNames.find(n => {
+        const nn = normSN(n);
+        return nn === 'mt' || nn === 'medtele' || nn.startsWith('medtele') ||
+               (nn.startsWith('med') && nn.includes('tele'));
+      });
+      const mtSheet = telSheet || mtByName || null;
+      dbg.push(`MT sheet: ${mtSheet||'(none)'} via ${telSheet?'dept':mtByName?'name':'(none)'}`);
+      const ordered = mtSheet
+        ? [mtSheet, ...rWb.SheetNames.filter(n => n !== mtSheet)]
+        : rWb.SheetNames.filter(n=>n==='Sheet2').concat(rWb.SheetNames.filter(n=>n!=='Sheet2'));
+      for (const sn of ordered) {
         const ws = rWb.Sheets[sn];
         if (!ws) continue;
-        // Quick sanity check: does it have any non-empty cells?
         if (wsMaxRow(ws) > 5) { rWs = ws; usedSheet = sn; break; }
       }
       if (!rWs) throw new Error('Could not read any sheet from the roster file.');
@@ -2343,7 +2366,7 @@ function RosterBuilderModal({ onClose }) {
       const hasRooms = rows.some(r=>r.rooms);
       setResult({ rows, rnCount:rnSeq, cnaCount:cnaSeq, unmatched, shift:shift.toUpperCase(),
         hasHC:hasAnyHC, hasFlt:hasAnyFlt, hasSit:hasAnySit, hasRooms, turnOrder, dbg,
-        rWb, usedSheet, headerRow, nameCol });
+        rWb, usedSheet, headerRow, nameCol, profCol });
       setView('preview');
     } catch(e) {
       setErr((e.message || String(e)) + (dbg.length ? '\n\nDiagnostic:\n'+dbg.join('\n') : ''));
@@ -2372,6 +2395,28 @@ function RosterBuilderModal({ onClose }) {
       if (sn !== result.usedSheet) { delete wb.Sheets[sn]; }
     }
     wb.SheetNames = [result.usedSheet];
+
+    // xlsm MT-sheet remapping: Profile col4→col6, Time col5→col11 (mirrors Python xlsm_remap_sheet)
+    // profCol===4 means we read from an xlsm MT sheet, not Sheet2
+    if (result.profCol === 4) {
+      ws['!merges'] = []; // clear all merged cells first
+      const remapEnd = result.rows.length > 0 ? Math.max(...result.rows.map(r => r.excelRow)) : hdr;
+      for (let ri0 = hdr - 1; ri0 <= remapEnd - 1; ri0++) {
+        const pCell = ws[XLSX.utils.encode_cell({r:ri0, c:3})]; // Profile was at col4 (0-based 3)
+        const tCell = ws[XLSX.utils.encode_cell({r:ri0, c:4})]; // Time was at col5 (0-based 4)
+        // Copy to Sheet2 target positions
+        if (pCell) ws[XLSX.utils.encode_cell({r:ri0, c:5})]  = {...pCell}; // → col6 (0-based 5)
+        else        delete ws[XLSX.utils.encode_cell({r:ri0, c:5})];
+        if (tCell) ws[XLSX.utils.encode_cell({r:ri0, c:10})] = {...tCell}; // → col11 (0-based 10)
+        else        delete ws[XLSX.utils.encode_cell({r:ri0, c:10})];
+        // Clear source cols and unused cols 7-10 (0-based 3,4,6,7,8,9)
+        [3,4,6,7,8,9].forEach(c => delete ws[XLSX.utils.encode_cell({r:ri0, c})]);
+      }
+      // Rename sheet to Sheet2
+      wb.Sheets['Sheet2'] = ws;
+      wb.SheetNames = ['Sheet2'];
+      delete wb.Sheets[result.usedSheet];
+    }
 
     // Strip merged cells that overlap col B(1), M(12), N(13), O(14)
     // for header row and all data rows — so our writes aren't swallowed by merges
@@ -2591,6 +2636,13 @@ function RosterBuilderModal({ onClose }) {
                   <button onClick={downloadExcel} style={{...baseBtn,background:'#15803d',color:'white'}}>⬇ Excel</button>
                   <button onClick={doPrint}        style={{...baseBtn,background:'#0284c7',color:'white'}}>🖨 Print</button>
                 </div>
+              </div>
+
+              <div style={{fontSize:10,color:'var(--text-2)',marginBottom:8,fontFamily:'monospace'}}>
+                Sheet: <b style={{color:'var(--text-1)'}}>{result.usedSheet}</b>
+                {result.dbg && result.dbg.length > 0 && (
+                  <span style={{marginLeft:10,opacity:0.6}}>{result.dbg.slice(0,3).join(' · ')}</span>
+                )}
               </div>
 
               {result.unmatched > 0 && (
