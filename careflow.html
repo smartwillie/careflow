@@ -3233,9 +3233,9 @@ function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, on
     <div
       className={`nurse-card${dragOver&&!trashOver?' drag-over':''}`}
       style={{ borderLeft:`3px solid ${nurse.color}` }}
-      onDragOver={e=>{ e.preventDefault(); if(!trashOver) setDragOver(true); }}
+      onDragOver={e=>{ if(e.dataTransfer.types.includes('nursereorder')) return; e.preventDefault(); if(!trashOver) setDragOver(true); }}
       onDragLeave={e=>{ if(!e.currentTarget.contains(e.relatedTarget)) setDragOver(false); }}
-      onDrop={e=>{ e.preventDefault(); setDragOver(false); onDrop(e,false); }}
+      onDrop={e=>{ if(e.dataTransfer.types.includes('nursereorder')) return; e.preventDefault(); setDragOver(false); onDrop(e,false); }}
     >
       {/* Header row: [dot] [name] [count·TELE·lock] ··flex gap·· [trash] */}
       <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
@@ -4767,6 +4767,8 @@ function App() {
   const [toast, setToast] = useState(null);
   const [newNurseName, setNewNurseName] = useState('');
   const [dragRoomIds, setDragRoomIds] = useState([]);
+  const [draggingNurseId, setDraggingNurseId] = useState(null);
+  const [dragOverNurseId, setDragOverNurseId] = useState(null);
   const [pendingAssignment, setPendingAssignment] = useState(null);
   const [theme, setTheme] = useState(()=>localStorage.getItem('careflow_theme')||'night');
   const [zapLoading,       setZapLoading]       = useState(false);
@@ -5389,6 +5391,21 @@ function App() {
     }, 320); // 320 ms spin — user can see the animation before result lands
   }
 
+  function handleNurseReorderDrop(targetId) {
+    if (!draggingNurseId || draggingNurseId === targetId) return;
+    setNurses(prev => {
+      const arr = [...prev];
+      const from = arr.findIndex(n => n.id === draggingNurseId);
+      const to   = arr.findIndex(n => n.id === targetId);
+      if (from === -1 || to === -1) return prev;
+      const [moved] = arr.splice(from, 1);
+      arr.splice(to, 0, moved);
+      return arr;
+    });
+    setDraggingNurseId(null);
+    setDragOverNurseId(null);
+  }
+
   // Drag from the Unassigned panel — reuses the same nurse-card drop handler
   function handleUnassignedDragStart(roomId, e) {
     e.dataTransfer.setData('roomIds', JSON.stringify([roomId]));
@@ -5636,25 +5653,56 @@ function App() {
               <div style={{ textAlign:'center', color:'var(--text-4)', fontSize:13, marginTop:40 }}>No nurses added yet</div>
             )}
             {nurses.map(nurse=>(
-              <NurseCard key={nurse.id} nurse={nurse}
-                rooms={nurseRooms[nurse.id]||[]}
-                allRooms={rooms}
-                previewIds={dragRoomIds}
-                onRemoveAll={()=>removeAllRooms(nurse.id)}
-                onDrop={(e,trash)=>handleDropOnNurse(nurse.id,e,trash)}
-                onRename={name=>setNurses(prev=>prev.map(n=>n.id===nurse.id?{...n,name}:n))}
-                onToggleShift={()=>setNurses(prev=>prev.map(n=>n.id===nurse.id?{...n,shift:n.shift==='PM'?'AM':'PM'}:n))}
-                onDelete={()=>deleteNurse(nurse.id)}
-                locked={lockedNurses.has(nurse.id)}
-                onToggleLock={()=>setLockedNurses(prev=>{
-                  const next=new Set(prev);
-                  next.has(nurse.id)?next.delete(nurse.id):next.add(nurse.id);
-                  return next;
-                })}
-                showFeedback={zapFeedbackNurses.has(nurse.id)}
-                onFeedbackGood={()=>handleFeedbackGood(nurse.id)}
-                onFeedbackBad={reason=>handleFeedbackBad(nurse.id, reason)}
-              />
+              <div key={nurse.id}
+                draggable
+                onDragStart={e=>{
+                  e.dataTransfer.setData('nurseReorder', nurse.id);
+                  e.dataTransfer.effectAllowed='move';
+                  setDraggingNurseId(nurse.id);
+                }}
+                onDragEnd={()=>{ setDraggingNurseId(null); setDragOverNurseId(null); }}
+                onDragOver={e=>{
+                  if(!e.dataTransfer.types.includes('nursereorder')) return;
+                  e.preventDefault();
+                  e.dataTransfer.dropEffect='move';
+                  if(dragOverNurseId!==nurse.id) setDragOverNurseId(nurse.id);
+                }}
+                onDragLeave={e=>{
+                  if(!e.currentTarget.contains(e.relatedTarget)) setDragOverNurseId(null);
+                }}
+                onDrop={e=>{
+                  if(!e.dataTransfer.types.includes('nursereorder')) return;
+                  e.preventDefault(); e.stopPropagation();
+                  handleNurseReorderDrop(nurse.id);
+                }}
+                style={{
+                  opacity: draggingNurseId===nurse.id ? 0.35 : 1,
+                  borderTop: dragOverNurseId===nurse.id && draggingNurseId!==nurse.id
+                    ? '2px solid var(--accent,#0A84FF)' : '2px solid transparent',
+                  transition: 'opacity 0.15s',
+                  cursor: 'grab',
+                }}
+              >
+                <NurseCard nurse={nurse}
+                  rooms={nurseRooms[nurse.id]||[]}
+                  allRooms={rooms}
+                  previewIds={dragRoomIds}
+                  onRemoveAll={()=>removeAllRooms(nurse.id)}
+                  onDrop={(e,trash)=>handleDropOnNurse(nurse.id,e,trash)}
+                  onRename={name=>setNurses(prev=>prev.map(n=>n.id===nurse.id?{...n,name}:n))}
+                  onToggleShift={()=>setNurses(prev=>prev.map(n=>n.id===nurse.id?{...n,shift:n.shift==='PM'?'AM':'PM'}:n))}
+                  onDelete={()=>deleteNurse(nurse.id)}
+                  locked={lockedNurses.has(nurse.id)}
+                  onToggleLock={()=>setLockedNurses(prev=>{
+                    const next=new Set(prev);
+                    next.has(nurse.id)?next.delete(nurse.id):next.add(nurse.id);
+                    return next;
+                  })}
+                  showFeedback={zapFeedbackNurses.has(nurse.id)}
+                  onFeedbackGood={()=>handleFeedbackGood(nurse.id)}
+                  onFeedbackBad={reason=>handleFeedbackBad(nurse.id, reason)}
+                />
+              </div>
             ))}
           </div>
 
