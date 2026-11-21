@@ -3352,7 +3352,7 @@ function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, on
           if(!r?.occupied) return null;
           return (
             <NurseBadge key={id} room={r}
-              onDragStart={e=>{ e.dataTransfer.setData('badgeRoomId',id); e.dataTransfer.setData('fromNurseId',nurse.id); }}
+              onDragStart={e=>{ e.stopPropagation(); e.dataTransfer.setData('badgeRoomId',id); e.dataTransfer.setData('fromNurseId',nurse.id); }}
             />
           );
         })}
