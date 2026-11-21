@@ -3204,7 +3204,7 @@ function NurseFeedbackStrip({ onGood, onBad, nurseColor }) {
 }
 
 // ── NURSE CARD ────────────────────────────────────────────────────────────────
-function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, onRename, onDelete, locked, onToggleLock, onToggleShift, showFeedback, onFeedbackGood, onFeedbackBad }) {
+function NurseCard({ nurse, rooms, allRooms, previewIds, onGripDragStart, onGripDragEnd, onRemoveAll, onDrop, onRename, onDelete, locked, onToggleLock, onToggleShift, showFeedback, onFeedbackGood, onFeedbackBad }) {
   const [dragOver, setDragOver] = useState(false);
   const [trashOver, setTrashOver] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -3239,7 +3239,7 @@ function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, on
     >
       {/* Header row: [grip] [dot] [name] [count·TELE·lock] ··flex gap·· [trash] */}
       <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
-        <span className="nurse-drag-grip" style={{cursor:'grab',color:'var(--text-4)',fontSize:12,lineHeight:1,userSelect:'none',flexShrink:0}}>⠿</span>
+        <span className="nurse-drag-grip" draggable onDragStart={onGripDragStart} onDragEnd={onGripDragEnd} style={{cursor:'grab',color:'var(--text-4)',fontSize:12,lineHeight:1,userSelect:'none',flexShrink:0}}>⠿</span>
         <div className="nurse-color-dot" style={{ background:nurse.color }}/>
         {/* Name — natural width, no flex:1 so controls sit right beside it */}
         {editing ? (
@@ -5655,14 +5655,6 @@ function App() {
             )}
             {nurses.map(nurse=>(
               <div key={nurse.id}
-                draggable
-                onDragStart={e=>{
-                  if (!e.target.closest || !e.target.closest('.nurse-drag-grip')) return;
-                  e.dataTransfer.setData('nurseReorder', nurse.id);
-                  e.dataTransfer.effectAllowed='move';
-                  setDraggingNurseId(nurse.id);
-                }}
-                onDragEnd={()=>{ setDraggingNurseId(null); setDragOverNurseId(null); }}
                 onDragOver={e=>{
                   if(!e.dataTransfer.types.includes('nursereorder')) return;
                   e.preventDefault();
@@ -5682,13 +5674,14 @@ function App() {
                   borderTop: dragOverNurseId===nurse.id && draggingNurseId!==nurse.id
                     ? '2px solid var(--accent,#0A84FF)' : '2px solid transparent',
                   transition: 'opacity 0.15s',
-                  cursor: 'grab',
                 }}
               >
                 <NurseCard nurse={nurse}
                   rooms={nurseRooms[nurse.id]||[]}
                   allRooms={rooms}
                   previewIds={dragRoomIds}
+                  onGripDragStart={e=>{ e.dataTransfer.setData('nurseReorder', nurse.id); e.dataTransfer.effectAllowed='move'; setDraggingNurseId(nurse.id); }}
+                  onGripDragEnd={()=>{ setDraggingNurseId(null); setDragOverNurseId(null); }}
                   onRemoveAll={()=>removeAllRooms(nurse.id)}
                   onDrop={(e,trash)=>handleDropOnNurse(nurse.id,e,trash)}
                   onRename={name=>setNurses(prev=>prev.map(n=>n.id===nurse.id?{...n,name}:n))}
