@@ -3204,7 +3204,7 @@ function NurseFeedbackStrip({ onGood, onBad, nurseColor }) {
 }
 
 // ── NURSE CARD ────────────────────────────────────────────────────────────────
-function NurseCard({ nurse, rooms, allRooms, previewIds, onGripMouseDown, onRemoveAll, onDrop, onRename, onDelete, locked, onToggleLock, onToggleShift, showFeedback, onFeedbackGood, onFeedbackBad }) {
+function NurseCard({ nurse, rooms, allRooms, previewIds, onGripPointerDown, onRemoveAll, onDrop, onRename, onDelete, locked, onToggleLock, onToggleShift, showFeedback, onFeedbackGood, onFeedbackBad }) {
   const [dragOver, setDragOver] = useState(false);
   const [trashOver, setTrashOver] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -3240,8 +3240,7 @@ function NurseCard({ nurse, rooms, allRooms, previewIds, onGripMouseDown, onRemo
       {/* Header row: [grip] [dot] [name] [count·TELE·lock] ··flex gap·· [trash] */}
       <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
         <span className="nurse-drag-grip"
-          onMouseDown={onGripMouseDown}
-          onMouseUp={()=>{ _gripNurseId=null; }}
+          onPointerDown={onGripPointerDown}
           style={{cursor:'grab',color:'var(--text-4)',fontSize:12,lineHeight:1,userSelect:'none',flexShrink:0}}>⠿</span>
         <div className="nurse-color-dot" style={{ background:nurse.color }}/>
         {/* Name — natural width, no flex:1 so controls sit right beside it */}
@@ -4760,7 +4759,7 @@ function PhoneDirectory({ onClose }) {
 }
 
 // tracks which nurse's grip was last mousedown'd; set before dragstart fires
-let _gripNurseId = null;
+let _sortingNurseId = null;
 
 // ── APP ───────────────────────────────────────────────────────────────────────
 function App() {
@@ -4864,6 +4863,46 @@ function App() {
     const h = e => { if(e.key==='Escape') setSelected(new Set()); };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
+  }, []);
+
+  useEffect(()=>{
+    const onMove = e => {
+      if(!_sortingNurseId) return;
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const wrapper = el?.closest('[data-nurse-id]');
+      const hoverId = wrapper?.dataset.nurseId || null;
+      setDragOverNurseId(prev => prev !== hoverId ? hoverId : prev);
+    };
+    const onUp = e => {
+      if(!_sortingNurseId) return;
+      const fromId = _sortingNurseId;
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      const wrapper = el?.closest('[data-nurse-id]');
+      const targetId = wrapper?.dataset.nurseId || null;
+      _sortingNurseId = null;
+      document.body.style.cursor = '';
+      setDraggingNurseId(null);
+      setDragOverNurseId(null);
+      if(targetId && targetId !== fromId) {
+        setNurses(prev => {
+          const arr = [...prev];
+          const from = arr.findIndex(n => n.id === fromId);
+          const to   = arr.findIndex(n => n.id === targetId);
+          if(from===-1||to===-1) return prev;
+          const [moved] = arr.splice(from,1);
+          arr.splice(to,0,moved);
+          return arr;
+        });
+      }
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
   }, []);
 
   function handleRoomDragStart(id, e) {
@@ -5398,20 +5437,6 @@ function App() {
     }, 320); // 320 ms spin — user can see the animation before result lands
   }
 
-  function handleNurseReorderDrop(targetId) {
-    if (!draggingNurseId || draggingNurseId === targetId) return;
-    setNurses(prev => {
-      const arr = [...prev];
-      const from = arr.findIndex(n => n.id === draggingNurseId);
-      const to   = arr.findIndex(n => n.id === targetId);
-      if (from === -1 || to === -1) return prev;
-      const [moved] = arr.splice(from, 1);
-      arr.splice(to, 0, moved);
-      return arr;
-    });
-    setDraggingNurseId(null);
-    setDragOverNurseId(null);
-  }
 
   // Drag from the Unassigned panel — reuses the same nurse-card drop handler
   function handleUnassignedDragStart(roomId, e) {
@@ -5661,34 +5686,7 @@ function App() {
             )}
             {nurses.map(nurse=>(
               <div key={nurse.id}
-                draggable
-                onDragStart={e=>{
-                  if(e.target!==e.currentTarget) return; // badge drag bubbled — ignore
-                  const id=_gripNurseId; _gripNurseId=null;
-                  if(id!==nurse.id) return; // not from grip
-                  e.dataTransfer.setData('nurseReorder', nurse.id);
-                  e.dataTransfer.effectAllowed='move';
-                  setDraggingNurseId(nurse.id);
-                }}
-                onDragEnd={()=>{
-                  _gripNurseId=null;
-                  setDraggingNurseId(null);
-                  setDragOverNurseId(null);
-                }}
-                onDragOver={e=>{
-                  if(!e.dataTransfer.types.includes('nursereorder')) return;
-                  e.preventDefault();
-                  e.dataTransfer.dropEffect='move';
-                  if(dragOverNurseId!==nurse.id) setDragOverNurseId(nurse.id);
-                }}
-                onDragLeave={e=>{
-                  if(!e.currentTarget.contains(e.relatedTarget)) setDragOverNurseId(null);
-                }}
-                onDrop={e=>{
-                  if(!e.dataTransfer.types.includes('nursereorder')) return;
-                  e.preventDefault(); e.stopPropagation();
-                  handleNurseReorderDrop(nurse.id);
-                }}
+                data-nurse-id={nurse.id}
                 style={{
                   opacity: draggingNurseId===nurse.id ? 0.35 : 1,
                   borderTop: dragOverNurseId===nurse.id && draggingNurseId!==nurse.id
@@ -5700,7 +5698,7 @@ function App() {
                   rooms={nurseRooms[nurse.id]||[]}
                   allRooms={rooms}
                   previewIds={dragRoomIds}
-                  onGripMouseDown={()=>{ _gripNurseId=nurse.id; }}
+                  onGripPointerDown={e=>{ e.preventDefault(); _sortingNurseId=nurse.id; setDraggingNurseId(nurse.id); document.body.style.cursor='grabbing'; }}
                   onRemoveAll={()=>removeAllRooms(nurse.id)}
                   onDrop={(e,trash)=>handleDropOnNurse(nurse.id,e,trash)}
                   onRename={name=>setNurses(prev=>prev.map(n=>n.id===nurse.id?{...n,name}:n))}
