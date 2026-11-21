@@ -5663,8 +5663,9 @@ function App() {
               <div key={nurse.id}
                 draggable
                 onDragStart={e=>{
+                  if(e.target!==e.currentTarget) return; // badge drag bubbled — ignore
                   const id=_gripNurseId; _gripNurseId=null;
-                  if(id!==nurse.id) return;
+                  if(id!==nurse.id) return; // not from grip
                   e.dataTransfer.setData('nurseReorder', nurse.id);
                   e.dataTransfer.effectAllowed='move';
                   setDraggingNurseId(nurse.id);
