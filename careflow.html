@@ -3237,8 +3237,9 @@ function NurseCard({ nurse, rooms, allRooms, previewIds, onRemoveAll, onDrop, on
       onDragLeave={e=>{ if(!e.currentTarget.contains(e.relatedTarget)) setDragOver(false); }}
       onDrop={e=>{ if(e.dataTransfer.types.includes('nursereorder')) return; e.preventDefault(); setDragOver(false); onDrop(e,false); }}
     >
-      {/* Header row: [dot] [name] [count·TELE·lock] ··flex gap·· [trash] */}
+      {/* Header row: [grip] [dot] [name] [count·TELE·lock] ··flex gap·· [trash] */}
       <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:6 }}>
+        <span className="nurse-drag-grip" style={{cursor:'grab',color:'var(--text-4)',fontSize:12,lineHeight:1,userSelect:'none',flexShrink:0}}>⠿</span>
         <div className="nurse-color-dot" style={{ background:nurse.color }}/>
         {/* Name — natural width, no flex:1 so controls sit right beside it */}
         {editing ? (
@@ -5656,6 +5657,7 @@ function App() {
               <div key={nurse.id}
                 draggable
                 onDragStart={e=>{
+                  if (!e.target.closest || !e.target.closest('.nurse-drag-grip')) return;
                   e.dataTransfer.setData('nurseReorder', nurse.id);
                   e.dataTransfer.effectAllowed='move';
                   setDraggingNurseId(nurse.id);
